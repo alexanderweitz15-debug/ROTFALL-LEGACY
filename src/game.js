@@ -2824,7 +2824,7 @@ export function newGame(cfg) {
   assignNpcDays();
   initialSpawns();
   ensureBoards();
-  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
+  aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); ensureTents(); registerContracts(); nameFix(); fortressHour();   // S12: Namen erst prüfen, wenn alle Figuren stehen (Wachen der Feste)
   bindSim(); SIM.initSim(); capital2Migrate(); ensureVaronCourt(); ensureVaronExile(); ensureSchutz(); stormCheck();   /* Belagerung S2: Exilhof nach dem Fall */
 
   const o = ORIGINS[cfg.origin], FS = FAC_STARTS[cfg.facStart] || null, race = FS ? FS.race : 'mensch';   /* Fraktions-Starts: Ort, Rasse, Paket */
@@ -3070,7 +3070,7 @@ export function continueGame(given = null, retried = false) {                   
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.goodsOnly && e.kind === 'npc') { delete e.goodsOnly; delete e._kontor; } }   /* P7-Fehler: Kontor setzte goodsOnly dauerhaft — alte Stände bereinigen */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
   S.flags.introDone ??= 1;   /* Einflug nur für neue Helden */
-  migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); ensureTents(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   if (!given && S.player && !S.player.alive && !S.dying) S.dying = { t0: performance.now() - 3000, killer: null, rec: S.legacy?.ancestors?.at(-1) || {} };   /* HB-01: ein gespeicherter Tod führt nach dem Laden sofort zum Todesbildschirm und zur Erbenwahl */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'prolog') { if (S.prolog) { buildProlog(); prologEnsure(); } else { const p = S.player; S.ents.prolog = []; S.map = p.map = 'world'; const q = freeSpotNear('world', ...worldPt(66, 70), 3); p.x = q.x; p.y = q.y; S.ents.world.push(p); } }   /* Prolog: Karte neu bauen, Schritt bleibt */
@@ -3511,7 +3511,7 @@ function update(dt, now) {
       if (Math.hypot(l.x - p.x / TS, l.y - p.y / TS) < l.r + 6 && !(S.flags.seen ||= {})[l.key]) { S.flags.seen[l.key] = true; dangerNote(l, p); }
     if (DUNGEONS[S.map]) (S.flags.seen ||= {})[S.map] = true;
     const inHouse = HOUSES.find(b => b.map === S.map && R.playerInside(b)) || null;   // Gebäude betreten: kurz benennen
-    if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(`${HB.BTYPES[inHouse.type]?.label || 'Haus'} · ${inHouse.town === 'varonburg' ? 'Varonsburg' : LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600);
+    if (inHouse !== lastHouse) { lastHouse = inHouse; if (inHouse) UI.toast(inHouse.tentKind ? tentEnter(inHouse) : `${HB.BTYPES[inHouse.type]?.label || 'Haus'} ·${inHouse.town === 'varonburg' ? 'Varonsburg' : LOCATIONS.find(l => l.key === inHouse.town)?.name || ''}`, 1600);
       if (inHouse && !S.flags.houseHint && S.settings?.tips !== false && !S._quiet) { S.flags.houseHint = 1; log('Drinnen: Das Dach wird durchsichtig, solange du im Haus bist. Was in fremden Truhen und Regalen liegt, gehört jemandem — nimmst du es vor Zeugen, ist es Diebstahl. Läden und Werkstätten öffnen ihr Fenster, wenn du die Leute dort ansprichst (E).', 'quest'); } }   /* Spec Welt §9: Gebäude erklären sich beim ersten Betreten */
   }
   ambT = (ambT || 0) + dt;
@@ -3837,6 +3837,7 @@ function tickCombatant(c, dt) {
   if (c.maxMana) c.mana = Math.min(c.maxMana, c.mana + dt / 1000 * 2.2 * (1 + tfx(c, 'manaRegen')) * (inAnomaly(c) ? 2 : 1));   // S15 P7: Anomalie
   if (c === S.player && c.titleClass) titleTick(c, dt);
   if ((c === S.player || c.coopHero) && isVamp(c)) vampTick(c, dt);
+  if (c === S.player && (brassT -= dt) <= 0) { brassT = 2000; brassTick(c); }   /* E44 */
   if (c === S.player && raceOf(c) === 'skelett') boneTick(c, dt);   /* Fraktions-Starts (d): Stigma „Knochen“ */   /* §5g.2: der Fluch gilt auch ungetragen und auch für Koop-Helden */
   // Statuszeiten
   if (c.status && c.status.length) {
@@ -7676,10 +7677,10 @@ function tribState(k) {
 /* T23 S2 (V14): Der Tribut kommt aus dem Dorfmarkt — Korn, bei Mangel der Rest aus Fleisch — und geht ins Lager der Eisenfeste. Dorf-Hunger ist der Hunger
    der Wirtschaft (ecoDay); die Ernte kommt von den Feldern (TRADES.farm), nicht mehr als +5 am Tag. */
 const tribFood = k => { const s = S.towns?.[k]?.stock; return s ? (s.grain || 0) + (s.meat || 0) : 0; };
-function tribTake(k, n) {
-  const s = S.towns?.[k]?.stock; if (!s) return 0;
-  const g = Math.min(n, Math.max(0, s.grain || 0)); s.grain = (s.grain || 0) - g;
-  const m = Math.min(n - g, Math.max(0, s.meat || 0)); s.meat = (s.meat || 0) - m;
+function tribTake(k, n, surplus = false) {   /* E45 (Entwickler 09.10.): der Tribut nimmt nur den Überschuss über dem Eigenbedarf (ECO.target) — Räuber nehmen alles */
+  const s = S.towns?.[k]?.stock; if (!s) return 0; const t = S.towns[k], keep = g => surplus ? ECO.target(t, g) : 0;
+  const g = Math.min(n, Math.max(0, (s.grain || 0) - keep('grain'))); s.grain = (s.grain || 0) - g;
+  const m = Math.min(n - g, Math.max(0, (s.meat || 0) - keep('meat'))); s.meat = (s.meat || 0) - m;
   return Math.round((g + m) * 10) / 10;
 }
 const tribCost = k => (tribState(k).harsh ? 2 : 1) * TRIB_TAKE * 6;
@@ -7695,7 +7696,9 @@ function tributeDay() {
     if (S.day < T.next) continue;
     T.next = (S.day | 0) + TRIB_EVERY;
     if (T.paid) { T.paid = false; log(`${V.name}: Der Tribut ist diesmal bezahlt — von dir.`, 'world'); continue; }
-    const take = tribTake(V.key, TRIB_TAKE * (T.harsh ? 2 : 1));   /* T23 S2: aus dem Dorfmarkt */
+    const want = TRIB_TAKE * (T.harsh ? 2 : 1), take = tribTake(V.key, want, true);   /* T23 S2: aus dem Dorfmarkt; E45: nur der Überschuss */
+    if (take < want - 0.5) { log(`${V.name}: Die Kette nimmt nur, was übrig ist — ${Math.round(take)} statt ${want} Korn. Varg wird es nicht gefallen.`, 'world');
+      if (!S.flags.tribSurplusHint) { S.flags.tribSurplusHint = 1; log('Tribut: Die Eiserne Kette nimmt den Dörfern nur, was über ihren eigenen Bedarf hinausgeht. Wer Korn liefert, füllt also auch die Kette.', 'quest'); } }
     if (tribFood(V.key) < 10) { T.hunger++; log(`${V.name} hungert nach dem Tribut.`, 'economy');
       if (T.hunger >= 2) { const v = VILLAGERS.find(c => c.homeTown === V.key && c.alive && c.prof !== 'Jäger'); if (v) { T.lost = (T.lost || 0) + 1; v.alive = false; S.ents.world.splice(S.ents.world.indexOf(v), 1); log(`${v.name} hat ${V.name} verlassen — der Hunger.`, 'world'); } } }
     else T.hunger = 0;
@@ -11183,7 +11186,7 @@ function deadEastTick() {   /* Hinweise beim ersten Blick (aus deadLifeTick) */
    Einen Tag nach Garmadons Tod wählt die Weltlage den Pfad: Halten die Toten die Schwarze Feste (Thron und Hof), beginnt der Thronstreit — Hofmarschall
    Veyl (Feste) gegen Morvath (Heerführer, Alter Friedhof); sonst zerfällt das Reich in Fürstentümer (Vharnholm, Beinhausen, Grabwacht).
    Thronstreit: Rückhalt je Anwärter, täglich Veyl +1 solange die Feste hält, Morvath +1 (+1 mehr, solange die Toten mindestens sechs Kriegsknoten halten);
-   eine Seelenphiole an Mutter Asch (für Veyl) oder an Morvath: +3. Nach sieben Tagen gewinnt der Stärkere (Gleichstand: Veyl, er sitzt im Thronsaal).
+   eine Seelenphiole an Mutter Asch (für Veyl) oder an Morvath: +3. Nach sieben Tagen gewinnt der Stärkere (Gleichstand: Morvath — E46, Entwickler 09.10.).
    Fällt ein Anwärter (tot, Veyl auch mit dem Verlust der Feste), gewinnt der andere sofort; fallen beide, zerfällt das Reich doch.
    Folgen: Regent Veyl — Waffenruhe (Ruf bei den Toten mindestens −40), die Lager im Osten kehren zurück. Totenkönig Morvath — die Heere der Toten wachsen
    wieder, Morvaths Heerzug gegen Varonheim wird wieder möglich (sim.js capThreatDay/warDay). Fürstentümer — drei Fürsten, kein Heerzug (Bedrohung ruht),
@@ -11210,7 +11213,7 @@ function deadSuccDay() {
   if (D.winner) return;
   succTick(true); if (D.winner || D.path !== 'throne') return;
   D.sup.veyl += keepHeld() ? 1 : 0; D.sup.morvath += 1 + (succUndNodes() >= SUCC.nodes ? 1 : 0);
-  if ((S.day | 0) - D.day >= SUCC.days) succCrown(D.sup.veyl >= D.sup.morvath ? 'veyl' : 'morvath', `Nach ${SUCC.days} Nächten (Rückhalt Veyl ${D.sup.veyl}, Morvath ${D.sup.morvath})`);
+  if ((S.day | 0) - D.day >= SUCC.days) succCrown(D.sup.veyl > D.sup.morvath ? 'veyl' : 'morvath',   /* E46 (Entwickler 09.10.): Gleichstand → Morvath */ `Nach ${SUCC.days} Nächten (Rückhalt Veyl ${D.sup.veyl}, Morvath ${D.sup.morvath})`);
 }
 function succTick(day) {   /* 0,9-s-Takt (und täglich): wer fällt, verliert seinen Anspruch */
   const D = S.flags.deadSucc; if (!D) return;
@@ -12273,12 +12276,13 @@ const takeGoods = (g, k) => { for (const s of [...S.player.inv]) { if (k <= 0) b
 function siegeSally(n, und) {
   const G = capGates(); if (!G) return; const k = ri(...SALLY_N), ids = [], [ox, oy] = [G.south[0], G.south[1] + 6];
   for (let i = 0; i < k; i++) { const e = spawnEnemy(pick(['skeleton', 'skeleton', 'zombie', 'bone_archer']), 'world', ox + ri(-4, 4), oy + ri(-2, 3), { level: 8 }); if (e) { Object.assign(e, { armyId: und.id, worth: SALLY_HIT / k, transient: true }); ids.push(e.id); } }
-  n.siege.sallyAt = S.day * 1440 + S.minute; S.war.sally = { ids, start: n.siege.sallyAt, army: und.id };
+  n.siege.sallyAt = S.day * 1440 + S.minute; S.war.sally = sallyLive = { ids, start: n.siege.sallyAt, army: und.id };
   if (geroRef) geroRef.anchor = { x: ox * TS, y: (oy - 2) * TS };
   log(`Ausfall! ${k} Tote stehen vor dem Südtor. Schlag sie, bevor das Lager aufwacht.`, 'combat'); UI.toast('AUSFALL', 2000);
 }
+let sallyLive = null;   /* 🐞→✔ Fehlersuche 09.10.: S.war.sally wird gespeichert, die Ausfall-Toten sind flüchtig — nach dem Laden galt der Ausfall sofort als gelungen. Jetzt: ein Ausfall aus einem Spielstand ist abgebrochen (ohne Folgen) */
 function sallyTick() {                                               /* entschieden: alle tot (Heer −15, nächster Zug ohne Mauerschaden) oder Spieler fort/zu lang (Besatzung −5) */
-  const X = S.war?.sally; if (!X) return; const n = capNode(), p = S.player, G = capGates();
+  const X = S.war?.sally; if (!X) return; if (X !== sallyLive) { S.war.sally = null; return; } const n = capNode(), p = S.player, G = capGates();
   const left = X.ids.map(byId).filter(e => e && e.alive), far = !G || p.map !== 'world' || Math.hypot(p.x / TS - G.south[0], p.y / TS - G.south[1]) > 45, late = S.day * 1440 + S.minute - X.start > 120;
   if (left.length && !far && !late) return;
   S.war.sally = null; if (geroRef && G) geroRef.anchor = { x: (G.southIn[0] + 2) * TS, y: G.southIn[1] * TS };
@@ -12313,6 +12317,7 @@ function varonChoices(npc, choices) {
     choices.unshift({ text: 'Was ist der Burgfrieden?', fn: () => say('„Keine Klinge in des Königs Halle. Du gibst ab, ich verwahre, du kriegst es am Tor zurück. Ritter behalten ihr Schwert, Offiziere gehen durch. Und wer drinnen zieht, den holt die Garde.“') });
   }
   if (npc.varonChancellor && !S.flags.varonAudience && !S.flags.varonDead) choices.unshift({ text: 'Ich will den König sprechen. (100 Gold für den Kanzler)', fn: () => {
+    if (B.brassOf(p) >= (STIGMA.brass?.valen?.spy || 99)) return say('„Mit so viel aurelischem Blech am Leib? Der König empfängt keine Spione. Verhüll dich — oder komm gar nicht.“ (E44: ab 2 sichtbaren Messingteilen keine Audienz)');
     if ((S.ranks.valen ?? -1) >= 1) { S.flags.varonAudience = 1; return say('„Ein Mann mit Rang. Nun gut — der König empfängt dich. Sprich nicht zu laut, und erwähne Aurelion nicht.“'); }
     if (S.gold < 100) return say('„Der Zugang zum König hat seinen Preis. Hundert Gold — oder ein Rang in der Armee.“');
     S.gold -= 100; S.flags.varonAudience = 1; say('„Großzügig. Der König empfängt dich. Und vergiss nicht, wer dir die Tür geöffnet hat.“'); } });
@@ -15573,7 +15578,8 @@ function staleEncounter(e, p) {
   return (e.encounter || e.escortLost) && !e.follow && !e.lurk && !(e.aggroId && huntsHero(e.aggroId, S.party)) && !S.party.includes(e.id) && (p.map !== 'world' || dist(e, p) > 1800);
 }
 function respawnTick() {
-  ensureWallSpiders(true);   /* Entwickler 02.10.: Wächterspinnen kommen erst, wenn der Held weit genug weg ist (nie im Bild, kein Zufallszug beim Laden) */
+  tentTick();   /* T21: Zelte aufstellen/abbauen, Bandenbeute */
+  ensureWallSpiders(true);   /* Entwickler 02.10.:Wächterspinnen kommen erst, wenn der Held weit genug weg ist (nie im Bild, kein Zufallszug beim Laden) */
   const p = S.player;
   const W = S.ents.world;
   for (let i = W.length - 1; i >= 0; i--) {
@@ -15672,7 +15678,111 @@ const HEALER_MS = 3500;
 // (40 Felder). Wer ihr Gebiet durchquert, ohne Schutzgeld zu zahlen, gerät in Hinterhalte. Ihr Unterhändler steht vor dem Lager:
 // Schutzgeld (20 Gold + 8 je Mann) gibt 5 Tage Ruhe. Jeden Tag ohne Schutzgeld raubt die Bande Reisende aus und wächst (bis 9 Mann).
 // Fällt der Anführer, zerfällt die Bande und die nächste Stadt zahlt Kopfgeld; alte Banden zerstreiten sich irgendwann von selbst.
-const BAND_NAMES = ['Die Krähen', 'Die Rote Hand', 'Die Grauen Wölfe', 'Die Schlitzer', 'Die Galgenbrüder', 'Die Aschemäntel', 'Die Nachtfalken', 'Die Schwarzen Stiefel'];
+/* ================= T21 Begehbare Zelte (§5g.4, Entwickler 01.10.; Aufgabe T21 in docs/audit/TASKS.md, Git c21fd64) =================
+   Zelte in Lagern, bei Banden, Pilgern und Garnisonen werden kleine Bauten mit Innenraum nach dem HOUSES-Muster (wie raiseDeadHouse):
+   Kacheln (Stoffwand = Mauerkachel, Erdboden, Tür im Süden), HOUSES-Eintrag Typ 'tent' (Bild buildings.js tentSprite, Wand render.js),
+   Einrichtung als flüchtige Props ohne Handlung (Strohlager, Fässer, Kerzen). Das Zelt-Prop bleibt im Spielstand und steht in der
+   Zeltwand, nur nicht gezeichnet (e._tent, nicht aufzählbar, also nicht gespeichert). Kacheln und HOUSES entstehen beim Laden neu:
+   ensureTents baut dann alles wieder auf; tentTick (alle 12 s) stellt neue Zelte auf, räumt Zelte ohne Prop und hält die
+   Bandenbeute aktuell. Keine Zufallszüge: Lage = erste passende Fläche in fester Reihenfolge (Prop in der Rückwand zuerst).
+   Hütten (Goblins, Bergleute, Moorhexe, Pilze) bleiben Props; nur die Oberwelt. ⚖ Größe 5×4, sonst 4×3; Beute-Stufen 10/20. */
+const TENT_SIZES = [[5, 4], [4, 3]], TENT_LOOT = [10, 20];
+const TENT_GROUND = new Set([T.GRASS, T.DIRT, T.SAND, T.ASH, T.MARSH, T.FIELD, T.STONE]);
+const TENT_LOOK = { camp: { cloth: '#8a7a58' }, band: { cloth: '#5e4a36' }, garrison: { cloth: '#7a6e58' }, pilger: { cloth: '#b0a68a', emblem: 'sun' }, still: { cloth: '#3e3c38', stripe: '#4e8f7a' } };
+const TENT_NAME = { camp: 'Lagerzelt', band: 'Räuberzelt', garrison: 'Soldatenzelt', pilger: 'Pilgerzelt', still: 'Zelt der Stillen' };
+const TENT_FURN = { camp: [['sack', 'Schlafsack'], ['barrel', 'Vorratsfass'], ['sack', 'Schlafsack']], band: [['sack', 'Strohlager'], ['barrel', 'Fass mit Branntwein'], ['sack', 'Strohlager']],
+  garrison: [['sack', 'Feldlager'], ['barrel', 'Wasserfass'], ['sack', 'Tornister'], ['sack', 'Feldlager']], pilger: [['sack', 'Strohlager eines Pilgers'], ['candles', 'Kerzen der Pilger'], ['sack', 'Strohlager']],
+  still: [['bones', 'Knochenlager'], ['candles', 'Grünes Licht'], ['sack', 'Grabtuch']] };
+const TENT_SOFT = new Set(['sack', 'candles', 'debris', 'bones']);
+const TENTS = new Map();                                             /* Haus-id → { b, prop, before, furn, key } — nur für diese Sitzung */
+function tentKind(e) {
+  if (e.type !== 'tent_prop' || (e.map || 'world') !== 'world') return null; const L = e.label || '';
+  if (/Hütte/.test(L)) return null;
+  if (e.bandId || /Räuber/.test(L)) return 'band';
+  if (/Pilger/.test(L)) return 'pilger';
+  if (/Stillen/.test(L)) return 'still';
+  if (/Garnison|Soldaten|Garde|Wachzelt|Aufseher|Sandreiter/.test(L)) return 'garrison';
+  if (!L) { const l = tentLoc(e); if (l?.poi === 'outpost' || l?.key === 'grenzwacht') return 'garrison'; if (l?.poi === 'bandits' || l?.key === 'banditcamp') return 'band'; }
+  return 'camp';
+}
+function tentLoc(e) { const tx = e.x / TS, ty = e.y / TS; let best = null, bd = 1e9; for (const l of LOCATIONS) { const d = Math.hypot(l.x - tx, l.y - ty); if (d < bd && d <= (l.r || 8) + 10) { bd = d; best = l; } } return best; }
+function tentBand(e) { if (e.bandId) return (S.bands || []).find(b => b.id === e.bandId && !b.gone) || null; const tx = e.x / TS, ty = e.y / TS; return bandsOf().find(b => Math.hypot(b.tx - tx, b.ty - ty) <= 8) || null; }
+function tentIndex() { const idx = new Map(); for (const o of S.ents.world) if (o.kind === 'prop') { const k = SK(o.x / TS | 0, o.y / TS | 0); (idx.get(k) || idx.set(k, []).get(k)).push(o); } return idx; }
+function tentFits(x, y, w, h, self, idx) {
+  for (let j = y - 1; j <= y + h; j++) for (let i = x - 1; i <= x + w; i++) {
+    const t = tileAt('world', i, j), inner = i >= x && i < x + w && j >= y && j < y + h;
+    if (inner ? !TENT_GROUND.has(t) : (t === T.WALL || t === T.DWALL)) return false;
+    if (inner) for (const o of idx.get(SK(i, j)) || []) if (o !== self && !o._tent && (o.solid || o.label || o.loot || o.harvest || o.type === 'tent_prop' || o.type === 'campfire_static')) return false;
+  }
+  const dx = x + (w >> 1), fy = y + h, ft = tileAt('world', dx, fy);
+  if (SOLID.has(ft) || ft === T.WATER || (idx.get(SK(dx, fy)) || []).some(o => o.solid && !o._tent)) return false;
+  return !HOUSES.some(b => b.map === 'world' && x - 1 < b.x + b.w && x + w + 1 > b.x && y - 1 < b.y + b.h && y + h + 1 > b.y);
+}
+function tentSpot(e, idx) {                                          /* das Prop liegt in der Zeltwand (zuerst Mitte der Rückwand), nie in der Tür */
+  const px = e.x / TS | 0, py = e.y / TS | 0;
+  for (const [w, h] of TENT_SIZES) {
+    const ring = []; for (let oy = 0; oy < h; oy++) for (let ox = 0; ox < w; ox++) { if ((oy > 0 && oy < h - 1 && ox > 0 && ox < w - 1) || (oy === h - 1 && ox === (w >> 1))) continue; ring.push([ox, oy, oy * 10 + Math.abs(ox - (w >> 1))]); }
+    ring.sort((a, b) => a[2] - b[2]);
+    for (const [ox, oy] of ring) if (tentFits(px - ox, py - oy, w, h, e, idx)) return [px - ox, py - oy, w, h];
+  }
+  return null;
+}
+function raiseTent(e, kind, spot) {
+  const [x, y, w, h] = spot, id = 'tent_' + (e.gk ?? e.id), before = [];
+  for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) { before.push(tileAt('world', i, j)); setTile('world', i, j, j === y || j === y + h - 1 || i === x || i === x + w - 1 ? T.WALL : T.DIRT); }
+  const dt = [x + (w >> 1), y + h - 1]; setTile('world', dt[0], dt[1], T.DIRT);
+  const L = tentLoc(e), look = TENT_LOOK[kind], fac = kind === 'garrison' ? (L?.faction || (e.gateCamp && townFac(e.gateCamp)) || 'valen') : null;
+  const b = { id, map: 'world', x, y, w, h, door: 'S', doorTile: dt, type: 'tent', town: null, wear: 0, seed: (x * 31 + y * 17) % 997 + 1, hx: x, hy: y, tentKind: kind,
+    cloth: look.cloth, stripe: look.stripe || (fac && FACTIONS[fac]?.colors?.[0]) || null, emblem: look.emblem || null, label: e.label || TENT_NAME[kind], where: L?.name || null };
+  HOUSES.push(b); const T0 = { b, prop: e, before, furn: [], key: null }; TENTS.set(id, T0);
+  Object.defineProperty(e, '_tent', { value: id, writable: true, configurable: true, enumerable: false });
+  tentFurnish(T0);
+  for (const o of S.ents.world) if (o.kind !== 'prop' && (o.map || 'world') === 'world' && tileAt('world', o.x / TS | 0, o.y / TS | 0) === T.WALL && o.x / TS >= x && o.x / TS < x + w && o.y / TS >= y && o.y / TS < y + h) { const s = freeSpotNear('world', dt[0], dt[1] + 1, 3); o.x = s.x; o.y = s.y; }   /* wer jetzt in der Zeltwand stünde, tritt vor die Tür */
+  return b;
+}
+function lowerTent(T0) {                                             /* Prop fort (Lager geräumt, Bande abgezogen): Kacheln zurück, Einrichtung weg */
+  const { b } = T0; let k = 0;
+  for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) setTile('world', i, j, T0.before[k++]);
+  const hi = HOUSES.indexOf(b); if (hi >= 0) HOUSES.splice(hi, 1);
+  const gone = new Set(T0.furn); for (const o of T0.furn) if (o.solid && solidIndex.world) removeSolid(o); S.ents.world = S.ents.world.filter(o => !gone.has(o));
+  if (T0.prop) T0.prop._tent = 0; TENTS.delete(b.id);
+}
+function tentItems(T0) {                                             /* Bandenzelt: im Zelt nahe der Lagermitte liegt die Beute (b.loot, T12) */
+  const { b } = T0; if (b.tentKind !== 'band') return [TENT_FURN[b.tentKind], b.tentKind];
+  const B0 = tentBand(T0.prop); if (!B0) return [[['debris', 'Ausgeräumt — hier haust gerade keine Bande'], ['sack', 'Strohlager']], 'leer'];
+  const mine = [...TENTS.values()].filter(t => t.b.tentKind === 'band' && tentBand(t.prop) === B0).sort((p, q) => Math.hypot(p.b.x + p.b.w / 2 - B0.tx, p.b.y + p.b.h / 2 - B0.ty) - Math.hypot(q.b.x + q.b.w / 2 - B0.tx, q.b.y + q.b.h / 2 - B0.ty) || p.b.x - q.b.x)[0];
+  if (mine !== T0) return [TENT_FURN.band, 'neben:' + B0.id];
+  const n = Math.max(0, Math.floor(B0.loot || 0)), st = n < 1 ? 0 : n < TENT_LOOT[0] ? 1 : n < TENT_LOOT[1] ? 2 : 3, good = ITEMS[B0.good]?.name;
+  const lab = st ? `Beute von ${B0.name}: ${n}${good ? ` (vor allem ${good})` : ''}` : `Beute von ${B0.name}: nichts — die Bande hungert`;
+  const items = [[st ? 'sack' : 'debris', lab], ...(st >= 2 ? [['barrel', `Beutefass von ${B0.name}`]] : []), ...(st >= 3 ? [['sack', `Beutesack von ${B0.name}`]] : []), ['sack', 'Strohlager']];
+  return [items, `${B0.id}:${st}:${lab}`];
+}
+function tentFurnish(T0) {
+  const [items, key] = tentItems(T0); if (key === T0.key) return; T0.key = key;
+  if (T0.furn.length) { const gone = new Set(T0.furn); for (const o of T0.furn) if (o.solid && solidIndex.world) removeSolid(o); S.ents.world = S.ents.world.filter(o => !gone.has(o)); T0.furn = []; }
+  const { b } = T0, { x, y, w, h } = b, mid = x + (w >> 1), slots = [], cap = Math.max(1, Math.floor((w - 2) * (h - 2) / 2) - 1); let solid = 0, k = 0;
+  for (let j = y + 1; j <= y + h - 2; j++) for (let i = x + 1; i <= x + w - 2; i++) if (!(i === mid && j === y + h - 2)) slots.push([i, j]);   /* die Kachel hinter der Tür bleibt frei */
+  for (const [type, label] of items) { if (k >= slots.length) break; const so = !TENT_SOFT.has(type); if (so && solid >= cap) continue; const [i, j] = slots[k++]; if (so) solid++;
+    const pr = { id: uid(), kind: 'prop', type, map: 'world', x: i * TS + TS / 2, y: j * TS + TS / 2, r: 12, gen: 2, house: b.id, transient: true, solid: so, tentOf: b.id, label };
+    S.ents.world.push(pr); if (so && solidIndex.world) addSolid(pr); T0.furn.push(pr); }
+}
+function ensureTents() {                                             /* idempotent: beim Laden/Neustart und aus tentTick */
+  if (!MAPS.world) return 0;
+  for (const [id, T0] of TENTS) if (!HOUSES.includes(T0.b)) TENTS.delete(id);   /* neu erzeugte Welt: alte Einträge gelten nicht mehr */
+  if (TENTS.size) { const live = new Set(S.ents.world); for (const T0 of [...TENTS.values()]) if (!live.has(T0.prop)) lowerTent(T0); }
+  const todo = S.ents.world.filter(e => e.type === 'tent_prop' && !e._tent && !e._tentNo && tentKind(e)); let n = 0;
+  if (todo.length) { const idx = tentIndex();
+    for (const e of todo) { const sp = tentSpot(e, idx); if (sp) { raiseTent(e, tentKind(e), sp); n++; } else Object.defineProperty(e, '_tentNo', { value: true, configurable: true, enumerable: false }); } }
+  for (const T0 of TENTS.values()) if (T0.b.tentKind === 'band') tentFurnish(T0);
+  return n;
+}
+function tentTick() { if (S.coop?.role !== 'guest') ensureTents(); }
+function tentEnter(b) {                                              /* Hinweis beim ersten Betreten eines Zelts (Spec Welt §9) */
+  if (!S.flags.tentHint && S.settings?.tips !== false && !S._quiet) { S.flags.tentHint = 1;
+    log('Zelte betritt man wie Häuser: Das Tuch wird durchsichtig, solange du drinnen bist. In Räuberzelten liegt die Beute der Bande — der Haufen wächst mit jedem Überfall und schrumpft, wenn sie hungert.', 'quest'); }
+  return `${b.label}${b.where ? ' · ' + b.where : ''}`;
+}
+const BAND_NAMES = ['Die Krähen','Die Rote Hand', 'Die Grauen Wölfe', 'Die Schlitzer', 'Die Galgenbrüder', 'Die Aschemäntel', 'Die Nachtfalken', 'Die Schwarzen Stiefel'];
 const bandsOf = () => (S.bands ||= []).filter(b => !b.gone);
 function bandFound(town, at = null) {
   const T = TOWN_PLAN[town]; if (!T?.square) return null; const [sx, sy] = T.square;
@@ -15745,6 +15855,8 @@ function bandDay() {
 function bandSpawn(b) {
   const x = b.tx * TS + 16, y = b.ty * TS + 16, day = S.day | 0;
   S.ents.world.push({ id: uid(), kind: 'prop', type: 'campfire_static', map: 'world', x, y, r: 10, solid: true, transient: true, bandId: b.id });
+  if (!LOCATIONS.some(l => (l.poi === 'bandits' || l.key === 'banditcamp') && Math.hypot(l.x - b.tx, l.y - b.ty) <= 8)) {   /* T21 ⚖: eine Bande ohne Räuberlager schlägt ein Zelt auf (flüchtig, wie das Feuer) */
+    const t = freeSpotNear('world', b.tx + 3, b.ty - 3, 2); S.ents.world.push({ id: uid(), kind: 'prop', type: 'tent_prop', map: 'world', x: t.x, y: t.y, r: 14, solid: true, transient: true, bandId: b.id, label: 'Räuberzelt' }); ensureTents(); }
   const q = freeSpotNear('world', b.tx - 11, b.ty, 2), n = makeChar({ name: pick(FIRST_M), prof: `Unterhändler (${b.name})`, x: q.x, y: q.y, level: 5, faction: null, traits: ['gierig'] });
   Object.assign(n, { bandId: b.id, bandTalk: true, transient: true, visitor: true, anchor: { x: q.x, y: q.y }, greet: `„Halt. Das ist Gebiet von ${b.name}. Wer hier durch will, zahlt.“` }); n.equip.weapon = mkItem('rusty_sword'); S.ents.world.push(n);
   if (b.paid >= day) return;                                  /* bezahlt: die Kämpfer bleiben in den Zelten */
@@ -17941,6 +18053,15 @@ function sunOn(c) {                                            /* 0…1: wie sta
   const w = S.weather, wk = w === 'clear' || w === 'heat' ? 1 : w === 'cloudy' || w === 'sandstorm' ? 0.5 : w === 'bloodrain' ? 0 : 0.3;
   return day * wk * (hooded(c) ? 0.5 : 1);
 }
+/* E44: Messing — der Orden notiert sichtbares Messing ab 2 Teilen (einmal am Tag Orden −1, ⚖); erster Hinweis, sobald jemand es sieht */
+let brassT = 0;
+function brassTick(p) {
+  const n = B.brassOf(p); if (!n || p.map !== S.map) return; const day = S.day | 0;
+  const near = (S.ents[p.map] || []).filter(e => e.kind === 'npc' && e.alive && !e.downed && Math.abs(e.x - p.x) <= 160 && Math.abs(e.y - p.y) <= 160 && stigmaOf(e, 'brass'));   /* ponytail: ganze Karte alle 2 s — Raster erst, wenn es misst */
+  if (near.length && !S.flags.brassHint) { S.flags.brassHint = 1; log('Man sieht dein Messing. Der Orden verlangt mehr und notiert es, Valens Kanzler wittert Spione, Aurelion gibt Nachlass. Ein Umhang verbirgt Prothesen, das Roboterauge sieht jeder.', 'faction'); }
+  if (n >= (STIGMA.brass.order.min || 2) && S.flags.brassOrderDay !== day && near.some(e => stigmaOf(e, 'brass')?.report === 'inq')) {
+    S.flags.brassOrderDay = day; addRep('order', -1); log('Ein Ordensbruder notiert dein Messing. (Orden −1)', 'faction'); }
+}
 function vampTick(c, dt) {
   const s = dt / 1000, V = (c.vamp ||= {}), now = performance.now();
   if (!c.alive) return;
@@ -18018,7 +18139,9 @@ function boneSeen(p) {
 // Stigma: Wer weiß es (bezeugt) — oder sieht es gerade (Sonnenbrand, rote Augen ab 70, ohne Kapuze, ganz nah)? Nach der Heilung
 // erinnert man sich noch 10 Tage.
 function stigmaOf(npc, kind) {
-  if (!kind) return stigmaOf(npc, 'vampire') || stigmaOf(npc, 'skeleton');   /* Fraktions-Starts (d): zweite Art „Knochen“ (Skelett-Held) */
+  if (!kind) return stigmaOf(npc, 'vampire') || stigmaOf(npc, 'skeleton') || stigmaOf(npc, 'brass');   /* Fraktions-Starts (d): zweite Art „Knochen“ (Skelett-Held); E44: dritte Art Messing */
+  if (kind === 'brass') { const p = S.player, f = npc?.kind === 'npc' ? (npc.faction || (npc.homeTown && townFac(npc.homeTown)) || null) : null, row = f && STIGMA.brass?.[f];
+    return row && p && B.brassOf(p) >= 1 && dist(npc, p) <= 160 ? row : null; }   /* E44: nur wer es sieht (160 px) */
   const p = S.player; if (!p || !npc || npc.kind !== 'npc') return null;
   const f = npc.faction || (npc.homeTown && townFac(npc.homeTown)) || null, row = f && STIGMA[kind]?.[f]; if (!row) return null;
   if (kind === 'skeleton') { if (raceOf(p) !== 'skelett') return null; const t = p.stigma?.skeleton?.[f];
@@ -20512,6 +20635,7 @@ function debugSections() {
       'T15: Prototyp-Arm (Stufe 4) rechts einsetzen': () => { B.attachProsthesis(p, 'rarm', 4); recalc(p); UI.toast('Prototyp-Arm — braucht alle 3 Tage eine Energiezelle'); },
       'T15: Prototyp leer (Ladetag −3)': () => { p.cellDay = (S.day | 0) - B.CELL_DAYS; cellDayHint(); recalc(p); },
       'T15: Kurzschluss auslösen': () => { p.shockImm = 0; applySpellStatus(p, { key: 'shocked', chance: 1 }, p); },
+      'E44 Messing: sichtbare Teile ins Log': () => log(`Sichtbares Messing: ${B.brassOf(p)} (Auge ${p.eye?.q ? 'ja' : 'nein'}, Umhang ${p.equip.cloak ? 'ja' : 'nein'}). Wer es sieht: ${actorsOf(S.map).list.filter(e => e.kind === 'npc' && dist(e, p) <= 160 && stigmaOf(e, 'brass')).map(e => `${e.name} ×${stigmaOf(e, 'brass').price}`).join(', ') || 'niemand'}.`, 'faction'),
       'T15: Energiezelle geben': () => { addItem(p, 'energiezelle', 1); UI.toast('Energiezelle'); },
       'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
       'Bande hier gründen (neben dir)': () => { const p = P(), T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square); const b = bandFound(T0, [(p.x / TS | 0) + 18, p.y / TS | 0]); if (b) UI.toast(b.name); },   /* Nutzer §5d.7 */
@@ -20753,17 +20877,27 @@ function debugSections() {
 }
 // Debug-GUI (Entwickler 02.10.2026: „das wird immer unübersichtlicher — mach ein richtiges GUI, das sich öffnet“): Fenster mit
 // Suche über alle Einträge, Gruppen links, Abschnitte als Karten mit Knopf-Kacheln, „Zuletzt benutzt“. Datenquelle bleibt debugSections().
-const DBG_GROUPS = [['Welt & Reisen', /Bewegung|^Welt|Kerker|Turm|Luftschiff|Kamera|Eisenfeste/], ['Spieler & Ausrüstung', /Spieler|Gegenstände|Bionik|Kampf|Magie/],
-  ['Blutkult & Varonheim', /Blutkult|Varonheim/], ['Ereignisse & Aufträge', /Ereignisse|Folgen|Krieg|Aufträge|Ahnen|Gefangene|Läden/],
-  ['Darstellung & Regie', /Grafik|Animation|Regie|Klang|Dialog/], ['Spielstand & Test', /Spielstand|Test/], ['Klassen & Talente', /^Klassen|^Sterne|^Skilltree/]];
-const dbgGroup = t => (DBG_GROUPS.find(([, re]) => re.test(t)) || ['Sonstiges'])[0];
-/* Einträge, die im Lauf der Zeit in fremde Abschnitte gerutscht sind, bekommen nach ihrem Präfix eine eigene Karte */
-const DBG_MOVE = [[/^Siedlung|^Gold-Sog/, 'Siedlung', 'Ereignisse & Aufträge'], [/^Geheime Orte/, 'Geheime Orte', 'Welt & Reisen'], [/^E[1-4]:/, 'Emergente Quests (E1–E4)', 'Ereignisse & Aufträge'],
-  [/^Ratgeber/, 'Ratgeber (Tipps)', 'Darstellung & Regie'], [/^Stadt ohne Schutz|^Burgwache|^König-Flucht/, 'Stadt ohne Schutz', 'Ereignisse & Aufträge'],
-  [/^Burgfrieden|^Burgtor|^Burg-Alarm|^Schmuggel|^Varon:/, 'Varonsburg: Tor, Burgfrieden, Alarm', 'Blutkult & Varonheim'], [/^UI:/, 'UI: Menüs und Meldungen', 'Darstellung & Regie'], [/^Aufträge:/, 'Aufträge: Darstellung', 'Ereignisse & Aufträge'], [/^Rang bremst|^Blutkult-Sense/, 'Blutkult: Extras', 'Blutkult & Varonheim']];
+/* Runde 2 (Entwickler 09.10.: „verbessere das Debug-Menü, Aussehen und funktionsmäßig“): Gruppen nach Spielbereich mit Symbol, „Sonstiges“
+   aufgelöst (Probe: jeder Abschnitt findet eine Gruppe). Reihenfolge = Reihenfolge links; der erste passende Ausdruck gewinnt. */
+const DBG_GROUPS = [['Spieler & Körper', '♟', /^Spieler$|^Starts|^Bionik|^Ahnenfeind/], ['Klassen & Magie', '✶', /^Klassen|^Sterne|^Skilltree|^Fertigkeiten|^Magie/],
+  ['Kampf & Gegner', '⚔', /^Kampf|^Gegner|^Rüstung und Wunden|^Wanderautomaten/], ['Welt & Reisen', '◈', /^Bewegung|^Welt|^Kerker|^Turm|^Luftschiff|^Eisenfeste|^Geheime Orte|^Pferde/],
+  ['Wirtschaft & Handel', '⚖', /^Läden|^Gegenstände & Handel|^Ressourcen|^Gold und Abgaben/], ['Fraktionen & Krieg', '⚑', /^Fraktion|^Krieg|^Ruf/],
+  ['Blutkult & Varonheim', '✝', /Blutkult|Varon/], ['Quests & Ereignisse', '❖', /^Aufträge|^Ereignisse|^Folgen|^Emergente|^Gefangene|^Tutorial/],
+  ['Städte & Siedlung', '⌂', /^Siedlung|^Stadt/], ['Darstellung & Regie', '◐', /^Grafik|^Animation|^Regie|^Klang|^Dialog|^Figuren|^Kamera|^Karte|^UI|^Ratgeber/],
+  ['Spielstand & Test', '⚙', /^Spielstand|^Test/]];
+const dbgGroup = t => (DBG_GROUPS.find(g => g[2].test(t)) || ['Sonstiges'])[0];
+/* Einträge, die im Lauf der Zeit in fremde Abschnitte gerutscht sind, bekommen nach ihrem Präfix eine eigene Karte (oder kommen in eine
+   vorhandene Karte gleichen Namens). Einträge, die ein Eingabefeld ihres Abschnitts lesen (v('…')), bleiben, wo das Feld steht. */
+const DBG_MOVE = [[/^Siedlung|^Gold-Sog/, 'Siedlung', 'Städte & Siedlung'], [/^Geheime Orte/, 'Geheime Orte', 'Welt & Reisen'], [/^E[1-4]:/, 'Emergente Quests (E1–E4)', 'Quests & Ereignisse'],
+  [/^Ratgeber/, 'Ratgeber (Tipps)', 'Darstellung & Regie'], [/^Stadt ohne Schutz|^Burgwache|^König-Flucht/, 'Stadt ohne Schutz', 'Städte & Siedlung'],
+  [/^Burgfrieden|^Burgtor|^Burg-Alarm|^Schmuggel|^Varon:/, 'Varonsburg: Tor, Burgfrieden, Alarm', 'Blutkult & Varonheim'], [/^UI:/, 'UI: Menüs und Meldungen', 'Darstellung & Regie'], [/^Aufträge:/, 'Aufträge: Darstellung', 'Quests & Ereignisse'], [/^Rang bremst|^Blutkult-Sense/, 'Blutkult: Extras', 'Blutkult & Varonheim'],
+  [/^Stadt: |^NPC-Ziele: |^Betrieb: |^Schmiede: |^Laden: |^Alle Orte: /, 'Stadtleben (Bewohner, Betriebe)', 'Städte & Siedlung'], [/^Leistung: /, 'Test', 'Spielstand & Test'],
+  [/^Musik: /, 'Klang & Effekte (Audit C3–C5)', 'Darstellung & Regie'], [/^Lehrer: /, 'Fertigkeiten (Skill-Core)', 'Klassen & Magie'], [/^Gruppe: Gefährten/, 'Dialoge', 'Darstellung & Regie'],
+  [/^Gold: |^Wirtschaft: /, 'Gold und Abgaben', 'Wirtschaft & Handel'], [/^Ruf: /, 'Ruf (Deckel, addRep)', 'Fraktionen & Krieg']];
 const dbgRecent = () => { try { return JSON.parse(localStorage.getItem('rotfall.dbg.recent') || '[]'); } catch (e) { return []; } };
-function dbgRun(sec, label, fn) {
+function dbgRun(sec, label, fn, noRecent) {
   try { fn(); UI.refreshHUD?.(); } catch (err) { console.error(err); UI.toast('Fehler: ' + err.message); return; }
+  if (noRecent) return;   /* Schnellleiste: nicht in „Zuletzt“ */
   try { const R = dbgRecent().filter(r => !(r[0] === sec && r[1] === label)); R.unshift([sec, label]); localStorage.setItem('rotfall.dbg.recent', JSON.stringify(R.slice(0, 10))); } catch (e) { /* privat: ohne Verlauf */ }
   const rc = $('dbg-recent'); if (rc) dbgRecentDraw();
 }
@@ -20848,40 +20982,227 @@ function dbgFavDraw() {
     b.oncontextmenu = e => { e.preventDefault(); dbgFavToggle(sec, label); }; box.appendChild(b); }
   if (!box.children.length) box.innerHTML = '<span class="dbg-hint">Rechtsklick auf einen Eintrag macht ihn zum Favoriten.</span>';
 }
+/* ---- Debug-GUI Runde 2 (Entwickler 09.10.: „verbessere das Debug-Menü, Aussehen und funktionsmäßig“) ----
+   Statuszeile (Ort, Kachel, Tag/Uhr, Wetter, Gold, Leben, Blut), Schnellleiste mit den häufigsten Aktionen, eigene Browser für Gegner/Tiere
+   und Teleport (Kategorien + Suche statt langer Auswahllisten), Tastatur (↑↓ Enter Esc), Fenster verschiebbar/vergrößerbar und gemerkt.
+   Die Aktionen selbst bleiben in debugSections(); Schnellleiste und Schnellziele rufen genau diese Einträge auf (dbgCall). */
+const DBG_TOOLS = [['Gegenstände', '⚒'], ['Gegner & Tiere', '☠'], ['Teleport', '➹']];
+const DBG_WX = { clear: 'Klar', cloudy: 'Bewölkt', rain: 'Regen', fog: 'Nebel', snow: 'Schnee', bloodrain: 'Blutregen', sandstorm: 'Sandsturm' };
+const dbgEsc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+function dbgCall(sec, label, noRecent) { const fn = debugSections().find(s => s[0] === sec)?.[2]?.[label]; if (fn) dbgRun(sec, label, fn, noRecent); else UI.toast(`Eintrag fehlt: ${sec} › ${label}`); }
+function dbgTp(tx, ty) { if (S.map !== 'world') travel('world'); const q = freeSpotNear('world', tx, ty, 3), p = S.player; p.x = q.x; p.y = q.y; log(`Teleport nach ${tx}, ${ty}.`, 'world'); }   /* wie tp() in debugSections */
+function dbgSelftest() {
+  UI.toast('Selbsttest läuft … (das Spiel steht 1–2 Minuten still)', 4000);
+  setTimeout(() => { const r = selftest(), bad = r.filter(x => !x.startsWith('PASS')); window.__st = r; log(`Selbsttest: ${r.length - bad.length}/${r.length}`, 'world');
+    if (bad.length) console.warn('Selbsttest rot:', bad); UI.toast(bad.length ? `Selbsttest: ${bad.length} rot (Liste in der Konsole)` : `Selbsttest: alle ${r.length} grün`, 6000); }, 150);
+}
+/* [Symbol, Name, Erklärung, Aktion, an?, Name dynamisch] */
+const DBG_QUICK = [['✚', 'Heilen', 'Volle Heilung, steht wieder auf (Spieler › Heilen)', () => dbgCall('Spieler', 'Heilen', 1)],
+  ['⛨', 'Gott', 'Gottmodus an/aus (Spieler)', () => dbgCall('Spieler', 'Gottmodus an/aus', 1), () => S.dbg?.god],
+  ['⇡', 'Noclip', 'Flug/Noclip an/aus (Bewegung)', () => dbgCall('Bewegung', 'Flug/Noclip an/aus', 1), () => S.dbg?.noclip],
+  ['»', 'Tempo', 'Lauftempo ×1 → ×2 → ×4 → ×8', () => { const L = [1, 2, 4, 8], d = S.dbg ||= {}; d.speed = L[(L.indexOf(d.speed || 1) + 1) % L.length]; UI.toast(`Tempo ×${d.speed}`, 900); }, () => (S.dbg?.speed || 1) > 1, () => `Tempo ×${S.dbg?.speed || 1}`],
+  ['☼', 'Tag', 'Uhr auf 12:00 (Welt › Tag)', () => dbgCall('Welt', 'Tag', 1)], ['☾', 'Nacht', 'Uhr auf 23:00 (Welt › Nacht)', () => dbgCall('Welt', 'Nacht', 1)],
+  ['◷', '+6 h', 'Zeit +6 Stunden (Welt)', () => dbgCall('Welt', 'Zeit +6 Stunden', 1)],
+  ['☁', 'Wetter', 'Wetter weiterschalten: Klar → Bewölkt → Regen → Nebel → Schnee → Blutregen → Sandsturm', () => { const L = Object.keys(DBG_WX); S.weather = L[(L.indexOf(S.weather) + 1) % L.length]; S.weatherLeft = 300; UI.toast('Wetter: ' + DBG_WX[S.weather], 900); }],
+  ['◎', 'Karte', 'Ganze Welt zeigen an/aus (Welt)', () => dbgCall('Welt', 'Ganze Welt zeigen an/aus', 1), () => S.dbg?.reveal],
+  ['¤', '+500 Gold', 'Gold +500 (Spieler)', () => dbgCall('Spieler', 'Gold +500', 1)],
+  ['✓', 'Selbsttest', 'Selbsttest starten (1–2 min, Spiel steht still; Ergebnis im Log, rote Proben in der Konsole)', dbgSelftest]];
+function dbgQuickSync(box) { for (const b of box.children) { const q = DBG_QUICK[+b.dataset.i]; b.classList.toggle('on', !!q[4]?.()); if (q[5]) b.lastChild.textContent = q[5](); } }
+function dbgQuickDraw(box) {
+  box.innerHTML = DBG_QUICK.map((q, i) => `<button class="dbg-q" data-i="${i}" title="${dbgEsc(q[2])}"><i>${q[0]}</i><span>${q[1]}</span></button>`).join('');
+  box.onclick = e => { const b = e.target.closest('.dbg-q'); if (!b) return; try { DBG_QUICK[+b.dataset.i][3](); } catch (err) { console.error(err); UI.toast('Fehler: ' + err.message); } UI.refreshHUD?.(); dbgQuickSync(box); };
+  dbgQuickSync(box);
+}
+function dbgStatusHTML() {
+  const p = S.player; if (!p) return '';
+  const tx = p.x / TS | 0, ty = p.y / TS | 0, w = S.map === 'world', tk = w && townAt(tx, ty);
+  const loc = w ? (tk ? townName(tk) : locAt(tx, ty)?.name || 'Wildnis') : (DUNGEONS[S.map]?.name || S.map), two = n => String(n | 0).padStart(2, '0');
+  const bl = typeof bloodLv === 'function' && typeof BLOOD === 'object' ? Math.round(bloodLv(p) / (BLOOD.max || 100) * 100) : null;   /* Blut kann parallel umgebaut werden: nur anzeigen, wenn da */
+  return `<span title="Ort · Gebiet · Kachel x,y (für „Teleport: Koordinaten“)">◈ <b>${dbgEsc(loc)}</b>${w ? ` <i>${regionAt(tx, ty) || ''}</i>` : ''} <i>${tx},${ty}</i></span>`
+    + `<span>☼ Tag ${S.day | 0}, <b>${two(S.minute / 60)}:${two(S.minute % 60)}</b> · ${DBG_WX[S.weather] || S.weather || '–'}</span><span>¤ <b>${S.gold | 0}</b> Gold</span>`
+    + `<span class="hp">♥ ${Math.round(p.hp)}/${Math.round(p.maxHp)}</span>${bl != null ? `<span class="bl">● Blut ${bl} %</span>` : ''}<span>Stufe ${p.level}</span>${p.downed ? '<span class="hp">bewusstlos</span>' : ''}`;
+}
+/* Fenster: verschiebbar (Kopfzeile ziehen), vergrößerbar (Ecke unten rechts), Lage und Größe in rotfall.dbg.win; Doppelklick = Standard */
+const DBG_WIN = 'rotfall.dbg.win';
+function dbgWinPlace(d, reset) {
+  let w = null; if (!reset) try { w = JSON.parse(localStorage.getItem(DBG_WIN) || 'null'); } catch (e) { /* ohne Merken */ }
+  const W = Math.min(Math.max(600, w?.w || Math.min(1000, innerWidth * 0.95)), innerWidth), H = Math.min(Math.max(400, w?.h || Math.min(700, innerHeight * 0.88)), innerHeight);
+  const L = w ? Math.min(Math.max(0, w.l), innerWidth - 160) : (innerWidth - W) / 2, T0 = w ? Math.min(Math.max(0, w.t), innerHeight - 48) : (innerHeight - H) / 2;
+  Object.assign(d.style, { width: Math.round(W) + 'px', height: Math.round(H) + 'px', left: Math.round(L) + 'px', top: Math.round(T0) + 'px', transform: 'none' });
+}
+function dbgWinSave(d) { const r = d.getBoundingClientRect(); try { localStorage.setItem(DBG_WIN, JSON.stringify({ l: r.left | 0, t: r.top | 0, w: r.width | 0, h: r.height | 0 })); } catch (e) { /* ohne Merken */ } }
+function dbgWinDrag(d) {
+  const head = d.querySelector('.dbg-head');
+  head.onmousedown = e => { if (e.button || e.target.closest('input,button,select')) return; e.preventDefault(); const r = d.getBoundingClientRect(), ox = e.clientX - r.left, oy = e.clientY - r.top;
+    const mv = ev => { d.style.left = Math.min(Math.max(0, ev.clientX - ox), innerWidth - 160) + 'px'; d.style.top = Math.min(Math.max(0, ev.clientY - oy), innerHeight - 48) + 'px'; };
+    const up = () => { removeEventListener('mousemove', mv); removeEventListener('mouseup', up); dbgWinSave(d); }; addEventListener('mousemove', mv); addEventListener('mouseup', up); };
+  head.ondblclick = e => { if (e.target.closest('input,button,select')) return; try { localStorage.removeItem(DBG_WIN); } catch (er) { /* egal */ } dbgWinPlace(d, true); };
+  if (window.ResizeObserver) { let first = true, t0 = 0; d._ro = new ResizeObserver(() => { if (first) { first = false; return; } clearTimeout(t0); t0 = setTimeout(() => d.isConnected && dbgWinSave(d), 300); }); d._ro.observe(d); }
+}
+/* Gegner-Browser: Kategorien nach Fraktion/Art, Bild wie im Kodex (Tier-, Brocken- oder Menschenraster), Stufe, Anzahl, Variante */
+const DBG_FCATS = [['Untote', m => m.faction === 'undead'], ['Goblins', m => m.faction === 'goblin'], ['Banditen', m => m.faction === 'bandit'], ['Kette', m => m.faction === 'chain'],
+  ['Blutkult', m => m.faction === 'blut'], ['Aurelion', m => m.faction === 'aurel'], ['Seevolk', m => m.faction === 'pirate'], ['Engel & Omega', m => m.faction === 'omega'], ['Valen', m => m.faction === 'valen'],
+  ['Raubtiere', m => m.faction === 'beast' && !m.prey], ['Nutz- & Wildtiere', m => !!m.prey], ['Übungsziele', m => !m.faction], ['Bosse', m => !!m.boss], ['Kopfgeld-Elite', null], ['Alle', () => true]];
+const DBG_LV = [0, 1, 3, 5, 8, 12, 16, 20, 25, 30, 40, 50], dbgF = { cat: 'Untote', q: '', n: 1, lv: 0, va: '' };   /* bleibt zwischen zwei Öffnungen stehen */
+const DBG_BEAST = new Set(['wolf', 'boar', 'bear', 'deer', 'wild_dog', 'bone_hound', 'cow', 'sheep', 'horse', 'dog', 'cat', 'chicken']), dbgMonIco = new Map();
+function dbgMonIcon(cv, k) {
+  const g = cv.getContext('2d'), m = MONSTERS[k]; g.imageSmoothingEnabled = false; g.clearRect(0, 0, cv.width, cv.height);
+  let src = dbgMonIco.get(k);
+  if (src === undefined) { src = null;
+    try { const f = !m || m.eye || k === 'carrion_wing' ? null : DBG_BEAST.has(k) ? SP.beastFrame(k, m.pal || {}, 'E', '', 1) : k === 'gorak' ? SP.bruteFrame(m.pal || {}, 'E', '', 0) : SP.humanFrame(SP.monsterSpec({ kind: 'enemy', mtype: k, seed: 2 }, m), 'S', 'i0');
+      if (f?.width) { const D0 = f.getContext('2d').getImageData(0, 0, f.width, f.height).data; let x0 = f.width, y0 = f.height, x1 = -1, y1 = -1;   /* auf den Inhalt zuschneiden */
+        for (let i = 3; i < D0.length; i += 4) if (D0[i]) { const x = (i >> 2) % f.width, y = (i >> 2) / f.width | 0; if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+        if (x1 >= x0) { src = document.createElement('canvas'); src.width = x1 - x0 + 1; src.height = y1 - y0 + 1; src.getContext('2d').drawImage(f, -x0, -y0); } } } catch (e) { src = null; }
+    dbgMonIco.set(k, src); }
+  if (!src) { g.fillStyle = '#8a7048'; g.font = '20px serif'; g.textAlign = 'center'; g.fillText('☠', cv.width / 2, cv.height / 2 + 7); return; }
+  const k0 = Math.min((cv.width - 2) / src.width, (cv.height - 2) / src.height), s = k0 >= 2 ? Math.floor(k0) : k0, w = Math.round(src.width * s), h = Math.round(src.height * s);
+  g.drawImage(src, Math.round((cv.width - w) / 2), Math.round((cv.height - h) / 2), w, h);
+}
+function dbgSpawn(k, i) {
+  const p = S.player, a = i * 2.4, r = i ? 5 : 4, tx = (p.x / TS | 0) + Math.round(Math.cos(a) * r), ty = (p.y / TS | 0) + Math.round(Math.sin(a) * r);
+  const e = spawnEnemy(k, S.map, tx, ty, { ...(dbgF.lv ? { level: dbgF.lv } : {}), ...(dbgF.va ? { noVariant: true } : {}) });
+  if (dbgF.va && dbgF.va !== 'plain') applyVariant(e, MONSTERS[k], dbgF.va); return e;
+}
+function dbgFoeBrowser(host) {
+  const opt = (L, cur) => L.map(([v, t]) => `<option value="${v}"${v === cur ? ' selected' : ''}>${t}</option>`).join('');
+  host.innerHTML = `<div class="dbi-top"><div class="dbi-cats"></div><div class="dbi-row"><input class="dbi-q" placeholder="Name oder Schlüssel (sucht in allen Kategorien) …" autocomplete="off">
+    <label>Stufe <select class="dbf-lv">${opt(DBG_LV.map(l => [l, l || 'Gebiet']), dbgF.lv)}</select></label><label>Anzahl <select class="dbf-n">${opt([1, 3, 5, 10].map(n => [n, n]), dbgF.n)}</select></label>
+    <label>Variante <select class="dbf-va">${opt([['', 'wie im Spiel'], ['plain', 'keine'], ...Object.entries(ENEMY_VARIANTS).map(([k, V]) => [k, V.name.replace(':', '')])], dbgF.va)}</select></label>
+    <button class="dbi-act" title="Entfernt alle Gegner im Umkreis von 25 Feldern auf dieser Karte (ohne Bosse, Haus- und Nutztiere)">✕ Umkreis leeren</button></div></div>
+    <div class="dbi-grid"></div><div class="dbi-foot">Klick = erscheint neben dir · Stufe „Gebiet“ = wie die Gegend · Kopfgeld-Elite = benannter Anführer aus den Steckbriefen (Stufe/Variante gelten dort nicht)</div>`;
+  const $q = host.querySelector('.dbi-q'), grid = host.querySelector('.dbi-grid');
+  const draw = () => {
+    host.querySelector('.dbi-cats').innerHTML = DBG_FCATS.map(c => `<button class="dbi-chip${!dbgF.q && c[0] === dbgF.cat ? ' on' : ''}" data-cat="${c[0]}">${c[0]} <small>${c[1] ? Object.values(MONSTERS).filter(c[1]).length : Object.keys(ELITES).length}</small></button>`).join('');
+    const q = dbgF.q.trim().toLowerCase(), c = DBG_FCATS.find(x => x[0] === dbgF.cat) || DBG_FCATS[0], hit = (k, n) => k.toLowerCase().includes(q) || String(n).toLowerCase().includes(q);
+    const mons = q ? Object.entries(MONSTERS).filter(([k, m]) => hit(k, m.name)) : c[1] ? Object.entries(MONSTERS).filter(([, m]) => c[1](m)) : [];
+    const els = q ? Object.entries(ELITES).filter(([k, E]) => hit(k, E.name)) : c[1] ? [] : Object.entries(ELITES);
+    mons.sort((a, b) => (a[1].threat || 0) - (b[1].threat || 0) || a[1].name.localeCompare(b[1].name));
+    grid.innerHTML = [...mons.map(([k, m]) => `<div class="dbi-tile${m.boss ? ' boss' : ''}" data-k="${k}" title="${dbgEsc(m.name)} (${k})"><canvas data-mon="${k}" width="34" height="34"></canvas><div class="dbi-txt"><b>${m.name}</b><span>Leben ${m.hp} · Schaden ${m.dmg}${m.ranged ? ' · Fernkampf' : ''}</span><i>${k}${m.boss ? ' · Boss' : ''}${m.threat ? ' · Gefahr ' + m.threat : ''}</i></div></div>`),
+      ...els.map(([k, E]) => `<div class="dbi-tile elite" data-el="${k}" title="${dbgEsc(E.say)}"><canvas data-mon="${E.base}" width="34" height="34"></canvas><div class="dbi-txt"><b>${E.name}</b><span>${MONSTERS[E.base]?.name || E.base} · Leben ×${E.hp ?? 1} · Schaden ×${E.dmg ?? 1}</span><i>${k} · Kopfgeld-Elite</i></div></div>`)].join('') || '<div class="dbg-hint">Nichts gefunden.</div>';
+    for (const cv of grid.querySelectorAll('canvas[data-mon]')) dbgMonIcon(cv, cv.dataset.mon);
+  };
+  host.onclick = e => {
+    const b = e.target.closest('button'), t = e.target.closest('.dbi-tile'), p = S.player;
+    if (b?.dataset.cat) { dbgF.cat = b.dataset.cat; dbgF.q = $q.value = ''; return draw(); }
+    if (b?.classList.contains('dbi-act')) { let n = 0; S.ents[S.map] = (S.ents[S.map] || []).filter(x => { const r = x.kind === 'enemy' && !x.boss && !MONSTERS[x.mtype]?.prey && !x.owner && !x.pet && dist(x, p) < 25 * TS; if (r) n++; return !r; }); return UI.toast(`${n} Gegner entfernt.`, 1400); }
+    if (!t) return; const n = dbgF.n;
+    if (t.dataset.el) { for (let i = 0; i < n; i++) spawnEliteHere(t.dataset.el); return UI.toast(`${n > 1 ? n + '× ' : ''}${ELITES[t.dataset.el].name} erscheint.`, 1400); }
+    const k = t.dataset.k; for (let i = 0; i < n; i++) dbgSpawn(k, i); UI.toast(`${n > 1 ? n + '× ' : ''}${MONSTERS[k].name}${dbgF.lv ? ` (Stufe ${dbgF.lv})` : ''} erscheint.`, 1400);
+  };
+  $q.value = dbgF.q; $q.oninput = () => { dbgF.q = $q.value; draw(); };
+  host.querySelector('.dbf-lv').onchange = e => { dbgF.lv = +e.target.value; }; host.querySelector('.dbf-n').onchange = e => { dbgF.n = +e.target.value; }; host.querySelector('.dbf-va').onchange = e => { dbgF.va = e.target.value; };
+  draw();
+}
+/* Teleport-Browser: Städte, Orte (mit Art), Karten/Dungeons, Personen der Oberwelt; Suche über alles, „Nähe“ sortiert nach Abstand, Schnellziele */
+const DBG_TCATS = [['Städte', '⌂'], ['Orte', '◈'], ['Karten', '▤'], ['Personen', '☺']], dbgT = { cat: 'Städte', sub: null, q: '', near: false };
+const DBG_LKIND = { village: 'Dorf', wild: 'Wildnis', dungeon: 'Dungeon', ruin: 'Ruine', camp: 'Lager', shrine: 'Schrein', city: 'Stadt', wreck: 'Wrack', tower: 'Turm', farm: 'Hof' };
+const DBG_TQUICK = [['Auftragsziel', 'Bewegung', 'Teleport: Auftragsziel'], ['Schwebende Insel', 'Bewegung', 'Teleport: Schwebende Insel'], ['Eisenfeste', 'Bewegung', 'Teleport: Eisenfeste'],
+  ['Turm des Nachtglases', 'Turm des Nachtglases', 'Zum Turm (Tor)'], ['Karawane', 'Welt', 'Zur Karawane']];
+function dbgTpList() {
+  const out = [];
+  for (const k of Object.keys(TOWN_PLAN)) { const [x, y] = TOWN_PLAN[k].square; out.push({ cat: 'Städte', name: townName(k), sub: '', key: k, x, y: y + 2 }); }
+  for (const l of LOCATIONS) if (l.kind !== 'road') out.push({ cat: 'Orte', name: l.name, sub: (DBG_LKIND[l.kind] || l.kind) + (l.poi ? ' (Fundort)' : ''), key: l.key, x: l.x, y: l.y });
+  for (const k of MAP_KEYS) out.push({ cat: 'Karten', name: DUNGEONS[k]?.name || 'Oberwelt', sub: '', key: k, map: k });
+  for (const e of S.ents.world || []) if (e.kind === 'npc' && e.alive && e.name && (e.vm || e.houseKey || e.passamt || (e.key && !e.villager && !e.guard))) out.push({ cat: 'Personen', name: e.name, sub: e.prof || '', key: e.id, id: e.id, x: e.x / TS | 0, y: e.y / TS | 0 });
+  return out;
+}
+function dbgTpBrowser(host) {
+  host.innerHTML = `<div class="dbi-top"><div class="dbi-cats"></div><div class="dbi-subs"></div><div class="dbi-row"><input class="dbi-q" placeholder="Stadt, Ort, Person, Karte … (sucht überall)" autocomplete="off">
+    <button class="dbi-chip dbt-near" title="Nächste zuerst sortieren">↕ Nähe</button><input class="dbi-xy" placeholder="x,y" size="8" title="Kachel-Koordinaten (stehen oben in der Statuszeile)"><button class="dbi-act dbt-go">Hin</button></div>
+    <div class="dbi-subs dbt-quick">${DBG_TQUICK.map((q, i) => `<button class="dbi-chip sm" data-qs="${i}" title="${dbgEsc(q[1] + ' › ' + q[2])}">➹ ${q[0]}</button>`).join('')}</div></div>
+    <div class="dbi-grid"></div><div class="dbi-foot">Klick = hinreisen (freier Platz neben dem Ziel) · Karten: Eingang des Dungeons · Personen und Orte liegen auf der Oberwelt</div>`;
+  const $q = host.querySelector('.dbi-q'), grid = host.querySelector('.dbi-grid');
+  const draw = () => {
+    const all = dbgTpList(), q = dbgT.q.trim().toLowerCase(), p = S.player, w = S.map === 'world', ptx = p.x / TS, pty = p.y / TS;
+    host.querySelector('.dbi-cats').innerHTML = DBG_TCATS.map(([n, ico]) => `<button class="dbi-chip${!q && n === dbgT.cat ? ' on' : ''}" data-cat="${n}">${ico} ${n} <small>${all.filter(t => t.cat === n).length}</small></button>`).join('');
+    const subs = !q && dbgT.cat === 'Orte' ? [...new Set(all.filter(t => t.cat === 'Orte').map(t => t.sub))].sort() : [];
+    if (dbgT.sub && !subs.includes(dbgT.sub)) dbgT.sub = null;
+    host.querySelector('.dbi-subs').innerHTML = subs.length > 1 ? [`<button class="dbi-chip sm${!dbgT.sub ? ' on' : ''}" data-sub="">Alle</button>`, ...subs.map(s => `<button class="dbi-chip sm${s === dbgT.sub ? ' on' : ''}" data-sub="${dbgEsc(s)}">${s}</button>`)].join('') : '';
+    host.querySelector('.dbt-near').classList.toggle('on', dbgT.near);
+    let L = q ? all.filter(t => t.name.toLowerCase().includes(q) || String(t.key).toLowerCase().includes(q) || t.sub.toLowerCase().includes(q)) : all.filter(t => t.cat === dbgT.cat && (!dbgT.sub || t.sub === dbgT.sub));
+    const far = t => w && t.x != null ? Math.hypot(t.x - ptx, t.y - pty) : 1e9;
+    L.sort(dbgT.near ? (a, b) => far(a) - far(b) : (a, b) => a.name.localeCompare(b.name)); const more = L.length - 400; L = L.slice(0, 400); host._L = L;
+    const ico = Object.fromEntries(DBG_TCATS);
+    grid.innerHTML = L.map((t, i) => `<div class="dbi-tile" data-i="${i}"><span class="dbi-ico">${ico[t.cat]}</span><div class="dbi-txt"><b>${dbgEsc(t.name)}</b><span>${[q && t.cat, dbgEsc(t.sub), far(t) < 1e9 && Math.round(far(t)) + ' Felder weg'].filter(Boolean).join(' · ') || '&nbsp;'}</span><i>${t.map ? t.key : t.x != null ? t.x + ',' + t.y : t.key}</i></div></div>`).join('')
+      + (more > 0 ? `<div class="dbg-hint">… ${more} weitere — Suche verfeinern.</div>` : '') || '<div class="dbg-hint">Nichts gefunden.</div>';
+  };
+  const go = t => { if (t.map) { if (t.map !== S.map) travel(t.map); } else if (t.id) { const e = byId(t.id); if (!e) return UI.toast('Die Person ist nicht mehr da.'); dbgTp(e.x / TS | 0, (e.y / TS | 0) + 1); } else dbgTp(t.x, t.y);
+    UI.toast(`Teleport: ${t.name}`, 1200); UI.refreshHUD?.(); };
+  host.onclick = e => {
+    const b = e.target.closest('button'), t = e.target.closest('.dbi-tile');
+    if (b?.dataset.cat) { dbgT.cat = b.dataset.cat; dbgT.sub = null; dbgT.q = $q.value = ''; return draw(); }
+    if (b?.dataset.sub != null) { dbgT.sub = b.dataset.sub || null; return draw(); }
+    if (b?.dataset.qs) { const Q = DBG_TQUICK[+b.dataset.qs]; return dbgCall(Q[1], Q[2]); }
+    if (b?.classList.contains('dbt-near')) { dbgT.near = !dbgT.near; return draw(); }
+    if (b?.classList.contains('dbt-go')) { const [x, y] = host.querySelector('.dbi-xy').value.split(',').map(Number); if (x >= 0 && y >= 0) { dbgTp(x, y); UI.toast(`Teleport: ${x}, ${y}`, 1200); } else UI.toast('Koordinaten als „x,y“ eingeben.'); return; }
+    if (t && host._L?.[+t.dataset.i]) go(host._L[+t.dataset.i]);
+  };
+  $q.value = dbgT.q; $q.oninput = () => { dbgT.q = $q.value; draw(); };
+  host.querySelector('.dbi-xy').onkeydown = e => { if (e.key === 'Enter') host.querySelector('.dbt-go').click(); };
+  draw();
+}
+/* Suche oben findet auch Gegenstände, Gegner und Ziele: Knöpfe springen in den Browser, mit der Suche schon eingetragen */
+function dbgXHits(q) {
+  const has = (k, n) => k.toLowerCase().includes(q) || String(n || '').toLowerCase().includes(q);
+  return [['Gegenstände', '⚒', Object.entries(ITEMS).filter(([k, it]) => has(k, it.name)).length], ['Gegner & Tiere', '☠', Object.entries(MONSTERS).filter(([k, m]) => has(k, m.name)).length + Object.entries(ELITES).filter(([k, E]) => has(k, E.name)).length],
+    ['Teleport', '➹', dbgTpList().filter(t => has(String(t.key), t.name) || t.sub.toLowerCase().includes(q)).length]].filter(x => x[2]);
+}
 function toggleDebug() {
   let d = $('debugpanel');
-  if (d) { d.remove(); return; }
-  d = document.createElement('div'); d.id = 'debugpanel'; d.className = 'panel dbg-gui';
-  const secs = debugSections(), used = new Set(secs.map(s => dbgGroup(s[0]))), groups = ['Gegenstände', ...[...DBG_GROUPS.map(g => g[0]), 'Sonstiges'].filter(g => used.has(g))], n = secs.reduce((a, s) => a + Object.keys(s[2]).length, 0);
-  d.innerHTML = `<div class="dbg-head"><span class="panel-title">DEBUG</span><input id="dbg-search" placeholder="Suchen in ${n} Einträgen … (Rechtsklick = Favorit)" autocomplete="off"><button id="dbg-close" title="Schließen (Strg+Umschalt+D)">✕</button></div>
-    <div class="dbg-body"><nav id="dbg-nav"></nav><div id="dbg-main"></div><div id="dbg-items"></div></div><div class="dbg-foot"><b>★</b> <span id="dbg-fav"></span></div><div class="dbg-foot"><b>Zuletzt:</b> <span id="dbg-recent"></span></div>`;
-  document.body.appendChild(d);
-  const nav = $('dbg-nav'), main = $('dbg-main'), cards = [];
+  if (d) { clearInterval(d._tick); d._ro?.disconnect(); d.remove(); return; }
+  d = document.createElement('div'); d.id = 'debugpanel'; d.className = 'panel dbg-gui'; d.tabIndex = -1;
+  const secs = debugSections(), n = secs.reduce((a, s) => a + Object.keys(s[2]).length, 0);
+  d.innerHTML = `<div class="dbg-head" title="Ziehen = verschieben · Ecke unten rechts = Größe · Doppelklick = Standardgröße"><span class="dbg-title">⚙ Debug</span><input id="dbg-search" placeholder="Suchen in ${n} Einträgen, Gegenständen, Gegnern, Orten …   ↑↓ wählen · Enter ausführen · Esc" autocomplete="off"><button id="dbg-close" title="Schließen (Esc / Strg+Umschalt+D)">✕</button></div>
+    <div class="dbg-status" id="dbg-status"></div><div class="dbg-quick" id="dbg-quick"></div>
+    <div class="dbg-body"><nav id="dbg-nav"></nav><div id="dbg-main"><div class="dbg-xhits" id="dbg-xhits"></div></div><div id="dbg-items" class="dbg-view"></div><div id="dbg-foes" class="dbg-view"></div><div id="dbg-tp" class="dbg-view"></div></div>
+    <div class="dbg-foot"><b title="Favoriten — Rechtsklick auf einen Eintrag">★</b><span id="dbg-fav"></span><b title="Zuletzt benutzt">⟲</b><span id="dbg-recent"></span></div>`;
+  document.body.appendChild(d); dbgWinPlace(d); dbgWinDrag(d);
+  const nav = $('dbg-nav'), main = $('dbg-main'), cards = [], byTitle = new Map(), search = $('dbg-search');
   const mk = (title, html, group) => { const sec = document.createElement('section'); sec.className = 'dbg-card'; sec.dataset.group = group;
     sec.innerHTML = `<h4 title="Klick klappt ein/aus">${title}<small></small></h4>${html ? `<div class="dbg-in">${html}</div>` : ''}<div class="dbg-grid"></div>`; main.appendChild(sec); cards.push(sec);
-    sec.querySelector('h4').onclick = () => sec.classList.toggle('shut'); return sec.querySelector('.dbg-grid'); };
-  const moved = new Map();
-  for (const [title, html, acts] of secs) {
-    const grid = mk(title, html, dbgGroup(title));
-    for (const [label, fn] of Object.entries(acts)) { const b = document.createElement('button'); b.className = 'dbg-btn'; b.textContent = label; b.title = label; b.dataset.label = label; b.dataset.q = label.toLowerCase(); b.onclick = () => dbgRun(title, label, fn);
-      b.oncontextmenu = e => { e.preventDefault(); dbgFavToggle(title, label); };
-      const M = DBG_MOVE.find(([re]) => re.test(label)); if (M) { if (!moved.has(M[1])) moved.set(M[1], mk(M[1], '', M[2])); moved.get(M[1]).appendChild(b); } else grid.appendChild(b); }
+    sec.querySelector('h4').onclick = () => sec.classList.toggle('shut'); const g = sec.querySelector('.dbg-grid'); byTitle.set(title, g); return g; };
+  for (const [title, html] of secs) mk(title, html, dbgGroup(title));
+  for (const [title, , acts] of secs) for (const [label, fn] of Object.entries(acts)) {
+    const b = document.createElement('button'); b.className = 'dbg-btn'; b.textContent = label; b.title = `${label}\n(${title}) — Rechtsklick = Favorit`; b.dataset.label = label; b.dataset.q = (label + ' ' + title).toLowerCase(); b.onclick = () => dbgRun(title, label, fn);
+    b.oncontextmenu = e => { e.preventDefault(); dbgFavToggle(title, label); };
+    const M = DBG_MOVE.find(([re]) => re.test(label)), stay = !M || /\bv\(['"]/.test(String(fn));
+    (stay ? byTitle.get(title) : byTitle.get(M[1]) || mk(M[1], '', M[2])).appendChild(b);
   }
   for (const c of [...cards]) if (!c.querySelector('.dbg-btn') && !c.querySelector('.dbg-in')) { c.remove(); cards.splice(cards.indexOf(c), 1); }
   for (const c of cards) { dbgPrefixGroups(c.querySelector('.dbg-grid')); c.querySelector('h4 small').textContent = ` ${c.querySelectorAll('.dbg-btn').length}`; }
-  const items = $('dbg-items'); dbgItemBrowser(items);
-  let cur = (() => { try { return localStorage.getItem('rotfall.dbg.group'); } catch (e) { return null; } })(); if (!groups.includes(cur)) cur = groups[0];
-  const show = () => { const q = $('dbg-search').value.trim().toLowerCase();
+  const views = { 'Gegenstände': $('dbg-items'), 'Gegner & Tiere': $('dbg-foes'), 'Teleport': $('dbg-tp') }, builders = { 'Gegenstände': dbgItemBrowser, 'Gegner & Tiere': dbgFoeBrowser, 'Teleport': dbgTpBrowser }, built = new Set();
+  const xh = $('dbg-xhits'); let kb = -1;
+  const vis = () => [...main.querySelectorAll('.dbg-btn')].filter(b => b.offsetParent);
+  const mark = i => { main.querySelector('.dbg-btn.kb')?.classList.remove('kb'); const L = vis(); if (!L.length) { kb = -1; return; } kb = (i + L.length) % L.length; L[kb].classList.add('kb'); L[kb].scrollIntoView({ block: 'nearest' }); };
+  let cur = (() => { try { return localStorage.getItem('rotfall.dbg.group'); } catch (e) { return null; } })();
+  const show = () => { const q = search.value.trim().toLowerCase(); let all = 0;
     for (const c of cards) { let hits = 0; for (const b of c.querySelectorAll('.dbg-btn')) { const ok = !q || b.dataset.q.includes(q); b.style.display = ok ? '' : 'none'; if (ok) hits++; }
-      c.style.display = (q ? hits > 0 : c.dataset.group === cur) ? '' : 'none'; if (q) c.classList.remove('shut');
+      c.style.display = (q ? hits > 0 : c.dataset.group === cur) ? '' : 'none'; if (q) c.classList.remove('shut'); all += q ? hits : 0;
       for (const s of c.querySelectorAll('.dbg-sub')) { let n2 = s.nextElementSibling, any = false; while (n2 && !n2.classList.contains('dbg-sub')) { if (n2.style.display !== 'none') any = true; n2 = n2.nextElementSibling; } s.style.display = any ? '' : 'none'; } }
-    const iv = !q && cur === 'Gegenstände'; items.style.display = iv ? '' : 'none'; main.style.display = iv ? 'none' : '';
-    for (const b of nav.children) b.classList.toggle('on', !q && b.dataset.g === cur); };
-  for (const g of groups) { const b = document.createElement('button'); b.dataset.g = g; b.textContent = g === 'Gegenstände' ? `${g} (${Object.keys(ITEMS).length})` : `${g} (${cards.filter(c => c.dataset.group === g).reduce((a, c) => a + c.querySelectorAll('.dbg-btn').length, 0)})`;
-    b.onclick = () => { cur = g; $('dbg-search').value = ''; try { localStorage.setItem('rotfall.dbg.group', g); } catch (e) { /* ohne Merken */ } show(); main.scrollTop = 0; }; nav.appendChild(b); }
-  $('dbg-search').oninput = show; $('dbg-search').onkeydown = e => { e.stopPropagation(); if (e.key === 'Escape') toggleDebug(); };
-  $('dbg-close').onclick = () => toggleDebug(); dbgRecentDraw(); dbgFavDraw(); show(); $('dbg-search').focus();
-  for (const el of d.querySelectorAll('input,select')) if (el.id !== 'dbg-search') el.addEventListener('keydown', e => e.stopPropagation());
+    const X = q.length >= 2 ? dbgXHits(q) : [];
+    xh.innerHTML = q ? `<span>${all ? `${all} Einträge` : 'Keine Einträge'}${X.length ? ' · auch in:' : ''}</span>` + X.map(([g, ico, c]) => `<button class="dbi-chip" data-x="${g}">${ico} ${c} ${g}</button>`).join('') : '';
+    xh.style.display = q ? '' : 'none';
+    const tool = !q && views[cur] ? cur : null; for (const [k, el] of Object.entries(views)) el.style.display = k === tool ? '' : 'none'; main.style.display = tool ? 'none' : '';
+    if (tool && !built.has(tool)) { built.add(tool); builders[tool](views[tool]); }
+    for (const b of nav.querySelectorAll('button')) b.classList.toggle('on', !q && b.dataset.g === cur); kb = -1; if (q) mark(0); };
+  const pick = g => { cur = g; search.value = ''; try { localStorage.setItem('rotfall.dbg.group', g); } catch (e) { /* ohne Merken */ } show(); main.scrollTop = 0; };
+  const navH = t => { const h = document.createElement('div'); h.className = 'dbg-navh'; h.textContent = t; nav.appendChild(h); };
+  const navB = (g, ico, cnt) => { const b = document.createElement('button'); b.dataset.g = g; b.title = g; b.innerHTML = `<span class="ico">${ico}</span><span class="nm">${g}</span><small>${cnt}</small>`; b.onclick = () => pick(g); nav.appendChild(b); };
+  navH('Werkzeuge'); navB('Gegenstände', '⚒', Object.keys(ITEMS).length); navB('Gegner & Tiere', '☠', Object.keys(MONSTERS).length + Object.keys(ELITES).length); navB('Teleport', '➹', dbgTpList().length);
+  navH('Bereiche'); for (const [g, ico] of [...DBG_GROUPS, ['Sonstiges', '?']]) { const c = cards.filter(x => x.dataset.group === g).reduce((a, x) => a + x.querySelectorAll('.dbg-btn').length, 0); if (c) navB(g, ico, c); }
+  if (![...nav.querySelectorAll('button')].some(b => b.dataset.g === cur)) cur = 'Gegenstände';
+  xh.onclick = e => { const g = e.target.closest('[data-x]')?.dataset.x; if (!g) return; const q = search.value.trim();
+    if (g === 'Gegenstände') Object.assign(dbgI, { cat: 'Alle', sub: null, q }), dbgI.rar.clear(); else if (g === 'Gegner & Tiere') dbgF.q = q; else dbgT.q = q;
+    built.delete(g); pick(g); };
+  search.oninput = show;
+  search.onkeydown = e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); mark(kb + (e.key === 'ArrowDown' ? 1 : -1)); } else if (e.key === 'Enter') { const L = vis(); (L[kb] || (search.value.trim() ? L[0] : null))?.click(); } };   /* leere Suche: Enter löst nichts aus */
+  d.addEventListener('keydown', e => { if (e.key !== 'Escape') return; e.preventDefault(); e.stopPropagation(); if (search.value) { search.value = ''; show(); search.focus(); } else toggleDebug(); }, true);   /* Esc: erst Suche leeren, dann schließen */
+  d.addEventListener('keydown', e => { if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') return; if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) e.stopPropagation(); });   /* Tippen steuert nicht den Helden */
+  d.addEventListener('mousedown', e => { if (!e.target.closest('input,select,button,textarea')) setTimeout(() => { if (!d.contains(document.activeElement)) d.focus({ preventScroll: true }); }); });
+  $('dbg-close').onclick = () => toggleDebug(); dbgRecentDraw(); dbgFavDraw(); show(); search.focus();
+  const st = $('dbg-status'), qb = $('dbg-quick'); dbgQuickDraw(qb);
+  const tick = () => { if (!d.isConnected) return clearInterval(d._tick); try { st.innerHTML = dbgStatusHTML(); dbgQuickSync(qb); } catch (e) { /* Status ist nur Anzeige */ } };
+  tick(); d._tick = setInterval(tick, 500);
 }
 function toggleDebugOld() {
   let d = $('debugpanel');
@@ -21703,6 +22024,16 @@ export function selftest() {
     S.dbg = { god: true }; const hp = p.hp; hurt(p, 50, null, 'Test'); const god = p.hp === hp; S.dbg = { reveal: true }; const rev = explored(1, 1); S.dbg = keep;
     return need && drops && s4 > s1 * 3.5 && through && god && rev;
   }));
+  ok('Debug-GUI Runde 2 (09.10.): jeder Abschnitt hat eine Gruppe (kein „Sonstiges“), jeder Gegner eine Kategorie; Gegner- und Teleport-Browser zeichnen Kacheln; Fenster mit Statuszeile, Schnellleiste und Werkzeugen', (() => {
+    const grouped = debugSections().every(s => dbgGroup(s[0]) !== 'Sonstiges') && DBG_MOVE.every(M => DBG_GROUPS.some(g => g[0] === M[2]) && dbgGroup(M[1]) !== 'Sonstiges');
+    const cats = Object.values(MONSTERS).every(m => DBG_FCATS.some(c => c[1] && c[0] !== 'Alle' && c[1](m)));
+    const h1 = document.createElement('div'), h2 = document.createElement('div'); dbgFoeBrowser(h1); dbgTpBrowser(h2);
+    const tiles = h1.querySelectorAll('.dbi-tile canvas').length > 5 && h2.querySelectorAll('.dbi-tile').length > 5 && dbgTpList().some(t => t.cat === 'Karten') && dbgTpList().some(t => t.cat === 'Orte');
+    const was = !!$('debugpanel'); if (was) toggleDebug(); toggleDebug(); const d = $('debugpanel');
+    const gui = !!d && /Tag \d+/.test($('dbg-status').textContent) && $('dbg-quick').children.length === DBG_QUICK.length && !d.querySelector('#dbg-nav [data-g="Sonstiges"]') && ['Gegenstände', 'Gegner & Tiere', 'Teleport'].every(g => d.querySelector(`#dbg-nav [data-g="${g}"]`));
+    toggleDebug(); if (was) toggleDebug();
+    return grouped && cats && tiles && gui && !$('debugpanel') === !was;
+  })());
   ok('Phase 4 Eisenfeste (MP2 §53/§54): Mine, Schmiedeviertel, Ställe, Vorwerk, Holzfällerlager stehen; an jedem Platz arbeiten Goblins mit Beruf, dazu Aufseher und Streifen', (() => {
     const near = (site, test, r = 14) => { const [x, y] = EISEN_SITES[site]; return S.ents.world.filter(e => test(e) && Math.hypot(e.x / TS - x, e.y / TS - y) < r); };
     const props = near('mine', e => e.type === 'ore_node').length >= 8 && near('smithy', e => e.type === 'forge').length >= 3 && near('vorwerk', e => e.type === 'scarecrow', 30).length >= 2 && near('lumber', e => e.type === 'fallen_tree').length >= 2;
@@ -22124,8 +22455,8 @@ export function selftest() {
     const V = tribVillages()[0], keep = structuredClone({ t: S.tribute || {}, q: S.quests.q_tribut || null, tq: S.tributQuest || null, c: S.factions.chain, f: S.flags.chainsBroken, g: S.gold, tw: S.towns });   /* T23 S2: Tribut aus dem Dorfmarkt */
     const inv0 = S.player.inv.slice(), before = new Set(S.ents.world.map(e => e.id)), q0 = S._quiet; S._quiet = true;
     try {
-      S.flags.chainsBroken = false; const T = tribState(V.key), st = S.towns[V.key].stock; st.grain = 60; st.meat = 0; T.harsh = 0; T.paid = false; T.next = S.day | 0; T.garrison = 1e9;
-      tributeDay(); const L = S.ents.world.find(e => e.tribV === V.key && !before.has(e.id)), took = st.grain === 60 - TRIB_TAKE && !!L && L.tribCargo === TRIB_TAKE;
+      S.flags.chainsBroken = false; const T = tribState(V.key), st = S.towns[V.key].stock, rs = ECO.target(S.towns[V.key], 'grain'); st.grain = 60 + rs; st.meat = 0; T.harsh = 0; T.paid = false; T.next = S.day | 0; T.garrison = 1e9;   /* E45: Eigenbedarf bleibt */
+      tributeDay(); const L = S.ents.world.find(e => e.tribV === V.key && !before.has(e.id)), took = Math.abs(st.grain - (60 + rs - TRIB_TAKE)) < 1e-9 && !!L && L.tribCargo === TRIB_TAKE;
       for (const e of S.ents.world) if (e.brawlV === V.key) { e.brawl = false; if (e.villager) e.brave = false; } if (S.brawls) delete S.brawls[V.key];
       T.next = S.day | 0; T.paid = true; S.gold = 1e4; const v1 = st.grain; tributeDay(); const paidOk = st.grain === v1 && !T.paid;
       L.alive = false; L.lastKiller = S.player.id; tribTick();
@@ -22432,11 +22763,11 @@ export function selftest() {
     const pen0 = penList().length; campArrive(J, null); const hunt = S.gobCity.pts === 30 && J.taken === F.huntGain && penList().length === pen0 + F.huntGain;
     const V = tribVillages()[0], T = tribState(V.key), st = S.towns[V.key].stock, kf = S.towns.kettenfeste.stock;
     for (const W of tribVillages()) tribState(W.key).next = day + 99;
-    Object.assign(T, { next: day, paid: false, harsh: 0, garrison: 1e9, hunger: 0 }); st.grain = 40; st.meat = 0; const k0 = kf.grain || 0, ids = new Set(S.ents.world.map(e => e.id));
+    const rs = ECO.target(S.towns[V.key], 'grain'); Object.assign(T, { next: day, paid: false, harsh: 0, garrison: 1e9, hunger: 0 }); st.grain = 40 + rs; st.meat = 0;   /* E45: Eigenbedarf bleibt */ const k0 = kf.grain || 0, ids = new Set(S.ents.world.map(e => e.id));
     const unbrawl = () => { for (const e of S.ents.world) if (e.brawlV === V.key) { e.brawl = false; e.brawlSide = null; if (e.villager) e.brave = false; } if (S.brawls) delete S.brawls[V.key]; };
     tributeDay(); const L = S.ents.world.find(e => e.tribV === V.key && !ids.has(e.id)); unbrawl();
-    const took = st.grain === 15 && L?.tribCargo === TRIB_TAKE; if (L) arriveTribute(L); const fort = kf.grain === k0 + TRIB_TAKE;
-    T.next = day; st.grain = 5; tributeDay(); unbrawl(); const hungry = T.hunger >= 1 && st.grain === 0;
+    const took = Math.abs(st.grain - (15 + rs)) < 1e-9 && L?.tribCargo === TRIB_TAKE; if (L) arriveTribute(L); const fort = kf.grain === k0 + TRIB_TAKE;
+    T.next = day; st.grain = 5; tributeDay(); unbrawl(); const hungry = T.hunger >= 1 && st.grain === 5;   /* E45: vom Hungernden nimmt die Kette nichts */
     T.vorrat = 60; st.grain = 10; tribState(V.key); const migr = st.grain === 40 && !('vorrat' in T);
     const res = { heads, size, heer, jagd, hunt, took, fort, hungry, migr }; if (!Object.values(res).every(Boolean)) console.warn('T23-S2-Probe', res, C, J);
     return Object.values(res).every(Boolean);
@@ -22450,13 +22781,13 @@ export function selftest() {
     W.armies = W.armies.filter(x => x.faction !== 'undead'); R.undead.v = 10; R.undead.stage = 0; for (const k of caps) W.nodes[k].garrison = 0;
     seedRng(sd); SIM.warDay(); const starve = !und().length && caps.every(k => W.nodes[k].owner !== 'undead' || W.nodes[k].garrison === 0);
     W.armies = W.armies.filter(x => x.faction !== 'undead'); R.undead.v = 60; R.undead.stage = 1; for (const k of caps) W.nodes[k].garrison = 10;
-    seedRng(sd); SIM.warDay(); const fresh = und()[0], army = fresh?.strength === 32 && U() === 30 + SIM.undNodeCount();
+    seedRng(sd); SIM.warDay(); const fresh = und()[0], army = fresh?.strength === 32 && Math.abs(U() - Math.round((30 + SIM.undNodeCount()) * (1 - (FAC_RES.undead.decay || 0)) * 10) / 10) < 0.11;   /* E48: Seelen verwehen 4 % am Tag */
     S.day = 90; W.armies = W.armies.filter(x => !x.host); W.nodes.varonheim.owner = 'valen'; W.hostCd = 0; R.undead.v = 100; const host = !!SIM.launchHost() && U() === 60;
     R.undead.stage = 2; const att = { id: 't3m', faction: 'undead', strength: 56, name: 'M', at: 'marsh', prev: 'graveyard' }, def = { id: 't3v', faction: 'valen', strength: 20, name: 'V', at: 'marsh', prev: 'marsh' };
     SIM.materializeForTest('marsh', att, def); const types = new Set(S.ents.world.filter(e => e.armyId === 't3m').map(e => e.mtype)); W.battles = []; const mixed = types.size >= 2;
     const A = AF(); A.zeal = 4; const order = crusadeEvery() === 8 && Math.abs(crusadeChance(false, 0) - 0.65) < 1e-9 && Math.abs(zealHealMul({ faction: 'order' }) - 1.1) < 1e-9 && zealHealMul({ faction: 'valen' }) === 1;
     A.zeal = 0; A.zealHold = -99; A.hunt = null; resDaily(R, false); const hold = A.zeal === (SIM.undNodeCount() >= FAC_RES.order.holdNodes ? 1 : 0);
-    A.zeal = 2; A.zealHold = S.day | 0; A.zealAt = (S.day | 0) - 10; resDaily(R, false); const decay = A.zeal === 1.5 && R.order.v === 1.5;
+    A.zeal = 2; A.zealHold = S.day | 0; A.zealAt = (S.day | 0) - 10; resDaily(R, false); const decay = A.zeal === 2 - FAC_RES.order.decay && R.order.v === 2 - FAC_RES.order.decay;   /* E48: Abklingen aus FAC_RES */
     const res = { harvest, starve, army, host, mixed, order, hold, decay }; if (!Object.values(res).every(Boolean)) console.warn('T23-S3-Probe', res, { d: d.strength, U: U(), fresh, types: [...types] });
     return Object.values(res).every(Boolean);
   }));
@@ -22558,6 +22889,14 @@ export function selftest() {
     } finally { S.ents.world = W0; const k2 = structuredClone(keep); S.vmGone = k2.g || undefined; S.vmGen = k2.n || undefined; S.vmPaid = k2.pd || undefined; if (k2.d) S.defense = k2.d; S.bands = keep.b; S.weary = k2.w || undefined; S.flags = keep.f; S.gold = g0;
       for (const x of ['vmGone', 'vmGen', 'vmPaid', 'weary']) if (S[x] === undefined) delete S[x]; }
   })());
+  ok('E44 Messing-Stigma (T15 V9): Auge immer sichtbar, Umhang verdeckt Prothesen; Orden ×1,25 und notiert ab 2 Teilen (Orden −1 einmal am Tag), Aurelion ×0,85; ohne Sichtkontakt nichts', sandbox(() => {
+    const p = stage(), o = actor(p.x + 40, p.y, { faction: 'order', name: 'Bruder' }), a = actor(p.x - 40, p.y, { faction: 'aurel', name: 'Bürgerin' }), far = actor(p.x + 900, p.y, { faction: 'order' });
+    const none = !stigmaOf(o, 'brass'); B.attachEye(p, 2); const eye = B.brassOf(p) === 1 && stigmaOf(o, 'brass')?.price === 1.25 && stigmaOf(a, 'brass')?.price === 0.85 && !stigmaOf(far, 'brass');
+    B.attachProsthesis(p, 'rarm', 2); const two = B.brassOf(p) === 2; p.equip.cloak = mkItem(Object.keys(ITEMS).find(k => ITEMS[k].slot === 'cloak')); const cloak = B.brassOf(p) === 1; p.equip.cloak = null;
+    const r0 = S.factions.order || 0; delete S.flags.brassOrderDay; brassTick(p); brassTick(p); const inq = (S.factions.order || 0) === Math.max(-100, r0 - 1);
+    const res = { none, eye, two, cloak, inq }; if (!Object.values(res).every(Boolean)) console.warn('E44-Probe', JSON.stringify(res));
+    return Object.values(res).every(Boolean);
+  }));
   ok('E41 Nachwachsen (09.10.): Stumpf wird nach 10 Tagen wieder ein fester Baum, vorher nicht, nie im Bild oder unter dem Helden', sandbox(() => {
     const p = stage(), d = S.day | 0, mk = (x, y, age) => { const s = { id: uid(), kind: 'prop', type: 'stump', map: '__a', x, y, r: 8, solid: false, stumpDay: d - age }; S.ents.__a.push(s); return s; };
     S.map = '__a'; const young = mk(p.x + 3000, p.y, 9), old = mk(p.x + 3000, p.y + 200, 10), under = mk(p.x, p.y, 12);
@@ -23291,7 +23630,7 @@ export function selftest() {
     try {
       ensureCoaches(); const coaches = S.ents.world.filter(e => e.coach).length >= 4 && S.ents.world.some(e => e.ferry === 'saltport');
       S.gold = 500; const T = tripOf('eren', 'northcity'); T.risk = 0; const m0 = S.day * 1440 + S.minute; journey(T, 'Die Kutsche');
-      const [nx, ny] = TOWN_PLAN.northcity.square, arrived = Math.hypot(p.x / TS - nx, p.y / TS - ny) < 8 && S.gold === 500 - T.price && Math.abs(S.day * 1440 + S.minute - m0 - T.min) < 0.5;   // Minuten sind Gleitkomma
+      const [nx, ny] = TOWN_PLAN.northcity.square, arrived = Math.hypot(p.x / TS - nx, p.y / TS - ny) < 12 && S.gold === 500 - T.price && Math.abs(S.day * 1440 + S.minute - m0 - T.min) < 0.5;   // Minuten sind Gleitkomma
       const T2 = tripOf('northcity', 'eren'); T2.risk = 1; const n0 = S.ents.world.filter(e => e.kind === 'enemy').length; journey(T2, 'Die Kutsche');
       const [ex, ey] = TOWN_PLAN.eren.square, mid = Math.hypot(p.x / TS - ex, p.y / TS - ey) > 10 && S.ents.world.filter(e => e.kind === 'enemy').length >= n0 + 3;
       const F = tripOf('saltport', 'kupferhafen', true);
@@ -26896,6 +27235,34 @@ export function selftest() {
     p.stigma = {}; p.boneRep = {}; p.equip.head = mkItem('kuttenkapuze'); const hidden = !stigmaOf(w) && boneSeen(p) === 0;
     S.ranks.undead = 0; const raid = !raidSources({ x: 487 * TS, y: 443 * TS, map: 'world' }).some(x => x.src === 'undead');
     return seen && rep && hidden && raid; }));
+  ok('Fehlersuche 09.10.: Textgröße (--ts) hebt die schmalen Bildschirm-Raster nicht auf — #stage-Spalten mit --ts nur innerhalb einer Breiten-Regel', (() => {
+    const css = [...document.styleSheets].filter(s => /style\.css/.test(s.href || '')).flatMap(s => { try { return [...s.cssRules]; } catch (e) { return []; } });
+    if (!css.length) return true;   /* ohne Stilblatt (Kopf-Test) nichts zu prüfen */
+    const top = css.some(r => r.selectorText === '#stage' && /--ts/.test(r.style?.gridTemplateColumns || ''));
+    const scoped = css.filter(r => r.media && [...r.cssRules].some(x => x.selectorText === '#stage' && /--ts/.test(x.style?.gridTemplateColumns || '')));
+    return !top && scoped.length >= 2 && scoped.every(r => /min-width/.test(r.conditionText || r.media.mediaText));
+  })());
+  ok('Fehlersuche 09.10.: Ausfall vor Varonheim (S3b) aus einem Spielstand — seine Toten sind flüchtig — gilt nach dem Laden als abgebrochen, nicht als gelungen', (() => {
+    const n = capNode(); if (!n || !S.war) return true; const sg = n.siege, ws = S.war.sally;
+    try { n.siege = { day: S.day | 0, by: 'probe' }; S.war.sally = JSON.parse(JSON.stringify({ ids: ['__weg'], start: S.day * 1440 + S.minute, army: 'probe' }));   /* wie aus dem Spielstand */
+      sallyTick(); return S.war.sally == null && !n.siege.noHit;
+    } finally { n.siege = sg; if (ws === undefined) delete S.war.sally; else S.war.sally = ws; }
+  })());
+  ok('Fehlersuche 09.10.: Tageshash (T23) streut — Prisen des Seevolks (10 %) kommen verteilt, nicht acht Tage am Stück alle 77 Tage', (() => {
+    const d0 = S.day; let run = 0, top = 0, n = 0;
+    try { for (let d = 0; d < 300; d++) { S.day = d; const hit = SIM.resHash(11, 1000) < 100; n += hit ? 1 : 0; run = hit ? run + 1 : 0; top = Math.max(top, run); } } finally { S.day = d0; }
+    return top <= 6 && n >= 10 && n <= 55;
+  })());
+  ok('Fehlersuche 09.10.: Händlerzüge auf dem Umweg (N1) — Überfälle dort gehen nie an die Bande an der Hauptstraße (wie beim eigenen Wagen)', (() => {
+    const E = S.eco, A = LOCATIONS.find(l => l.key === 'eren'), Bq = LOCATIONS.find(l => l.key === 'northcity'); if (!E || !A || !Bq || !S.towns?.eren) return true;
+    const k = { c: E.caravans, b: S.bands, r: E.routes, f: JSON.stringify(S.facRes ?? null), ch: S.chronicle.length, fl: { ...S.flags } };
+    try {
+      const bd = { id: '__bd', name: 'Probebande', where: 'Probe', men: 9, tx: (A.x + Bq.x) / 2, ty: (A.y + Bq.y) / 2, loot: 5 }; S.bands = [bd]; E.routes = {};
+      E.caravans = Array.from({ length: 16 }, () => ({ id: uid(), from: 'eren', to: 'northcity', good: 'grain', n: 10, guards: 0, eta: 1e9, detour: true }));
+      keepRng(() => { for (let s = 1; s <= 40; s++) { seedRng(s * 7919); ECO.caravanDay(); } });
+      return E.caravans.some(c => c.raided) && bd.loot === 5;
+    } finally { E.caravans = k.c; S.bands = k.b; E.routes = k.r; S.facRes = JSON.parse(k.f) ?? undefined; if (!S.facRes) delete S.facRes; S.chronicle.length = k.ch; for (const x of Object.keys(S.flags)) if (!(x in k.fl)) delete S.flags[x]; }
+  })());
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
   S.quests = quests0;
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;

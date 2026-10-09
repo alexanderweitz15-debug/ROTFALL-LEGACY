@@ -402,3 +402,12 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
 - **Debug-Menü:** kompakt, kleiner, übersichtlich; Gegenstände mit eigener Einteilung (Waffen, Rüstung, Talismane …).
 - **Fertigkeiten-Menü:** wird neu gebaut („holy shit ist das arsch“).
 - Pushen direkt auf main, sobald der Selbsttest grün ist.
+
+## 09.10.2026 — Fragerunde 2 (Entwickler)
+- **E18 Belagerung S3c:** Kellerweg **nur mit Kultschlüssel**; Varon: **als Ritter Varons ja, sonst 15 % Ablehnung je Tag**.
+- **E44 Messing-Stigma (T15 V9):** Vorschlag übernommen — Orden ×1,25 Preise, Inquisitor meldet ab 2 sichtbaren Teilen; Valen ×1,1, Spionverdacht bei der Audienz ab 2; Kette ×1,2; Aurelion ×0,85 Rabatt; Händler/Seevolk/Freie ×1,1; Banditen/Goblins/Tote ×1,0. Umhang verdeckt Arme, nicht das Auge.
+- **E45 Tribut (T23):** Die Kette nimmt **nur aus dem Überschuss** — Dörfer leiden, sterben aber nicht aus.
+- **E46 Thronstreit (E40 S3):** Bei Gleichstand gewinnt **Morvath**.
+- **E47 Gesetze der Stillen:** gelten **nur in Vharnholm**.
+- **E48 Seelen/Eifer (T23):** sollen **langsamer** an den Deckel laufen (stärkeres Abklingen), damit Spielerhandlungen sichtbar wirken.
+- **E49 Aurelion nach Wohlstand:** soll **stärker wirken** — auch Wachen, Preise und Automaten-Streifen.

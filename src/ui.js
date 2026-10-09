@@ -1346,11 +1346,12 @@ function masteryUI(body) {
   const groups = [...SK_GROUPS, ...new Set(info.map(s => s.group).filter(g => !SK_GROUPS.includes(g)))].map(g => [g, info.filter(s => s.group === g)
     .sort((a, b) => skUsed(b) - skUsed(a) || b.v - a.v || a.name.localeCompare(b.name))]).filter(([, L]) => L.length);
   if (!byK[skSel]) skSel = groups.flatMap(([, L]) => L).find(skUsed)?.k || info[0]?.k || null;
-  const nUsed = info.filter(skUsed).length, open = info.filter(s => s.master?.open);
+  const nUsed = info.filter(skUsed).length, open = info.filter(s => s.master?.open), cols = [[], []], hgt = [0, 0];
+  for (const G of groups) { const i = hgt[0] <= hgt[1] ? 0 : 1; cols[i].push(G); hgt[i] += G[1].length + 1.5; }   /* zwei Spalten, nach Zeilen ausgeglichen */
   body.innerHTML = `<div class="sk">
     <header class="sk-head"><span>${nUsed} von ${info.length} geübt</span>${open.length ? `<span class="sk-open">★ Meisterprüfung offen: ${open.map(s => s.name).join(', ')}</span>` : ''}
       <span class="sk-legend"><i class="sk-mark near">◆</i> Meilenstein nah <i class="sk-mark open">★</i> Meisterprüfung</span></header>
-    <div class="sk-main"><div class="sk-list" id="sk-list">${groups.map(([g, L]) => `<section class="sk-grp"><h4>${g}<small>${L.filter(skUsed).length}/${L.length}</small></h4>${L.map(skRow).join('')}</section>`).join('')}</div>
+    <div class="sk-main"><div class="sk-list" id="sk-list">${cols.map(C => `<div class="sk-col">${C.map(([g, L]) => `<section class="sk-grp"><h4>${g}<small>${L.filter(skUsed).length}/${L.length}</small></h4>${L.map(skRow).join('')}</section>`).join('')}</div>`).join('')}</div>
       <section class="sk-det" id="sk-det">${skDetail(byK[skSel])}</section></div>
     <p class="sk-hint">Fertigkeiten wachsen durch Tun — jede Waffenart für sich. Stufe = Wert ÷ 2 (bis 50). Starke Gegner lehren mehr als harmlose; dasselbe Ziel immer wieder lehrt kaum noch etwas. Zeile überfahren: Einzelheiten, anklicken: festhalten.</p></div>`;
   paintIcons(body);
@@ -1413,7 +1414,7 @@ function charUI(body, who) {
       ${isPlayer ? `<h3>Talente</h3><p class="traits">${Object.keys(p.tree || {}).map(k => SKILL_TREE[k]?.name).filter(Boolean).join(' · ') || 'Noch keine.'}${p.skillPoints ? ` · <b style="color:var(--gold)">${p.skillPoints} frei (T)</b>` : ''}</p>` : ''}
       <h3>Fertigkeiten</h3>
       <dl class="ledger-list">${skills.slice(0, 5).map(([k, n]) => `<div title="${SK_HOW[k] || ''}"><dt>${n}</dt><dd>Stufe ${Math.floor(p.skills[k] / 2)}</dd></div>`).join('') || '<div><dt>Noch ungeübt</dt><dd>—</dd></div>'}</dl>
-      ${isPlayer ? `<button class="txtbtn" id="ch-mastery">${skills.length > 5 ? `Alle ${skills.length} Fertigkeiten` : 'Fertigkeiten'}: Meilensteine, Meisterschaft →</button>` : ''}
+      ${isPlayer ? `<button class="txtbtn" id="ch-mastery" title="Reiter „Fertigkeiten“: alle Fertigkeiten mit Meilensteinen, Techniken und Meisterschaft">Alle Fertigkeiten${skills.length > 5 ? ` (${skills.length})` : ''} →</button>` : ''}
     </section>
   </div>`;
   if ($('ch-figure')) drawFigureTo($('ch-figure'), p);

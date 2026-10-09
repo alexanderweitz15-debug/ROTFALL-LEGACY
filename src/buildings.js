@@ -91,6 +91,7 @@ export const BTYPES = {
   magitech:    { label: 'Magitech-Werkstatt',          mono: 1, glass: 1, emblem: 'gear', glow: 1 },
   factoryhall: { label: 'Werkhalle',                   mono: 1, glass: 1, saw: 1, emblem: 'gear', dark: 1 },
   legion:      { label: 'Kaserne der Sonnenlegion',    mono: 1, towers: 1, emblem: 'sun' },
+  tent:        { label: 'Zelt', tent: 1, noWin: 1 },   /* T21 (§5g.4): begehbares Zelt, gebaut in game.js (raiseTent), Bild tentSprite */
 };
 
 // 5×4-Symbole für Schilder ('#' = Farbe, '+' = Licht)
@@ -120,7 +121,8 @@ const styleOf = b => ({ pitch: 0.34 + hh(b.hx ?? b.x, b.hy ?? b.y, 61) * 0.17, d
 
 // Wandhöhe FH: höher als eine Figur (25 Texel inkl. Kopf ≈ Tür 16). Firsthöhe RISE wächst mit der Tiefe.
 // Session 10: Fassade höher (Tür ≈ Figurenhöhe, Figuren sind seit v2 größer); das Dach behält mindestens 24 Texel.
-export function houseDims(b) { const T = BTYPES[b.type] || {}; if (T.mono) { const RISE = 12 + b.h * 2 + (T.dome ? 30 : T.towers ? 16 : 0), FH = Math.min(52, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 }; }
+export function houseDims(b) { const T = BTYPES[b.type] || {}; if (T.tent) { const RISE = 8 + b.h * 2; return { OV: 2, RISE, FH: 12, W: b.w * 16 + 4, H: RISE + b.h * 16 + 1 }; }   /* T21: Zelt, niedriger als ein Haus */
+  if (T.mono) { const RISE = 12 + b.h * 2 + (T.dome ? 30 : T.towers ? 16 : 0), FH = Math.min(52, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 }; }
   const RISE = 10 + b.h * 2 + (isNoble(b) ? 8 : b.type === 'chapel' && quarterOf(b) === 'temple' ? 34 : 0), FH = Math.min(T.floors === 2 || isNoble(b) ? 46 : b.big || T.big ? 34 : 32, RISE + b.h * 16 - 24); return { OV: 2, RISE, FH, W: b.w * 16 + 4, H: RISE + b.h * 16 + 1 }; }
 // Giebel nach vorn: über der Vorderwand ein Giebeldreieck (Höhe GH), dahinter zwei Dachflächen, die nach hinten laufen.
 export function gableOf(b) {
@@ -192,7 +194,46 @@ function monumentSprite(b, lit) {
   if (b.door !== 'S') for (let y = dy; y < yB - 3; y++) for (let x = dx - 6; x < dx + dw + 6; x++) g.p(x, y, St.b);                        // Seiteneingang: Front geschlossen
   return toCanvas(g);
 }
+/* T21 (§5g.4): Firstzelt — der First läuft von vorn nach hinten, vorn der Giebel mit dem Eingang (Tür im Süden). Stoff je Lagerart
+   (b.cloth), Streifen in Fraktionsfarbe an der Traufe und ein Wimpel (b.stripe), Zeichen über dem Eingang (b.emblem), geflickt bei Banden
+   (b.tentKind 'band'). Gleiche Maße-Logik wie Häuser (houseDims), damit Ausblenden beim Betreten und Kollision gleich bleiben. */
+function tentSprite(b, lit) {
+  const { OV, RISE, W, H } = houseDims(b), g = new G(W, H), n = (x, y) => hh(x, y, b.seed || 1);
+  const yB = RISE + b.h * 16, fx0 = OV, fx1 = OV + b.w * 16 - 1, cx = (fx0 + fx1) / 2, half = cx - fx0;
+  const GH = Math.min(Math.round(b.w * 16 * 0.42), yB - 8), apexY = yB - GH, depth = Math.max(8, Math.min(Math.round(b.h * 16 * 0.62), apexY - 3));
+  const C = ramp(b.cloth || '#8a7a58'), S2 = b.stripe ? ramp(b.stripe) : null, worn = b.tentKind === 'band';
+  for (let x = fx0; x <= fx1; x++) {                                   /* Dachflächen: je Spalte zwischen Vorderkante (Giebel) und Hinterkante */
+    const t = Math.abs(x - cx) / half, left = x < cx, yF = Math.round(apexY + GH * t), yK = yF - depth;
+    for (let y = Math.max(0, yK); y <= yF; y++) {
+      let c = left ? (t < 0.12 ? C.hi : C.b) : (t < 0.12 ? C.b : C.sh);
+      if ((Math.round(x - cx) % 7) === 0 && t > 0.05) c = left ? C.sh : C.dk;                          /* Stoffbahnen */
+      if (y === yK) c = left ? C.hi : C.b;                                                              /* hintere Kante im Licht */
+      if (S2 && t > 0.74 && t < 0.88) c = left ? S2.b : S2.sh;                                          /* Streifen der Garnison */
+      if (worn && n(x >> 2, y >> 2) > 0.84) c = mix(c, (x + y) % 5 ? '#3a2c1e' : '#7a6446', 0.45);      /* Flicken */
+      g.p(x, y, c);
+    }
+  }
+  for (let y = apexY; y < yB; y++) {                                  /* Giebel vorn */
+    const hw = half * (y - apexY) / GH;
+    for (let x = Math.ceil(cx - hw); x <= Math.floor(cx + hw); x++) { let c = mix(C.b, C.sh, 0.25); if (worn && n(x >> 2, (y >> 2) + 40) > 0.86) c = mix(c, '#3a2c1e', 0.4); if (S2 && y >= yB - 4 && y < yB - 2) c = S2.b; g.p(x, y, c); }
+  }
+  const oh = Math.round(GH * 0.72), ow = Math.min(16, Math.round(half * 0.7));   /* Eingang: dunkles Dreieck, Flügel zurückgeschlagen */
+  for (let y = yB - oh; y < yB - 1; y++) {
+    const k = (y - (yB - oh)) / oh, hw = ow * k / 2;
+    for (let x = Math.ceil(cx - hw); x <= Math.floor(cx + hw); x++) g.p(x, y, lit ? ((x + y) % 3 ? '#e2a95a' : '#f2cf8a') : (y > yB - 4 ? '#0e0b08' : '#1c150e'));
+    g.p(Math.floor(cx - hw) - 1, y, C.hi); g.p(Math.ceil(cx + hw) + 1, y, C.hi);                       /* Kanten der Flügel */
+    if (k > 0.35) { g.p(Math.floor(cx - hw) - 2, y, C.b); g.p(Math.ceil(cx + hw) + 2, y, C.sh); }
+  }
+  const E = b.emblem && EMBLEM[b.emblem]; if (E) { const ex = Math.round(cx) - 2, ey = yB - oh - 7; E.forEach((row, j) => [...row].forEach((ch, i) => { if (ch !== '.') g.p(ex + i, ey + j, ch === '+' ? '#f2d58a' : '#b08a3e'); })); }
+  const px = Math.round(cx); g.r(px, apexY - depth - 4, 1, 5, '#3a2c1e');                              /* Zeltstange über dem hinteren First */
+  g.r(px, apexY - 4, 1, 5, '#3a2c1e');                                                                /* und vorn */
+  if (S2) { g.r(px + 1, apexY - 4, 4, 2, S2.b); g.p(px + 5, apexY - 3, S2.sh); }                      /* Wimpel */
+  for (const x0 of [fx0, fx1]) g.r(x0, yB - 3, 1, 3, '#4a3a26');                                      /* Heringe an den Ecken */
+  for (let x = fx0; x <= fx1; x++) if (g.at(x, yB - 1)) g.p(x, yB - 1, mix(g.at(x, yB - 1), '#120e0c', 0.5));   /* Bodenschatten */
+  return toCanvas(g);
+}
 export function houseSprite(b, lit) {
+  if (BTYPES[b.type]?.tent) return tentSprite(b, lit);
   if (BTYPES[b.type]?.mono) return monumentSprite(b, lit);
   const T = BTYPES[b.type] || BTYPES.house, st = TOWN_STYLE[b.town] || TOWN_STYLE.eren;
   const wear = wearOf(b), sty = styleOf(b), q = quarterOf(b), qh = k => hh(b.x, b.y, 300 + k), noble = isNoble(b);

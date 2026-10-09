@@ -566,7 +566,7 @@ export function resStage(f, v, old = 1) {
 /* T23 S3: Seelen aus Verlusten einer Schlacht im Kriegsgraphen (abstrakt oder vor Ort) — 30 % der Stärke, die der Verlierer verlor, gleich welche Seite */
 export function soulHarvest(loss) { const n = Math.round(Math.max(0, loss) * FAC_RES.undead.battle); if (n > 0) resAdd('undead', n); return n; }
 export const resStageOf = f => S.facRes?.[f]?.stage ?? resStage(f, facRes(f));
-export const resHash = (salt, n) => Math.abs(((S.seed | 0) * 7 + (S.day | 0) * 13 + salt * 31) | 0) % n;   /* Tageshash statt rnd() */
+export const resHash = (salt, n) => { let h = Math.imul((S.seed | 0) ^ Math.imul((S.day | 0) + 1, 0x9E3779B1) ^ Math.imul(salt + 7, 0x85EBCA77), 0xC2B2AE3D); h ^= h >>> 15; h = Math.imul(h, 0x27D4EB2F); h ^= h >>> 13; return (h >>> 0) % n; };   /* Tageshash statt rnd() */   /* 🐞→✔ Fehlersuche 09.10.: vorher linear im Tag (Tag × 13) — 10 % kamen als 8 Tage am Stück alle 77 Tage; jetzt gemischt */
 export const undNodeCount = () => Object.values(S.war?.nodes || {}).filter(n => n.owner === 'undead').length;
 export const valenGrainNow = () => Object.keys(S.war?.nodes || {}).filter(k => S.war.nodes[k].owner === 'valen' && S.towns?.[k]).reduce((n, k) => n + (S.towns[k].stock.grain || 0), 0);
 export function aurelIndex() {                                      /* F1 (Entwickler 01.10.): Index aus Versorgung und Magitech — der kleinere zählt */
@@ -590,7 +590,8 @@ export function facResDay() {
   if (!resNum(R.undead.v)) set('undead', Math.min(FAC_RES.undead.max, FAC_RES.undead.start[0] + FAC_RES.undead.start[1] * undNodeCount()));
   if (!resNum(R.merch.v)) set('merch', FAC_RES.merch.def);
   if (!first) resAdd('merch', -FAC_RES.merch.decay);   /* S4: der Handelswert klingt ab, wenn keine Züge ankommen */
-  if (!(S.flags?.garmadonSlain && S.flags?.deadSucc?.winner !== 'morvath')) resAdd('undead', FAC_RES.undead.node * undNodeCount());   /* S3: die Gräber geben — 1 Seele je Ort der Toten */
+  if (!(S.flags?.garmadonSlain && S.flags?.deadSucc?.winner !== 'morvath')) resAdd('undead', FAC_RES.undead.node * undNodeCount());
+  if (!first && FAC_RES.undead.decay) resAdd('undead', -facRes('undead') * FAC_RES.undead.decay);   /* E48 (Entwickler 09.10.): Seelen verwehen — die Gruft läuft nicht dauerhaft am Deckel */   /* S3: die Gräber geben — 1 Seele je Ort der Toten */
   H.resDaily?.(R, first);                                           /* Tagesquellen und -senken der Scheiben S3–S5 (game.js) */
   set('chain', resNum(src.labor) ? src.labor : FAC_RES.chain.def);
   set('aurel', aurelIndex().v);
