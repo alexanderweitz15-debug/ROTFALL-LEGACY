@@ -389,8 +389,8 @@ export function routeLines(town, o = {}) {
 function caravanDay() {
   const E = S.eco;
   for (const c of [...E.caravans]) {
-    if (!c.raided && chance(riskOf(c.from, c.to, c.guards))) {
-      c.raided = true; const lost = Math.ceil(c.n * (0.5 + rnd() * 0.5)); c.n -= lost; merchAdd(-FAC_RES.merch.raid);   /* T23 S4: ein überfallener Zug kostet die Gilde */
+    if (!c.raided && chance(riskOf(c.from, c.to, c.guards, { detour: c.detour }))) {
+      c.raided = true; noteRaid(c.from, c.to);   /* N1: die Strecke merkt es sich */ const lost = Math.ceil(c.n * (0.5 + rnd() * 0.5)); c.n -= lost; merchAdd(-FAC_RES.merch.raid);   /* T23 S4: ein überfallener Zug kostet die Gilde */
       const bd = raidBand(c.from, c.to);   /* T12 B2: war es eine Bande, bekommt sie die Beute */
       if (bd) onBandRaid(bd, lost, c.good, `einen Zug nach ${townName(c.to)}`);
       else log(`Räuber überfielen einen Händlerzug nach ${townName(c.to)}: ${lost} ${ITEMS[c.good].name} verloren.`, 'economy');
@@ -407,7 +407,7 @@ function caravanDay() {
     for (const g of GOODS) for (const a of (DEAD_GOODS.includes(g) ? TD : T)) {
       const ta = S.towns[a], sur = ta.stock[g] - target(ta, g) * 1.3; if (sur < 6) continue;
       for (const b of (DEAD_GOODS.includes(g) ? TD : T)) {
-        if (a === b || E.caravans.some(c => c.to === b && c.good === g)) continue;
+        if (a === b || E.caravans.some(c => c.to === b && c.good === g) || routeOf(a, b)?.shunTill > S.day) continue;   /* N1: gemiedene Strecke */
         const tb = S.towns[b], need = target(tb, g) * 0.6 - tb.stock[g]; if (need < 3) continue;
         const gain = ecoPrice(b, g, false) - ecoPrice(a, g, true);
         const score = gain * Math.min(sur, need) / tripDays(a, b);
@@ -416,8 +416,44 @@ function caravanDay() {
     }
     if (!best || best.score <= 0) break;
     S.towns[best.a].stock[best.g] -= best.n;
-    E.caravans.push({ id: uid(), from: best.a, to: best.b, good: best.g, n: best.n, guards: ri(0, 1 + (mv > 60 ? 1 : 0)) + (mv < FAC_RES.merch.lt ? 1 : 0), eta: (S.day | 0) + tripDays(best.a, best.b) });
+    const det = routeOf(best.a, best.b)?.detourTill > S.day;   /* N1: Umweg nach zwei Überfällen */
+    E.caravans.push({ id: uid(), from: best.a, to: best.b, good: best.g, n: best.n, guards: ri(0, 1 + (mv > 60 ? 1 : 0)) + (mv < FAC_RES.merch.lt ? 1 : 0), eta: (S.day | 0) + tripDays(best.a, best.b) + (det ? 1 : 0), ...(det ? { detour: true } : {}) });
   }
+}
+
+/* N1 „Händler meiden Strecken“ (PROPOSALS/npc_eigene_ziele.md §5.1): Gedächtnis je Strecke (ungerichtet). 2 Überfälle in 10 Tagen →
+   10 Tage Umweg (+1 Tag, Banden zählen nicht); 3 in 14 Tagen → 8 Tage fährt kein Zug dort, am Ziel wird die Ware knapp und teurer.
+   Wer entscheidet, hat einen Namen (Kontorhändler des Ursprungsorts). Eine zerschlagene Bande gibt ihre Strecken wieder frei. */
+export const ROUTE_MEM = { win: 14, detourHits: 2, detourWin: 10, detourDays: 10, shunHits: 3, shunDays: 8, max: 12 };
+export const routeKey = (a, b) => [a, b].sort().join('|');
+export const routeOf = (a, b) => S.eco?.routes?.[routeKey(a, b)];
+export const ECO_H = {};   /* von game.js: marketName(town) */
+export function noteRaid(a, b) {
+  const R = (S.eco.routes ||= {}), k = routeKey(a, b), day = S.day | 0, M = ROUTE_MEM, r = (R[k] ||= { hits: [], detourTill: 0, shunTill: 0, by: null });
+  r.hits = [...r.hits.filter(d => day - d < M.win), day];
+  const keys = Object.keys(R); if (keys.length > M.max) delete R[keys.sort((x, y) => Math.max(...R[x].hits, -1) - Math.max(...R[y].hits, -1))[0]];
+  const by = () => (r.by = ECO_H.marketName?.(a) ? `${ECO_H.marketName(a)} aus ${townName(a)}` : `Die Händler von ${townName(a)}`);
+  if (r.hits.filter(d => day - d < M.win).length >= M.shunHits && !(r.shunTill > day)) {
+    r.shunTill = day + M.shunDays; const t = `${by()} schickt keine Wagen mehr nach ${townName(b)} — ${M.shunHits}-mal ausgeraubt in zwei Wochen. In ${townName(b)} wird die Ware knapp.`;
+    log(t, 'economy'); chronicle(`Keine Wagen mehr von ${townName(a)} nach ${townName(b)}`, 'news', t);
+    if (!S.flags?.routeHint) { (S.flags ||= {}).routeHint = 1; log('Händler merken sich gefährliche Straßen: erst fahren sie Umwege, dann meiden sie die Strecke ganz. Zerschlage die Bande dahinter, und die Wagen rollen wieder. Der Kontor zeigt gemiedene Straßen.', 'quest'); }
+  } else if (r.hits.filter(d => day - d < M.detourWin).length >= M.detourHits && !(r.detourTill > day) && !(r.shunTill > day)) {
+    r.detourTill = day + M.detourDays; log(`${by()} lässt die Wagen nach ${townName(b)} Umwege fahren — einen Tag länger, dafür an den Banden vorbei.`, 'economy');
+  }
+}
+export function routesFreedBy(bandId) {                              /* Bande zerschlagen: ihre Strecken sind wieder frei (vor dem Entfernen aufrufen) */
+  for (const [k, r] of Object.entries(S.eco?.routes || {})) {
+    const [a, b] = k.split('|'); if (!riskWhy(a, b).some(w => w.band === bandId)) continue;
+    const was = r.shunTill > S.day || r.detourTill > S.day; r.hits = []; r.shunTill = 0; r.detourTill = 0;
+    if (was) log(`Die Straße zwischen ${townName(a)} und ${townName(b)} ist wieder frei. ${r.by || 'Die Händler'} lässt anspannen.`, 'economy');
+  }
+}
+export function routeNotes(town) {                                   /* Kontor: gemiedene Straßen und Umwege ab hier */
+  const day = S.day | 0, out = [];
+  for (const [k, r] of Object.entries(S.eco?.routes || {})) { const [a, b] = k.split('|'); if (a !== town && b !== town) continue; const o = a === town ? b : a;
+    if (r.shunTill > day) out.push(`Gemieden: nach ${townName(o)} (noch ${r.shunTill - day} Tage) — ${r.by || 'die Händler'}`);
+    else if (r.detourTill > day) out.push(`Umweg: nach ${townName(o)} (+1 Tag, noch ${r.detourTill - day} Tage)`); }
+  return out;
 }
 
 // ---------------- Eigene Karawane ----------------

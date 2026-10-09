@@ -356,7 +356,7 @@ function arrive(c, player) {
 export function caravanDied(c) {
   log('Die Karawane ist verloren. Ihre Ladung liegt auf der Straße.', 'economy'); chronicle('Die Karawane nach Nordfurt ist nie angekommen', 'news');
   H.addRep ? H.addRep('merch', -2) : (S.factions.merch -= 2);
-  S.caravanBack = S.day + 2; ECO.merchAdd(-FAC_RES.merch.died);   /* T23 S4: verlorene Große Karawane −10 */
+  S.caravanBack = S.day + 2; ECO.merchAdd(-FAC_RES.merch.died); if (S.eco) ECO.noteRaid('eren', 'northcity');   /* N1: die Alte Straße merkt sich den Verlust */   /* T23 S4: verlorene Große Karawane −10 */
 }
 
 // ---------------- Krieg ----------------
