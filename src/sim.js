@@ -1,8 +1,8 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
-import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=25';
-import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS, MONSTERS, FAC_RES } from './data.js?v=25';
-import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=25';
-import * as ECO from './economy.js?v=25';
+import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=26';
+import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS, MONSTERS, FAC_RES } from './data.js?v=26';
+import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=26';
+import * as ECO from './economy.js?v=26';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
 const LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
@@ -438,6 +438,7 @@ function battleAbstract(node, a, d, dMul) {
   afterBattle(node, win, lose);
 }
 function afterBattle(node, win, lose) {
+  if (lose.faction === 'valen' && !lose.garrison) H.weary?.('valen', 'lossBattle'); else if (win.faction === 'valen' && lose.faction === 'undead') H.weary?.('valen', 'winBattle');   /* N3 */
   if (!lose.garrison) lose.at = lose.prev || lose.at;       // Verlierer weicht zurück
   const n = S.war.nodes[node];
   if (node === CAPK && n.owner === 'valen') {
@@ -461,6 +462,7 @@ function capture(node, faction) {
   const n = S.war.nodes[node];
   if (n.owner === faction) return;
   const was = n.owner;
+  if (was === 'valen' && faction === 'undead') H.weary?.('valen', node === CAPK ? 'capLost' : 'townLost'); else if (was === 'undead' && faction !== 'undead') H.weary?.('valen', 'townFreed');   /* N3 */
   n.owner = faction; n.garrison = faction === 'undead' ? (node === CAPK ? CAP_SIEGE.occ : 10) : (node === CAPK ? 20 : 8); n.wave = 0; n.waves = 0;   // neu besetzt: Befreiung beginnt wieder bei Welle 1
   if (node === CAPK) { n.siege = null; n.walls = faction === 'undead' ? 0 : 30; }
   if (faction === 'undead') for (const a of S.war.armies) if (a.order === node) { a.order = null; if (!a.host && !a.lawOrder) H.heldTaken?.(node); delete a.lawOrder; }   // S15 P20: Befehl erfüllt (der Heerzug ist kein Befehl des Spielers)
@@ -493,6 +495,7 @@ function cleanupArmies() {
   const W = S.war;
   W.armies = W.armies.filter(a => {
     if (a.strength >= 6) return true;
+    if (a.faction === 'valen') H.weary?.('valen', 'armyBroken');   /* N3 */
     log(`${a.name} ist zerschlagen.`, 'faction');
     chronicle(`${a.name} zerschlagen`, 'battle');
     return false;
@@ -527,7 +530,7 @@ export function warDay() {
   capThreatDay();
   const muster = W.nodes.northcity?.owner === 'valen' ? 'northcity' : Object.keys(W.nodes).find(k => k !== CAPK && W.nodes[k].owner === 'valen' && S.towns[k]);   /* Audit V1: nur in einer eigenen Stadt; die Hauptstadt mustert nicht */
   if (!W.armies.some(a => a.faction === 'valen')) {
-    if (muster && chance(0.3 + 0.04 * undNodes)) { W.armies.push(newArmy('valen', muster, 35)); log('Valen stellt ein neues Aufgebot auf.', 'faction'); }
+    if (muster && chance((0.3 + 0.04 * undNodes) * (H.wearyStage?.('valen') >= 3 && !W.nodes[CAPK]?.siege ? 0.5 : 1))) {   /* N3: ab Stufe 85 halbe Chance (ruht in der Belagerung) */ W.armies.push(newArmy('valen', muster, 35)); log('Valen stellt ein neues Aufgebot auf.', 'faction'); }
     else if (!muster && W.nodes[CAPK]?.owner === 'valen' && !W.nodes[CAPK].siege && chance(0.5)) {   /* keine andere Stadt mehr: die Hauptstadt schickt Entsatz — aus Varonheim, nicht belagert */
       W.armies.push(newArmy('valen', CAPK, 45)); log('Aus Varonheim zieht ein Entsatzheer ins Feld.', 'faction');
       chronicle('Entsatz aus Varonheim', 'news', 'Die Krone schickt ihre Garde, um das Land zurückzuholen.');

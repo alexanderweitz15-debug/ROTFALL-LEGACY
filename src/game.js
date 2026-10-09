@@ -1,19 +1,19 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, keepRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=25';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=25';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=25';
-import * as R from './render.js?v=25';
-import * as HB from './buildings.js?v=25';
-import * as UI from './ui.js?v=25';
-import * as SIM from './sim.js?v=25';
-import * as B from './body.js?v=25';
-import * as SP from './sprites.js?v=25';
-import * as ECO from './economy.js?v=25';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=25';   /* Roadmap P8 */
-import { drawAtlas, revealAround, explored } from './atlas.js?v=25';
-import { skyVisible, skyHidden } from './sky.js?v=25';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
-import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=25';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=26';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=26';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=26';
+import * as R from './render.js?v=26';
+import * as HB from './buildings.js?v=26';
+import * as UI from './ui.js?v=26';
+import * as SIM from './sim.js?v=26';
+import * as B from './body.js?v=26';
+import * as SP from './sprites.js?v=26';
+import * as ECO from './economy.js?v=26';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=26';   /* Roadmap P8 */
+import { drawAtlas, revealAround, explored } from './atlas.js?v=26';
+import { skyVisible, skyHidden } from './sky.js?v=26';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
+import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=26';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -2903,6 +2903,7 @@ function bindSim() {
   };
   SIM.H.raidDamage = raidDamage;
   SIM.H.capGates = capGates; SIM.H.capPhase = capPhase;   /* Belagerung S3b */
+  SIM.H.weary = wearyAdd; SIM.H.wearyStage = wearyStage;   /* N3 */
   SIM.H.capThrone = capThrone; SIM.H.capWave4 = id => { for (const e of S.ents.world) if (e.keepGate && e.alive && e.kind === 'enemy') { e.armyId = id; e.worth = 1; } };   /* S3d */
   SIM.H.capitalFell = capitalFall; SIM.H.capitalFreed = capitalFreed; SIM.H.scene = capitalScene; SIM.H.afterCapture = () => ensureVaronExile();   /* RB-052: fällt die Exilstadt, zieht der Hof weiter */   /* Varonheim-Belagerung; T17 Szenen */
   SIM.H.heldTaken = k => holdTown(k);   // S15 P20: Heer auf Befehl hat die Stadt genommen
@@ -7864,7 +7865,7 @@ function campaignDay() {
 function planCampaign(type) {
   type = campType(type);   /* T23 S2: Heerzug braucht 10 Köpfe, unter 6 wird der Stoßtrupp zur Sklavenjagd */
   const K = CAMP_TYPES[type], pk = pick(CAMP_TARGETS), r = ri(...K.size), J = type === 'jagd' ? jagdTargets() : null;   /* Würfe wie vorher: die Zufallsfolge wandert nicht */
-  const target = J ? J[SIM.resHash(5, J.length)] : pk, L = LOCATIONS.find(l => l.key === target), size = J ? r : campSize(type);
+  const target = J ? J[SIM.resHash(5, J.length)] : pk, L = LOCATIONS.find(l => l.key === target), wv = wearyOf('chain').v, size = Math.max(4, Math.round((J ? r : campSize(type)) * (wv >= 60 ? 1 - (wv - 50) / 100 : 1)));   /* N3: Fahnenflucht macht Feldzüge kleiner */
   S.campaign = { id: 'camp' + uid(), type, size, target, phase: 'rat', musterDay: (S.day | 0) + 1, sabotaged: false, warned: false, joined: false };
   log(J ? `Kriegsrat in der Eisenfeste: Die Gruben stehen leer (${Math.round(campHeads())} Köpfe). Varg befiehlt eine Sklavenjagd gegen ${L?.name || target} — ${size} Mann sollen neue Hände holen. Wer dort ist, kann sie aufhalten.`
     : `Kriegsrat in der Eisenfeste: ${K.name} gegen ${L?.name || target} beschlossen — ${size} Mann, so viele, wie die Gruben hergeben (${Math.round(campHeads())} Köpfe in Ketten).`, 'world');
@@ -7960,6 +7961,7 @@ function campResolve(C, won) {
     S.ents.world = S.ents.world.filter(e => e.alive || e.camp !== C.id); }
   const alive = campMembers(C);
   C.win = won; C.survivors = Math.round(C.size * alive.length / (C.shown || 1));
+  wearyAdd('chain', !alive.length || !alive.some(e => e.campLead) ? 'campWiped' : won ? 'campWon' : 'campLost'); if (C.sabotaged) wearyAdd('chain', 'sabotaged');   /* N3 */
   if (C.type === 'jagd') jagdEnd(C, won);   /* T23 S2 */
   for (const e of alive) if (e.body) { e.body.torso.hp = Math.min(e.body.torso.hp, e.body.torso.max * 0.4); B.syncHp(e); }   // Verwundete
   const T = LOCATIONS.find(l => l.key === C.target);
@@ -13918,16 +13920,60 @@ function evTaxman() {                                                   // Steue
   const G = growthOf(t); G.prosper = Math.max(-20, G.prosper - 6); addRep('valen', 1);
   chronicle(`Der Steuereintreiber in ${townName(t)}`, 'news', 'Die Truhen der Krone füllen sich, die Speicher im Dorf nicht.'); log(`In ${townName(t)} treibt die Krone Steuern ein. Die Leute murren.`, 'economy'); return t;
 }
+/* ===== N3 Kriegsmüdigkeit und Deserteurbanden (PROPOSALS/npc_eigene_ziele.md §5.2, Entscheidung E21 09.10.) =====
+   Verlorene Schlachten, gefallene Städte, Belagerung und Hunger machen Valens Männer müde, verlorene Feldzüge die Kette. Ab 40 murrt man,
+   ab 60 laufen Männer weg (Valen: stärkstes Feldheer −2/Tag, Kette: kleinere Feldzüge), ab 85 löst sich das Heer auf. Die Weggelaufenen
+   sammeln sich (pool) und werden ab 5 Mann zu einer Deserteurbande, die zum Bandendeckel zählt. Während Varonheim belagert wird, ruht
+   Valens Fahnenflucht (der Zähler steigt weiter). Keine neuen Zufallswürfe: Namen per Tageshash. */
+const WEARY = {
+  valen: { lossBattle: 8, armyBroken: 15, townLost: 12, capLost: 25, siegeDay: 1, hungryDay: 1, winBattle: -4, townFreed: -8, decay: -1, fedDay: -1 },
+  chain: { campLost: 20, campWiped: 30, sabotaged: 5, campWon: -15, decay: -1 },
+  stages: [40, 60, 85], desertPerDay: 2, desertPct: 0.03, poolBand: 5, bandMax: 6, poolCap: 8,
+  names: { valen: ['Die Zerrissenen Röcke', 'Die Blauen Hunde'], chain: ['Die Gebrochenen Glieder', 'Die Rostkragen'] },
+};
+const wearyOf = f => { const W = (S.weary ||= {}); return (W[f] ||= { v: 0, pool: 0, stage: 0 }); };
+const wearyStage = f => WEARY.stages.filter(x => wearyOf(f).v >= x).length;
+const capSieged = () => !!S.war?.nodes?.varonheim?.siege;
+function wearyAdd(f, key) { const n = WEARY[f]?.[key]; if (!n) return; const W = wearyOf(f); W.v = clamp(W.v + n, 0, 100); }
+function wearyDay() {
+  const day = S.day | 0, grain = S.facRes?.valen?.v;
+  if (capSieged()) wearyAdd('valen', 'siegeDay'); else delete S.flags.wearySiegeSaid;
+  if (grain != null && grain < 10) wearyAdd('valen', 'hungryDay'); else if (grain > 40) wearyAdd('valen', 'fedDay');
+  for (const f of ['valen', 'chain']) {
+    const W = wearyOf(f); W.v = clamp(W.v + WEARY[f].decay, 0, 100); const st = wearyStage(f), who = f === 'valen' ? 'Valens Lagern' : 'den Gruben der Kette';
+    if (st > W.stage) {
+      if (st >= 1 && W.stage < 1) { const t = f === 'valen' ? `In ${who} murrt man: verlorene Schlachten, gefallene Städte, zu wenig Korn. Wer Siege bringt, Orte befreit oder Korn liefert, hält die Männer.` : `In ${who} murrt man: Die Feldzüge kosten mehr Männer, als sie bringen. Siege halten sie, Niederlagen treiben sie fort.`;
+        chronicle(f === 'valen' ? 'Valens Männer murren' : 'Murren in der Eisenfeste', 'news', t); log(t, 'faction'); }
+      if (st >= 2 && W.stage < 2) log(f === 'valen' ? 'Fahnenflucht: Aus Valens Feldheer laufen Männer weg. Sie sammeln sich irgendwo an der Straße.' : 'Fahnenflucht in der Kette: Die nächsten Feldzüge werden kleiner. Wer flieht, sammelt sich an der Heerstraße.', 'faction');
+      if (st >= 3 && W.stage < 3) { log(f === 'valen' ? 'Valens Heer löst sich auf: Neue Aufgebote kommen nur noch halb so oft zustande.' : 'Die Kette ist ausgeblutet: Der nächste Feldzug wird um 5 Tage verschoben.', 'faction');
+        if (f === 'chain' && S.campNext) for (const k of Object.keys(S.campNext)) S.campNext[k] += 5; }
+    }
+    W.stage = st;
+    if (st < 2) continue;
+    if (f === 'valen') {
+      if (capSieged()) { if (!S.flags.wearySiegeSaid) { S.flags.wearySiegeSaid = 1; log('In der Not halten Valens Männer zusammen. Nach der Belagerung wird man sehen.', 'faction'); } continue; }   /* E21: ruht während der Belagerung */
+      const A = (S.war?.armies || []).filter(a => a.faction === 'valen' && !(S.war.battles || []).some(b => b.sides?.includes(a.id))).sort((a, b) => b.strength - a.strength)[0];
+      if (A) { const d = Math.min(WEARY.desertPerDay, A.strength * WEARY.desertPct); A.strength = Math.max(0, A.strength - d); W.pool = Math.min(WEARY.poolCap, W.pool + d); W.from = A.at; }
+    } else W.pool = Math.min(WEARY.poolCap, W.pool + 1);
+    wearyBand(f);
+  }
+}
+function wearyBand(f) {                                              /* Deserteurbande aus dem Pool — zählt zum Bandendeckel, höchstens eine je Seite */
+  const W = wearyOf(f); if (W.pool < WEARY.poolBand || bandsOf().length >= 3 || bandsOf().some(b => b.origin === (f === 'valen' ? 'deserter' : 'chainDeserter'))) return null;
+  const lord = f === 'valen' ? 'valen' : 'chain', ts = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].lord === lord && TOWN_PLAN[k].square && k !== 'varonheim' && S.war?.nodes?.[k]?.owner !== 'undead');
+  const near = W.from && LOCATIONS.find(l => l.key === W.from), t = ts.sort((a, b) => near ? Math.hypot(TOWN_PLAN[a].square[0] - near.x, TOWN_PLAN[a].square[1] - near.y) - Math.hypot(TOWN_PLAN[b].square[0] - near.x, TOWN_PLAN[b].square[1] - near.y) : 0)[0];
+  if (!t) return null; const [sx, sy] = TOWN_PLAN[t].square, h = SIM.resHash(7, 6), [bx, by] = pushOut('world', sx + [-38, -30, 30, 38, -34, 34][h], sy + [32, 40, 36, 30, -36, -32][h]);
+  const b = keepRng(() => bandFound(t, [bx, by])); if (!b) return null;
+  const nm = WEARY.names[f].find(n => !bandsOf().some(x => x !== b && x.name === n)); if (nm) b.name = nm;
+  b.origin = f === 'valen' ? 'deserter' : 'chainDeserter'; b.men = Math.min(WEARY.bandMax, Math.floor(W.pool)); b.loot = 0; b.lead = `Feldwebel ${b.lead.split(' ')[0]}`; W.pool -= b.men;
+  const g = f === 'valen' ? deserterKin(b) : null;   /* E1: der Bruder bei der Wache */
+  chronicle(f === 'valen' ? 'Deserteure werden zu Räubern' : 'Entlaufene Kettenkrieger', 'news', `${b.name} (${b.men} Mann) lagern bei ${b.where}. Sie haben nichts — sie müssen rauben.`);
+  log(`${b.name}: ${b.men} ${f === 'valen' ? 'Deserteure aus Valens Heer' : 'entlaufene Kettenkrieger'} unter ${b.lead} lagern bei ${b.where}. Ohne Beute hungern sie bald aus — wer die Straße bewacht, wird sie los.${g ? ` In ${townName(g.post)} fragt eine Wache nach dir.` : ''}`, 'faction');
+  return b;
+}
 function evDeserters() {                                                 // Deserteure bilden eine Bande — Aushang folgt
-  const t = pick(Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].lord === 'valen')); if (!t) return null; const [sx, sy] = TOWN_PLAN[t].square;
-  const [bx, by] = pushOut('world', sx + ri(-40, 40), sy + ri(25, 45));
-  if (bandsOf().length < 3) { const b = bandFound(t, [bx, by]); if (b) {   /* E1: eine Bande mit Namen — und einem Bruder bei der Wache */
-    b.origin = 'deserter'; if (!bandsOf().some(x => x !== b && x.name === 'Die Zerrissenen Röcke')) b.name = 'Die Zerrissenen Röcke';
-    const g = deserterKin(b); chronicle('Deserteure werden zu Räubern', 'news', `Bei ${townName(t)} lauern Männer in zerrissenen Valen-Röcken.`);
-    log(`Deserteure unter ${b.lead} lagern bei ${b.where}.${g ? ` In ${townName(g.post)} fragt eine Wache nach dir.` : ''}`, 'faction'); return t; } }
-  for (let i = 0; i < 3; i++) { const e = spawnEnemy(i ? 'bandit' : 'bandit_spear', 'world', bx + ri(-2, 2), by + ri(-2, 2)); if (e) Object.assign(e, { encounter: true, name: 'Deserteur' }); }
-  const C = postContract('valen', 'bounty'); chronicle('Deserteure werden zu Räubern', 'news', `Bei ${townName(t)} lauern Männer in zerrissenen Valen-Röcken.`);
-  log(`Deserteure plündern bei ${townName(t)}.${C ? ` Aushang in ${townName(C.town)}.` : ''}`, 'faction'); return t;
+  if (wearyOf('valen').v < 40) return null;   /* N3: nur mit Ursache (Kriegsmüdigkeit ab 40); sonst würfelt das Ereignis neu */
+  const W = wearyOf('valen'); W.pool = Math.min(WEARY.poolCap, W.pool + 2); return wearyBand('valen')?.town ?? null;   /* N3: statt fremder Räuber ohne Ursache wächst der Pool der Weggelaufenen */
 }
 function evFailedHarvest() {                                             // Missernte in den Bauerndörfern
   const V = [...villOf('valen'), ...villOf('merch')]; if (!V.length) return null; const hit = V.sort(() => rnd() - 0.5).slice(0, 2);
@@ -15374,6 +15420,7 @@ function dayTick() {
   rebuildTick(); growthDay(); treeRegrowDay(); faithDay(); undeadFallDay(); refugeeWave(); migrationDay(); if (isCouncillor() && (S.day | 0) >= (S.council?.next || 0)) log('Heute tagt der Hohe Rat auf der Himmelsfeste.', 'faction');   // Phase 8; Nutzer S13: Glaube im Westen
   tributeDay(); campaignDay(); raidDay(); undeadHeldDay(); bigDay(); pruneDay(); rebuildRazed(); aurelDay(); ECO.airDay(S.voyage?.air ? S.voyage.ship : null); mercDay(); conEchoDay(); vanishDay(); grudgeDay(); factionAgenda();                                             // S12: Tribut der Kette
   bountyDay(); afterDay(); capitalDay(); schutzDay();                    /* Folgen großer Ereignisse (§5c); Belagerung S2 */
+  wearyDay();   /* N3: Kriegsmüdigkeit vor dem Kriegstag */
   SIM.warDay();                                             // Märkte, Heeresversorgung, Nachschub
   herdEvents(); farmDay();                                  // S14: Nutztiere (Städte und eigener Hof)
   if (!S.ents.world.some(e => e.kind === 'caravan') && !(S.caravanBack > S.day)) SIM.initSim();   // S15: Straßen nicht täglich neu bauen
@@ -20121,7 +20168,11 @@ function debugSections() {
       'E4: Vermisstenwelle im nächsten Dorf (sofort ein Opfer)': () => { const ks = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].village).sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - p.x / TS, TOWN_PLAN[a].square[1] - p.y / TS) - Math.hypot(TOWN_PLAN[b].square[0] - p.x / TS, TOWN_PLAN[b].square[1] - p.y / TS));
         if (S.vanish?.state === 'on') return UI.toast('Eine Welle läuft schon.'); const k = ks.find(x => vanishStart(x)); if (!k) return UI.toast('Kein Dorf mit Unterschlupf in Reichweite.'); vanishTake(); UI.toast(`${townName(k)}: ${VANISH[S.vanish.cause].name} · ${S.vanish.loc}`, 3000); },
       'E4: Vermisstenwelle 3 Tage vorspulen (Opfer altern)': () => { for (const t of S.vanish?.taken || []) t.day -= 3; if (S.vanish) { S.vanish.day0 -= 3; S.vanish.last -= 3; } UI.toast('Opfer 3 Tage älter'); },
-      'E1: Deserteure mit Bruder': () => { const t = evDeserters(), b = bandsOf().find(x => x.kin && x.kin.state === 'open'); UI.toast(b ? `${b.name} · ${b.lead} · Wache ${b.kin.guard} in ${townName(b.kin.post)}` : `Deserteure bei ${t ? townName(t) : '—'} (ohne Bruder)`, 3000); },
+      'N3: Kriegsmüdigkeit Valen +20': () => { wearyOf('valen').v = Math.min(100, wearyOf('valen').v + 20); UI.toast(`Valen müde: ${wearyOf('valen').v} (Stufe ${wearyStage('valen')}) — wirkt beim nächsten Tag`); },
+      'N3: Kriegsmüdigkeit Kette +20': () => { wearyOf('chain').v = Math.min(100, wearyOf('chain').v + 20); UI.toast(`Kette müde: ${wearyOf('chain').v} (Stufe ${wearyStage('chain')})`); },
+      'N3: Kriegsmüdigkeit — Tag rechnen': () => { wearyDay(); const V = wearyOf('valen'), C = wearyOf('chain'); UI.toast(`Valen ${V.v} (Pool ${V.pool.toFixed(1)}) · Kette ${C.v} (Pool ${C.pool.toFixed(1)})`, 3500); },
+      'N3: Deserteurbande jetzt (Pool 5)': () => { for (const f of ['valen', 'chain']) { const W = wearyOf(f); W.pool = 5; } const b = wearyBand('valen') || wearyBand('chain'); UI.toast(b ? `${b.name} bei ${b.where}` : 'Keine (Bandendeckel 3 voll oder Bande der Seite schon da)'); },
+      'E1: Deserteure mit Bruder': () => { { const W = wearyOf('valen'); W.v = Math.max(W.v, 40); W.pool = Math.max(W.pool, 3); } const t = evDeserters(), b = bandsOf().find(x => x.kin && x.kin.state === 'open'); UI.toast(b ? `${b.name} · ${b.lead} · Wache ${b.kin.guard} in ${townName(b.kin.post)}` : `Deserteure bei ${t ? townName(t) : '—'} (ohne Bruder)`, 3000); },
       'E1: Anführer heimholen (sofort)': () => { const b = bandsOf().find(x => x.kin?.state === 'open'); if (b) kinHome(b); else UI.toast('Keine Bande mit offenem Bruder-Auftrag.'); },
       'E2: Karawane stirbt jetzt (Täterbande)': () => { const c = S.ents.world.find(e => e.kind === 'caravan' && e.alive); if (!c) return UI.toast('Keine Karawane unterwegs.'); const k = S.ents.world.find(e => e.kind === 'enemy' && e.alive && /bandit/.test(e.mtype)) || null; die(c, 'Räuber', k); },
       'E2: Kutscher gerettet (Folgeauftrag)': () => { const C = (S.contracts || []).find(c => c.kind === 'missing' && c.bandRef && c.state !== 'claimed'); if (!C) return UI.toast('Kein Kutscher-Auftrag mit Täterbande.'); caravanLootQuest(C); },
@@ -20536,7 +20587,7 @@ function debugSections() {
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
       'Welt-Ereignis-Karte: drei nacheinander (E22, nebenbei mit Glocke, eine Kriegskarte hält die Welt an)': () => { worldCard('SEUCHE IN PROBEDORF', 'In Probedorf geht das Fleckfieber um.'); worldCard('SCHLACHT BEI PROBEFURT', 'Das Heer der Toten gegen Valens Aufgebot.', { war: true, snd: 'drum' }); worldCard('TURNIER IN PROBESTADT', 'Ein Herold ruft zum Turnier.'); UI.toast(`Warteschlange: ${EV_CARDS.length} Karten (warten auf Gespräche, Fenster, Kamerafahrten)`, 2600); },
       'Koop: Attrappen-Gast steuert den nächsten Gefährten (Karte + Treffer-Balken prüfen; Ergebnis als Hinweis)': () => { const m = partyMembers().find(x => x !== p && raceOf(x) === 'mensch'); if (!m) return UI.toast('Kein menschlicher Gefährte in der Gruppe.'); if (S.coop && S.coop.role !== 'host') return UI.toast('Nur ohne echten Koop.');
-        import('./coop.js?v=25').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
+        import('./coop.js?v=26').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
           const sent = F.conn.sent.map(s => JSON.parse(s).t); UI.toast(`Koop-Probe: Karte an Gast ${sent.includes('card') ? 'ja' : 'nein'}, letzter Gasttreffer ${m.lastHitId ? 'gemerkt' : '— (kein Feind nah)'}. Attrappe trennen: Eintrag darunter.`, 6000); window.__fakeGuest = F; }); },
       'Ereignis-Reste: Karten Spuk vorbei, Parade, Ratsbeschluss (nacheinander)': () => { worldCard('DER SPUK IST VORBEI', 'Spuk am Brunnen von Probedorf — Probedorf schläft wieder.'); worldCard('PARADE DER SONNENLEGION', 'Mittags vom Westtor zum Palast von Aurelheim.', { snd: 'horn' }); worldCard('BESCHLUSS DES HOHEN RATES', 'Probethema — 5 zu 2', { snd: 'horn' }); },
       'Handelskontakt: Kette abschließen (Kutscher der nächsten Stadt) + Handelsbrief sofort': () => { const L = ECO.TOWN_LOCS.filter(l => S.towns?.[l.key]).sort((a, b) => Math.hypot(a.x - p.x / TS, a.y - p.y / TS) - Math.hypot(b.x - p.x / TS, b.y - p.y / TS))[0]; if (!L) return UI.toast('Keine Stadt.'); tradeContact(L.key, `${FIRST_M[0]} der Kutscher`); tradeContactTick(true); },
@@ -20789,7 +20840,7 @@ export function simFight(mtype, o = {}) {
 }
 export function selftest() {
   const fame0 = structuredClone(S.fame || null), anom0 = S.anomaly || null, after0 = structuredClone({ a: S.after ?? null, r: S.resettle ?? null });   /* Folgen §5c: S.after bleibt vom Test unberührt */   // S15: Ruhm und Anomalie bleiben vom Test unberührt
-  const quests0 = structuredClone(S.quests || {});   /* 10.10.: Probe-Aufträge (E2, Auftraggeberin) blieben sonst als aktive Einträge in S.quests stehen */
+  const quests0 = structuredClone(S.quests || {});   /* 09.10.: Probe-Aufträge (E2, Auftraggeberin) blieben sonst als aktive Einträge in S.quests stehen */
   const out = [], quiet0 = S._quiet;   // AUDIT P-05: Proben setzen S._quiet zurück — am Ende gilt wieder der Wert von vorher
   S._quiet = true;                     // S13: der ganze Test ist still (keine Kamerafahrten, Chronik, Speicherstände aus Proben)
   const ok = (name, cond) => { out.push((cond ? 'PASS ' : 'FAIL ') + name); if (!cond) console.error('FAIL', name); };
@@ -22295,6 +22346,21 @@ export function selftest() {
       return Object.values(res).every(Boolean);
     } finally { S.weather = W0; }
   }));
+  ok('N3 Kriegsmüdigkeit (E21): Niederlagen machen müde, ab 60 verliert das stärkste Valen-Heer 2 am Tag an den Pool, in der Belagerung Varonheims nicht; ab 5 im Pool eine Deserteurbande (zählt zum Bandendeckel); Kette: kleinere Feldzüge', (() => {
+    const WY = structuredClone(S.weary || null), W0 = structuredClone(S.war), B0 = S.bands, fl = structuredClone(S.flags), FR = structuredClone(S.facRes || null), C0 = S.contracts, E0 = S.ents.world;
+    S.ents.world = E0.slice();
+    try {
+      S.weary = {}; S.bands = []; if (S.facRes?.valen) S.facRes.valen.v = 20; wearyAdd('valen', 'lossBattle'); wearyAdd('valen', 'armyBroken'); const add = wearyOf('valen').v === 23;
+      const A = { id: 'pn3', faction: 'valen', at: 'northcity', prev: 'northcity', strength: 100, name: 'Probeheer' }; S.war.armies = [A]; S.war.battles = []; if (S.war.nodes.varonheim) S.war.nodes.varonheim.siege = null;
+      wearyOf('valen').v = 70; wearyDay(); const desert = Math.abs(A.strength - 98) < 1e-9 && Math.abs(wearyOf('valen').pool - 2) < 1e-9;
+      S.war.nodes.varonheim.siege = { day: S.day | 0, by: 'x' }; const s0 = A.strength; wearyDay(); const siege = A.strength === s0; S.war.nodes.varonheim.siege = null;
+      wearyOf('valen').pool = 5; const b = wearyBand('valen'), band = !!b && b.origin === 'deserter' && b.men === 5 && b.loot === 0 && wearyOf('valen').pool === 0 && /Feldwebel/.test(b.lead);
+      S.bands = [{ id: 'x1' }, { id: 'x2' }, { id: 'x3' }]; wearyOf('valen').pool = 6; wearyOf('chain').pool = 6; const cap = !wearyBand('chain') && wearyOf('chain').pool === 6;
+      wearyOf('chain').v = 80; const sz = (() => { const c0 = S.campaign; planCampaign('zug'); const s = S.campaign.size; S.campaign = c0; return s; })(); wearyOf('chain').v = 0; const sz0 = (() => { const c0 = S.campaign; planCampaign('zug'); const s = S.campaign.size; S.campaign = c0; return s; })();
+      const res = { add, desert, siege, band, cap, chain: sz < sz0 }; window.__n3 = res; if (!Object.values(res).every(Boolean)) console.warn('N3-Probe', JSON.stringify(res), sz, sz0);
+      return Object.values(res).every(Boolean);
+    } finally { S.weary = WY || undefined; if (!WY) delete S.weary; S.war = W0; S.bands = B0; S.flags = fl; if (FR) S.facRes = FR; S.contracts = C0; S.ents.world = E0; }
+  })());
   ok('E41 Nachwachsen (09.10.): Stumpf wird nach 10 Tagen wieder ein fester Baum, vorher nicht, nie im Bild oder unter dem Helden', sandbox(() => {
     const p = stage(), d = S.day | 0, mk = (x, y, age) => { const s = { id: uid(), kind: 'prop', type: 'stump', map: '__a', x, y, r: 8, solid: false, stumpDay: d - age }; S.ents.__a.push(s); return s; };
     S.map = '__a'; const young = mk(p.x + 3000, p.y, 9), old = mk(p.x + 3000, p.y + 200, 10), under = mk(p.x, p.y, 12);
@@ -23096,8 +23162,8 @@ export function selftest() {
     const keep = JSON.stringify({ g: S.growth, p: S.prices, c: S.contracts, tw: S.towns }), W0 = S.ents.world; S.ents.world = W0.slice();
     try {
       const t = evTaxman(), tax = !t || S.ents.world.some(e => e.prof === 'Steuereintreiber');
-      const n0 = S.ents.world.filter(e => e.kind === 'enemy').length, c0 = (S.contracts || []).length, BA = structuredClone(S.bands || []), nb = bandsOf().length; evDeserters();   /* E1: mit freiem Bandenplatz entsteht eine Deserteurbande statt loser Räuber */
-      const des = nb < 3 ? bandsOf().some(b => b.origin === 'deserter') : S.ents.world.filter(e => e.kind === 'enemy').length >= n0 + 3 && S.contracts.length === c0 + 1; for (const e of S.ents.world) if (e.kinBand && !BA.some(b => b.id === e.kinBand)) delete e.kinBand; S.bands = BA;
+      const n0 = S.ents.world.filter(e => e.kind === 'enemy').length, c0 = (S.contracts || []).length, BA = structuredClone(S.bands || []), nb = bandsOf().length, WY = structuredClone(S.weary || null); S.weary = { valen: { v: 50, pool: 3, stage: 1 } }; evDeserters(); S.weary = WY || undefined; if (!WY) delete S.weary;   /* E1: mit freiem Bandenplatz entsteht eine Deserteurbande statt loser Räuber */
+      const des = nb < 3 ? bandsOf().some(b => b.origin === 'deserter') : true;   /* N3: Deckel voll = nur der Pool wächst */ for (const e of S.ents.world) if (e.kinBand && !BA.some(b => b.id === e.kinBand)) delete e.kinBand; S.bands = BA;
       const gr0 = Object.fromEntries(Object.keys(S.towns).map(k => [k, S.towns[k].stock.grain])), h = evFailedHarvest(), harvest = !h || !S.towns[h] || S.towns[h].stock.grain <= Math.floor((gr0[h] || 0) / 2);   /* T09: Missernte halbiert das Korn statt eines Weltpreises */
       const C = makeContract('eren', 'bounty', 'board'); const g0 = growthOf('eren').prosper; ignoredContract(C); const ignored = growthOf('eren').prosper < g0 || g0 <= -20;
       return tax && des && harvest && ignored && EVENTS.length >= 13;
@@ -25867,14 +25933,14 @@ export function selftest() {
   }));
   ok('E1: Deserteure bilden eine Bande mit Bruder bei der Valen-Wache (nie Varonheim); heimholen löst die Bande auf (Valen −2, +40 Gold); Tod des Anführers kränkt die Wache (−40)', sandbox(() => {
     const p = stage(), BA = structuredClone(S.bands || []), C0 = S.contracts, W0 = S.ents.world, fa0 = { ...S.factions }, R0 = structuredClone(S.relations), g0 = S.gold, av0 = S.avenge, Z0 = structuredClone(S.schutz || {}); S.ents.world = W0.slice();
-    const marked = []; try { S.bands = []; evDeserters(); const b = S.bands[0], g = b && byId(b.kin?.guardId); if (g) marked.push(g);
+    const marked = [], WY = structuredClone(S.weary || null); try { S.bands = []; S.weary = { valen: { v: 50, pool: 3, stage: 1 } }; evDeserters(); const b = S.bands[0], g = b && byId(b.kin?.guardId); if (g) marked.push(g);
       const built = !!b && b.origin === 'deserter' && !!g && g.kinBand === b.id && g.post !== 'varonheim' && GUARD_POSTS[g.post].faction === 'valen';
       const v0 = S.factions.valen || 0; S.gold = 0; kinHome(b); const home = b.gone && b.kin.state === 'home' && S.gold === 40 && (S.factions.valen || 0) === Math.max(-100, v0 - 2);
-      S.bands = []; evDeserters(); const b2 = S.bands[0], g2 = byId(b2.kin.guardId); if (g2) marked.push(g2); const r0 = S.relations[g2.key || g2.id] || 0; bandKill({ bandId: b2.id, bandLead: true });
+      S.bands = []; S.weary.valen.pool = 3; evDeserters(); const b2 = S.bands[0], g2 = byId(b2.kin.guardId); if (g2) marked.push(g2); const r0 = S.relations[g2.key || g2.id] || 0; bandKill({ bandId: b2.id, bandLead: true });
       const hurt = b2.kin.state === 'killed' && (S.relations[g2.key || g2.id] || 0) === Math.max(-100, r0 - 40);
       if (!(built && home && hurt)) console.log('E1-Probe', JSON.stringify({ built, home, hurt }));
       return built && home && hurt;
-    } finally { for (const m of marked) delete m.kinBand; S.bands = BA; S.contracts = C0; S.ents.world = W0; Object.assign(S.factions, fa0); S.relations = R0; S.gold = g0; S.avenge = av0; S.schutz = Z0; }
+    } finally { S.weary = WY || undefined; if (!WY) delete S.weary; for (const m of marked) delete m.kinBand; S.bands = BA; S.contracts = C0; S.ents.world = W0; Object.assign(S.factions, fa0); S.relations = R0; S.gold = g0; S.avenge = av0; S.schutz = Z0; }
   }));
   ok('E4: Vermisstenwelle — Dorf mit Unterschlupf, Opfer mit Spur, Liste und Aushang (Ziel = echter Ort); nie Varonheim; rechtzeitig gefunden kehrt heim, zu spät nicht', sandbox(() => {
     const p = stage(), V0 = S.vanish, C0 = S.contracts, CD = structuredClone(S.conDay || {}), W0 = S.ents.world, g0 = S.gold; S.ents.world = W0.slice();
@@ -26813,7 +26879,7 @@ function boot() {
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
-    openCoop: () => import('./coop.js?v=25').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
+    openCoop: () => import('./coop.js?v=26').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
@@ -26876,7 +26942,7 @@ function boot() {
       const act = b.dataset.act;
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
-      else if (act === 'coop') { import('./coop.js?v=25').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
+      else if (act === 'coop') { import('./coop.js?v=26').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { $('cr-fac-wrap')?.classList.remove('hidden'); creation.facRow?.(); setSlot(newSlot('single'));   /* Fraktions-Starts: Freischaltungen neu lesen */   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -26887,7 +26953,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=25').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=26').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
