@@ -49,7 +49,13 @@ export function sfx(name, weight = 0.4, vol = 1, mat = null, armored = false) {
       case 'bone':  noise(t, 0.06, 'bandpass', 1800, 900, 0.35 * v, 3); noise(t + 0.03, 0.05, 'bandpass', 1300, 700, 0.25 * v, 3); tone(t, 0.08, 'triangle', 220, 120, 0.15 * v); break;
       case 'metal': noise(t, 0.18, 'bandpass', 3400, 2600, 0.35 * v, 12); tone(t, 0.16, 'square', 880, 760, 0.05 * v); break;
       case 'dodge': noise(t, 0.2, 'lowpass', 900, 200, 0.2 * v, 0.7); break;
-      case 'step':  noise(t, 0.04, 'lowpass', 500 + Math.random() * 200, 150, 0.08 * v); break;
+      case 'step':  noise(t, 0.04, 'lowpass', 500 + Math.random() * 200, 150, 0.08 * v);
+        /* R3 (09.10.2026): Schrittklang je Rüstung — mat = Rüstungsart (sprites.js armor). Platte klirrt (schmales Band + Ton), Kette rasselt
+           (zwei kurze Hochpass-Stöße), Leder knarzt dumpf, Stoff/ohne bleibt beim leisen Grundschritt. */
+        if (mat === 'plate') { noise(t + 0.01, 0.06, 'bandpass', 2900 + Math.random() * 300, 2300, 0.05 * v, 9); tone(t + 0.01, 0.05, 'square', 720, 640, 0.008 * v); }
+        else if (mat === 'chain') { noise(t + 0.01, 0.035, 'highpass', 4200, 5200, 0.035 * v); noise(t + 0.045, 0.03, 'highpass', 4600, 5600, 0.025 * v); }
+        else if (mat === 'leather') noise(t + 0.005, 0.05, 'bandpass', 380, 260, 0.05 * v, 3);
+        break;
       case 'death': tone(t, 0.45, 'sawtooth', 180, 50, 0.12 * v); noise(t, 0.3, 'lowpass', 900, 120, 0.2 * v); break;
       case 'bell':   tone(t, 2.6, 'sine', 196, 194, 0.16 * v); tone(t, 2.0, 'sine', 392.5, 390, 0.06 * v); tone(t + 0.01, 1.4, 'triangle', 588, 584, 0.03 * v); break;   /* T10: Totenglocke beim Heldentod */
       case 'bow':   tone(t, 0.12, 'triangle', 330, 180, 0.2 * v); noise(t, 0.08, 'highpass', 3000, 5000, 0.08 * v); break;

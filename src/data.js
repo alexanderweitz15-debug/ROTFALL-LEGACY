@@ -50,7 +50,7 @@ export const FAC_STARTS = {
             desc:'Hallengast der Zwerge an der Tiefhall. Die Königsstadt liegt unter der alten Halle — und dazwischen stehen Hrodvars Tote.' },
 };
 export const SKILL_NAMES = { onehanded:'Einhändig', twohanded:'Zweihändig', polearms:'Stangenwaffen', archery:'Bogen', defense:'Verteidigung',
-  medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung', fishing:'Fischen', woodcutting:'Holzfällen', mining:'Bergbau', herbalism:'Kräuterkunde', cooking:'Kochen' };
+  medicine:'Medizin', toughness:'Zähigkeit', survival:'Überleben', hunting:'Jagd', crafting:'Handwerk', smithing:'Schmieden', trading:'Handel', stealth:'Schleichen', leadership:'Führung', fishing:'Fischen', woodcutting:'Holzfällen', mining:'Bergbau', herbalism:'Kräuterkunde', cooking:'Kochen', katana:'Katana' };
 /* Skill-Core Phase 1 (Spec Skills §2–§12, §57; Planlauf 08.10.2026 — Werte vorläufig ⚖): zentrale Definition je Fertigkeit. Der Wert (0–100) bleibt
    wie bisher in p.skills und wächst durch Nutzung; Stufe = Wert / 2 (0–50). Meilensteine 5/10/15/20/25/30/40/50; „perks“ sind echte Freischaltungen
    [Art, Größe, Text] — zunächst für Einhändig (Schwert), Stangenwaffen (Speer) und Schmieden (Spec §58: erst 2–3 Skills testen). */
@@ -59,6 +59,11 @@ export const SKILL_DEF = {
   onehanded: { group: 'Kampf', what: 'Schwert, Axt, Kolben, Dolch', perks: { 5: ['stamina', 0.08, 'Sparsame Hiebe: 8 % weniger Ausdauer je Hieb'], 10: ['recover', 0.07, 'Schnellere Erholung nach dem Hieb (7 % kürzer)'], 20: ['parry', 0.35, 'Größeres Parierfenster (+35 %)'] } },
   polearms:  { group: 'Kampf', what: 'Speer, Hellebarde, Sense', perks: { 5: ['stamina', 0.08, 'Sparsame Stöße: 8 % weniger Ausdauer je Hieb'], 10: ['recover', 0.07, 'Schnellere Erholung nach dem Stoß (7 % kürzer)'], 20: ['stagger', 0.4, 'Wuchtstoß: der schwere Hieb lässt Gegner 40 % länger taumeln'] } },
   twohanded: { group: 'Kampf', what: 'Zweihänder, Kriegshammer, Großaxt', perks: {} },
+  /* E38 (Entwickler 09.10.2026: eigene Waffenklasse; Leiter nach Spec Skills §10, Werte vorläufig ⚖): Stufen passen auf die vorhandene Kampfmechanik —
+     Ausweichhieb (Rolle → schneller Hieb), Gegenhieb (Parade → harter Hieb), Ausfallschnitt (Reichweite), Parierfenster, fließende Folge, Konterhieb. */
+  katana:    { group: 'Kampf', what: 'Katana (Seevolk, Händler im Osten)', perks: { 5: ['dodgeatk', 0.3, 'Ausweichhieb: der erste Hieb nach einer Rolle ist 30 % schneller'], 10: ['counter', 0.25, 'Gegenhieb: nach einer Parade trifft der nächste Hieb 25 % härter'],
+    15: ['reach', 0.12, 'Ausfallschnitt: 12 % mehr Reichweite'], 20: ['parry', 0.35, 'Größeres Parierfenster (+35 %)'], 25: ['recover', 0.1, 'Fließende Folge: 10 % schnellere Erholung nach dem Hieb'],
+    30: ['counter', 0.25, 'Konterhieb: der Gegenhieb nach der Parade noch einmal 25 % härter'] } },
   archery:   { group: 'Kampf', what: 'Bogen, Armbrust', perks: {} },
   defense:   { group: 'Kampf', what: 'Abwehr von vorn', perks: {} },
   toughness: { group: 'Kampf', what: 'Treffer einstecken', perks: {} },
@@ -81,6 +86,7 @@ export const SKILL_DEF = {
 /* Phase 6 Meisterschaften (Spec Skills §11, §48; 09.10.2026 — Werte vorläufig ⚖): ab Stufe lv ist die Meisterprüfung offen; bestanden = Meistertitel und
    eine Meisterhaltung (Perk, wirkt wie die Meilensteine). Charaktergebunden — stirbt mit der Figur (§38). */
 SKILL_DEF.onehanded.master = { lv: 40, title: 'Klingenmeister', task: 'Besiege einen starken Gegner (Veteran, Anführer oder zwei Stufen über dir) mit einer Einhandwaffe und ohne Schild.', perk: ['parry', 0.15, 'Meisterhaltung: Parierfenster noch einmal +15 %'] };
+SKILL_DEF.katana.master = { lv: 40, title: 'Meister des Katana', task: 'Besiege einen starken Duellanten (Veteran, Anführer oder zwei Stufen über dir) mit dem Katana, ohne Schild und ohne in diesem Kampf getroffen zu werden.', perk: ['dodgeatk', 0.2, 'Meisterhaltung: Ausweichhieb noch 20 % schneller'] };   /* E38 */
 SKILL_DEF.polearms.master = { lv: 40, title: 'Meister des Speers', task: 'Besiege einen Veteranen oder Anführer mit einer Stangenwaffe.', perk: ['recover', 0.05, 'Meisterhaltung: noch 5 % schnellere Erholung'] };
 SKILL_DEF.smithing.master = { lv: 40, title: 'Meisterschmied', task: 'Schmiede ein Meisterstück — oder ein meisterliches Stück mit Königseisen.', perk: ['quality', 8, 'Meisterhand: Güte wie mit 8 Punkten mehr'] };
 SKILL_DEF.fishing.master = { lv: 40, title: 'Meisterfischer', task: 'Fang den „Alten vom Grund“, einen uralten Wels in einem See.', perk: ['window', 0.25, 'Meistergespür: noch 25 % mehr Zeit zum Anschlagen'] };
@@ -315,6 +321,11 @@ export const ITEMS = {
     lore:'Vargs Axt. Rote Stoffstreifen hängen am Griff, einer für jeden, der nicht mehr arbeiten konnte.' },
   // S14 Seevolk (Nutzer: Inselreich, zerstrittene Clans, Piratenkönig Weißbart — eigene Figur, eigene Waffe)
   entermesser:   { name:'Entermesser', slot:'weapon', wtype:'sword', dmg:11, reach:40, arc:1.8, speed:500, stam:8, rarity:'uncommon', value:75, skill:'onehanded', lore:'Kurz, breit, gebogen. Zwischen Tauen und Masten ist ein Langschwert zu lang.' },
+  /* E38 (09.10.2026, Werte vorläufig ⚖): Katana als eigene Waffenklasse — wtype 'katana' (Bild/Animation: Agent Figuren; bis dahin Schwert-Rückfall), Skill 'katana'.
+     Schneller als das Langschwert, schmaler Bogen, scharf (Krit). Herkunft: Salzbund (Ysolde Kielmark, Gischtinseln). */
+  katana:        { name:'Katana', slot:'weapon', wtype:'katana', dmg:13, reach:50, arc:1.3, speed:480, stam:8, crit:1.9, rarity:'rare', value:320, skill:'katana', lore:'Eine gebogene Klinge von jenseits des Meeres. Der Salzbund bringt jedes Jahr eine Handvoll — und die Kunst, sie zu führen, nur in Andeutungen.' },
+  gischtklinge:  { name:'Gischtklinge', slot:'weapon', wtype:'katana', dmg:14, reach:52, arc:1.2, speed:470, stam:8, crit:2.0, rarity:'rare', value:390, skill:'katana', lore:'Im Salzwasser gehärtet, mit Haifischhaut am Griff. Rostet nicht, sagen die Seeleute. Sie lügen selten über Klingen.' },
+  nebelkatana:   { name:'Nebelklinge', slot:'weapon', wtype:'katana', dmg:17, reach:54, arc:1.3, speed:460, stam:9, crit:2.0, rarity:'epic', value:950, skill:'katana', lore:'Die Klinge eines Kapitäns, der im Nebel verschwand. Sie singt leise, wenn man sie zieht.' },
   harpune:       { name:'Walharpune', slot:'weapon', wtype:'spear', dmg:13, reach:78, arc:0.4, speed:700, stam:9, ap:0.25, rarity:'uncommon', value:90, skill:'polearms', lore:'Widerhaken aus Walbein. Was sie trifft, kommt schwer wieder los.' },
   sturmanker:    { name:'Der Sturmanker', slot:'weapon', wtype:'hammer', dmg:34, reach:58, arc:2.2, speed:1300, stam:24, ap:0.45, stagger:2.2, crush:true, rarity:'legendary', unique:true, value:1100, skill:'twohanded', twohand:true,
     lore:'Weißbarts Anker, an einer Kette um den Unterarm. Er hat damit ein Zollschiff Valens versenkt — von innen.' },
@@ -529,6 +540,7 @@ export const ITEMS = {
                   rarity:'legendary', unique:true, leg:'thirst', value:520, skill:'onehanded', lore:'Aus Grubenwerkzeug geschmiedet. Das Blatt ist nie gereinigt worden — es trinkt.' },
   order_seal:   { name:'Siegel des Ordens', slot:'cloak', armor:2, holy:0.2, rarity:'rare', value:200, look:{ cape:'wappen', col:'#d9d2c0', trim:'#9b2e26', lin:'#9b2e26', fib:'#c8a050' }, lore:'Elfenbein und altes Rot. Es wiegt mehr, als es sollte.' },
   grave_seal:   { name:'Grabsiegel', slot:'material', stack:1, rarity:'rare', value:0, lore:'Kalt, auch in der Sonne.' },
+  grabgut:      { name:'Grabgut', slot:'material', stack:20, rarity:'uncommon', value:18, lore:'Ringe, Spangen, alte Münzen aus den Gräbern. Die Toten kaufen es zurück — teuer.' },   /* E40.5: Marktgut */
   soul_vial:    { name:'Seelenphiole', slot:'consumable', use:'soul', stack:5, rarity:'uncommon', value:40, lore:'Ein Hauch, abgefüllt. Totenrufer trinken daraus, Hexer löschen damit.' },
   scout_report: { name:'Späherbericht', slot:'material', stack:1, rarity:'uncommon', value:0, lore:'Kohleschrift, halb verwischt: „Sie zählen uns. Nicht wir sie. Sie warten auf eine Zahl.“' },
   /* Audit 3.3: kings_iron (Questbarren) ist in koenigseisen aufgegangen; alte Stände werden beim Laden umbenannt (migrateKingsIron) */
@@ -1435,6 +1447,26 @@ export const SKIES = {
   goblinlord:  { name:'Die Grube', title:'goblinlord', at:[1880, 520], col:'#9ad05a' },
   companion:   { name:'Die Gefährten', comp:true, at:[0, 1500], col:'#c8b48a' },
 };
+/* E42 (Entwickler 09.10.2026, Auswahl ⚖ vorläufig): der Himmel wird kleiner.
+   1) Doppelte Allerwelts-Sterne fallen weg: reine Wertesterne der Klassen- und Titel-Sternbilder (Leben, Rüstung, Ausdauer, Mana, Krit),
+      die der Wanderer schon bietet, dazu zwei doppelte Fähigkeitssterne in zusammengelegten Sternbildern (kb_song = ba_voice,
+      kj_core = wl_arrow). Wer danach kam, hängt an deren Voraussetzungen; die Zeilen werden neu gezählt.
+   2) Ähnliche Klassen werden eins: jede Kettenklasse ist ein Weg (way) ihrer Schwesterklasse. Schlüssel, Lehrer, Prüfungen und
+      Fähigkeiten bleiben; wer den Weg lernt, kann die Schwesterklasse mit und führt beide Fähigkeitssätze. Die Sterne des Wegs stehen
+      als Kettenarm im Sternbild der Schwesterklasse (versiegelt bis zur Weihe). Alte Stände: game.js skyCut() gibt die Punkte zurück. */
+export const CUT_STARS = new Set(['kr_grip', 'kr_drill', 'kr_core', 'rt_mail', 'rt_shield', 'pa_faith', 'pa_halo', 'bs_scar', 'bs_hide', 'hp_iron', 'hp_core',
+  'sc_eye', 'sc_wind', 'sc_core', 'wl_hide', 'wl_bark', 'kj_boots', 'kj_hide', 'kj_core', 'su_soft', 'su_lung', 'su_core', 'as_poise', 'as_skin', 'fk_apron', 'fk_night',
+  'kl_lamp', 'kl_robe', 'kl_core', 'dp_ink', 'dp_core', 'mg_ink', 'mg_robe', 'mg_core', 'ba_lungs', 'ba_coat', 'kb_coat', 'kb_lungs', 'kb_song', 'al_glove', 'al_core',
+  'va_cold', 'va_blood', 'gb_hide', 'gb_lungs', 'dk_plate']);
+export const CLASS_WAYS = { chainbard: 'bard', chainhunter: 'ranger', torturer: 'assassin', darkpriest: 'cleric' };
+for (const [k, w] of Object.entries(CLASS_WAYS)) { CLASSES[k].way = w; delete SKIES[k]; }
+for (const n of Object.values(SKILL_TREE)) if (CLASS_WAYS[n.branch]) n.sky = CLASS_WAYS[n.branch];
+{ const res = r => CUT_STARS.has(r) ? (SKILL_TREE[r]?.requires || []).flatMap(res) : [r], touched = new Set();
+  const req = {}; for (const [k, n] of Object.entries(SKILL_TREE)) if (!CUT_STARS.has(k)) req[k] = [...new Set(n.requires.flatMap(res))];
+  for (const k of CUT_STARS) if (SKILL_TREE[k]) { touched.add(SKILL_TREE[k].branch); delete SKILL_TREE[k]; }
+  for (const [k, r] of Object.entries(req)) SKILL_TREE[k].requires = r;
+  const row = k => SKILL_TREE[k].requires.length ? 1 + Math.max(...SKILL_TREE[k].requires.map(row)) : 0;
+  for (const [k, n] of Object.entries(SKILL_TREE)) if (touched.has(n.branch) || CLASS_WAYS[n.branch]) n.row = row(k); }
 const WAND_ARM = { combat: -2.45, magic: -0.69, survival: 1.57 };   /* Wanderer: Klinge links oben, Stern rechts oben, Blatt unten */
 export function skyLayout() {                                     /* idempotent: neue Knoten bekommen Lage, alte behalten sie */
   const bySky = {};
@@ -1474,6 +1506,45 @@ export const FACTIONS = {
   wuest: { name:'Der Wüstenbund', colors:['#4a3420','#d8b070'], desc:'Karak-Atar und Dünenwacht: das Wüstenvolk unter dem Schutz der Sandfürsten. Wasser, Wegzoll und Karawanen — wer die Straße sichert, ist willkommen.', ranks:['Karawanengast','Karawanenwächter','Sandreiter'] },
   zwerge:{ name:'Die Zwerge der Tiefhall', colors:['#2a3040','#c87a3a'], desc:'Die letzten der Tiefhall. Seit die Toten die obere Halle nahmen, schmieden und brauen sie unter dem Berg — und warten.', ranks:['Hallengast','Hallenbruder','Schildträger des Königs'] },
   goblin:{ name:'Die Grubenstämme', colors:['#3d4a22','#b8a050'], desc:'Kein Volk von Monstern — ein Volk, das man zu Monstern gemacht hat. Wer ihre Ketten bricht, findet Händler, Sänger und Groll.', ranks:['Fremder','Freund','Grubenbruder'] },
+};
+
+/* T23 „Woher die Mächte ihre Kraft nehmen“ (Spec t23_fraktionsressourcen.md, DESIGN_LOCKED 01.10.; E37 09.10.2026). Je Macht eine Zahl mit Quelle,
+   Verbrauch und Wirkung, einmal am Tag am Ende von warDay gerechnet (sim.js facResDay). Stufe 0 (niedrig) unter lt, 2 (hoch) ab ge; zurück zur Mitte erst
+   10 % jenseits der Schwelle. def = Wert ohne Daten (alter Stand = Verhalten wie vorher). say = Meldung je Stufe [niedrig, normal, hoch] mit Ursache und
+   Hebel. Alle Zahlen vorläufig ⚖ — eine Stelle für die Balance. */
+export const FAC_RES = {
+  valen:  { name: 'Korn', unit: 'Korn', lt: 10, ge: 40, def: 20,
+    does: 'Valens Heere wachsen, solange die Städte der Krone Korn haben (über 10 Korn: +3 Stärke am Tag, sonst +1). Das Feldheer isst Nordfurts Weizen.',
+    lever: 'Korn in eine Valen-Stadt liefern (Nordfurt zuerst) hilft der Krone. Wer Aurelions Gesandten Nordfurts Korn kaufen lässt, schwächt sie.',
+    say: ['Valens Kornspeicher sind leer. Die Heere der Krone wachsen kaum noch — wer Korn nach Nordfurt bringt, ändert das.', 'Valens Speicher füllen sich wieder. Die Krone hebt Männer aus wie gewohnt.', 'Valens Speicher sind voll. Die Heere der Krone wachsen schnell.'] },
+  order:  { name: 'Eifer', unit: 'von 5', lt: 2, ge: 4, def: 0, max: 5, holdNodes: 4, holdEvery: 5, decay: 0.5, decayEvery: 10, crusadeWin: 1, crusadeLoss: 1, kammer: 1,
+    does: 'Je mehr Eifer, desto öfter zieht der Kreuzzug (alle 12 − Eifer Tage) und desto sicherer siegt er. Ab Eifer 2 jagt die Inquisition Hexen, ab 3 reiten doppelte Streifen und Ordensheiler verlangen mehr, ab 4 überfällt der Orden Grubenhort fast sicher.',
+    lever: 'Eifer steigt mit verbrannten Hexen, gewonnenen Kreuzzügen und Land der Toten (4 Orte und mehr). Wer Angeklagte rettet, senkt ihn; ohne Anlass kühlt er alle 10 Tage ab.',
+    say: ['Der Eifer des Ordens ist erkaltet. Keine Hexenjagd, Andachten statt Streifen — und der Händler in Lichtenrain gibt Weihwasser billiger.', 'Der Orden predigt wie gewohnt. Der Eifer hält sich.', 'Der Orden brennt vor Eifer: Der Kreuzzug zieht früher, Inquisitoren reiten doppelt, und Grubenhort ist in Gefahr. Wer Angeklagte rettet, kühlt ihn ab.'] },
+  undead: { name: 'Seelen', unit: '', lt: 21, ge: 120, def: 60, max: 200, start: [20, 5], node: 1, battle: 0.3, newArmy: 30, armyBase: 20, armyDiv: 5, armyMax: 50, fill: 1, host: 40, kammer: 30, crusade: 10, vial: 2, raidHalf: 0.5, vialLow: 1.5, vialHigh: 0.7,
+    does: 'Seelen stellen neue Heere auf (30 Seelen je Heer, Stärke 20 + Seelen/5) und füllen die Besatzungen. Satte Gruft (120+): gemischte Heere, billige Phiolen. Leere Gruft (20 und weniger): kein neues Heer, halb so viele Dorfüberfälle.',
+    lever: 'Jede Schlacht gibt den Toten Seelen — auch eine verlorene. Wer Dörfer hält, die Seelenkammer im Turm zerschlägt und Kreuzzüge gewinnt, lässt die Gruft hungern; wer den Toten dient, füttert sie (Überfälle, Erheben, Phiolen am Totentempel).',
+    say: ['Die Gräber schweigen. Der Gruft fehlen Seelen — kein neues Heer steigt auf, die Besatzungen füllen sich nicht.', 'Die Gruft hat wieder genug Seelen, um neue Heere aufzustellen.', 'Die Gruft ist satt. Die Heere der Toten kommen gemischt — Schützen, Elite, Monster. Seelenphiolen werden billig.'] },
+  merch:  { name: 'Handelszüge', unit: 'von 100', lt: 30, ge: 81, def: 50, max: 100, arrive: 4, big: 8, deliver: 2, deliverDay: 4, raid: 6, died: 10, decay: 1, embargo: 15, embargoDays: 3, fair: 80, fairMul: 1.15, priceDiv: 250, shock: 6, shockMax: 10, shockMin: 25,
+    does: 'Der Handelswert bestimmt, wie viele Züge die Gilde am Tag losschickt (2 + Wert/25), wie gut sie bewacht sind und was die Händler der Gilde verlangen (±20 %). Unter 15 drei Tage lang: Handelssperre. Über 80: Messe in Eren und Nordfurt.',
+    lever: 'Angekommene Züge, die Große Karawane und Lieferaufträge heben ihn; Überfälle senken ihn. Geleit fahren und Banden zerschlagen hilft der Gilde — wer für Rook raubt, treibt die Geleitlöhne hoch.',
+    say: ['Die Gilde verliert Züge. Sie zahlt Söldner für jeden Wagen, und Geleitaufträge zahlen mehr. Wer die Straßen sichert, ändert das.', 'Der Handel läuft wieder in gewohnten Bahnen.', 'Die Gilde blüht: Züge rollen auf allen Straßen, die Läden der Gilde sind billig.'] },
+  chain:  { name: 'Arbeitskraft', unit: 'Köpfe', lt: 10, ge: 1e9, def: 56, village: 2, mul: { raid: 0.2, zug: 0.45, heer: 0.8 }, heer: 10, slow: 10, walls: 8, hunt: 6, huntGain: 4, huntHort: 10, huntSize: [8, 10], sold: 2, soldGold: 30,
+    does: 'Die Kette zieht so groß ins Totenland, wie sie Hände hat: Gefangene in Pferch, Grube und Steinbruch sowie jedes Tributdorf (2 Köpfe). Unter 10 Köpfen ziehen die Feldzüge seltener, ein Heerzug braucht 10, unter 8 lässt Varg Treiber in die Dörfer, unter 6 macht die Kette Sklavenjagd auf Grubenhort und die Tributdörfer.',
+    lever: 'Pferche öffnen, Gefangene freikaufen und Tributzüge rauben nimmt der Kette Hände (kleinere Feldzüge, stärkere Totenruinen). Gefangene an Vesk verkaufen gibt ihr welche.',
+    say: ['Die Kette hat kaum noch Hände in den Gruben. Die Feldzüge ziehen klein und selten — und Varg schickt Treiber nach neuen Köpfen.', 'Die Gruben der Kette sind wieder besetzt.', ''] },
+  aurel:  { name: 'Wohlstand', unit: 'Tage', lt: 4, ge: 12, def: 8, buyBelow: 6, buyMax: 12, buyKeep: 8, toll: 0.1, freight: 15, freightPay: 2, fallMul: [1.5, 1, 0.5], legion: [14, 20, 26],
+    does: 'Index aus Versorgung und Magitech: so viele Tage reichen Nahrung UND Magitech in den Städten des Hochreichs (der kleinere Wert zählt). Unter 4 Tagen steigen die Zölle, Aurelion kauft Nordfurts Korn auf und sucht Frachtfahrer; über 12 fallen die Zölle schnell, und Aurelion ist schwerer zu erschüttern (seine Städte fallen seltener, die Sonnenlegion kehrt stärker zurück).',
+    lever: 'Luftschiffe schützen und reparieren, Korn nach Kupferhafen liefern, Barren für die Werke. Wer Luftschiffe sabotiert, lässt Aurelion hungern — und treibt Nordfurts Kornpreis hoch.',
+    say: ['Aurelion hungert: Nahrung oder Magitech reichen nur noch wenige Tage. Die Zölle steigen, ein Gesandter kauft Korn in Nordfurt, und in Kupferhafen hängt ein Frachtauftrag.', 'Aurelions Speicher und Werke laufen wieder rund.', 'Aurelion schwimmt in Wohlstand. Die Zölle fallen, und das Hochreich steht fester denn je.'] },
+  sea:    { name: 'Salz', unit: 'Lasten', lt: 20, ge: 81, def: 50, ports: ['saltport', 'northcity', 'kupferhafen'], prize: 0.10, raider: 0.10, black: 0.2, blackAfter: 0.05, blackDays: 10, take: 0.3, takeMax: 12, prizesHigh: 3, inland: 6, inlandTo: ['eren', 'varonheim'], escortMul: 1.5,
+    does: 'Der Salzvorrat der Häfen (Salzhafen, Nordfurt, Kupferhafen). Die Sturmklinge kapert Salzschiffe (etwa eine Prise in 10 Tagen). Unter 20: Salz wird teuer, der Salzbund setzt ein Kopfgeld auf die Schwarzsegel aus. Über 80: Salzbund-Schiffe bringen Salz ins Binnenland.',
+    lever: 'Salzfrieden stiften beendet die Prisen. Weißbart erschlagen bringt zehn Tage Schwarzsegel. Selbst kapern zählt als Prise.',
+    say: ['Das Salz wird knapp: Die Sturmklinge kapert die Schiffe. Der Salzbund zahlt Kopfgeld auf die Schwarzsegel.', 'In den Häfen liegt wieder genug Salz.', 'Die Salzspeicher quellen über — der Salzbund bringt Salz ins Binnenland.'] },
+  goblin: { name: 'Grubenhort', unit: 'Punkte', lt: -1, ge: 1e9, def: 0, freed: 1, freedDay: 4,
+    does: 'Die Punkte des Grubenhorts bestimmen die Stufe der Goblinstadt (10/25/45/70) und die Söldner bei Grisk.',
+    lever: 'Spenden, befreite Goblins (+1 je Goblin, der den Hort erreicht) und Händler helfen. Drei Feinde: Ordensüberfälle (je mehr Eifer, desto öfter), die Sklavenjagd der Kette und die Toten.',
+    say: ['', '', ''] },
 };
 
 export const NPCS = [
@@ -1925,7 +1996,7 @@ export const REP_TIERS = [
   { min: -60, name: 'Feindlich', price: 1.3, greet: '„Leute wie dich bedienen wir nur ungern.“' },
   { min: -Infinity, name: 'Verhasst', price: null, greet: '„Verschwinde, bevor ich die Wache rufe.“' },
 ];
-export const GOODS = ['grain', 'meat', 'salt', 'cloth', 'pelt', 'timber', 'woodware', 'stoneware', 'ore', 'ingot', 'tools', 'arms', 'magitech'];   // S13 Wirtschaft: economy.js
+export const GOODS = ['grain', 'meat', 'salt', 'cloth', 'pelt', 'timber', 'woodware', 'stoneware', 'ore', 'ingot', 'tools', 'arms', 'magitech', 'bone', 'soul_vial', 'grabgut'];   /* E40.5 (09.10.): Totenwaren */   // S13 Wirtschaft: economy.js
 export const TOWNS = {
   eren:      { name:'Eren', pop:40, stock:{ grain:40, salt:6, cloth:5, pelt:8 }, prod:{ grain:7, pelt:2 }, use:{ grain:3, salt:2, cloth:1 } },
   northcity: { name:'Nordfurt', pop:90, stock:{ grain:12, salt:30, cloth:25, pelt:3 }, prod:{ salt:5, cloth:4 }, use:{ grain:8, pelt:2, salt:1 } },

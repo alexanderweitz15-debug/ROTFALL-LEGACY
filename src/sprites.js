@@ -13,7 +13,8 @@
 
 export const PX = 2;
 import { ATLAS } from './ref5_atlas.js?v=25';
-import { ITEMS, RACES, FACTIONS } from './data.js?v=25';   // Nutzer S13: Sprites aus dem Referenzblatt
+import { ITEMS, RACES, FACTIONS } from './data.js?v=25';
+import { S as GS } from './state.js?v=25';   /* R4 Rangzeichen (09.10.): Fraktionsrang des Helden */   // Nutzer S13: Sprites aus dem Referenzblatt
 import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=25';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
 import { ATK_U } from './anim.js?v=25';   /* Kampfanimation Scheibe 1 */
@@ -210,11 +211,11 @@ export function flashOf(cv) {
 
 // ---------------- Aussehen (Spec → aufgelöste Rampen) ----------------
 const SPEC_KEYS = ['sp', 'skin', 'hair', 'cloth', 'pants', 'boots', 'belt', 'hooded', 'hood', 'cloak', 'face', 'glow', 'armor', 'armorCol',
-  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr', 'cpm', 'hc2', 'la', 'prop', 'rr', 'wd'];   /* prop (08.10.): Berufsding in der Hand; Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen; R11: Umhangmuster, Kapuzen-Zweitfarbe */
+  'helm', 'helmCol', 'crest', 'hs', 'beard', 'robe', 'apron', 'tabard', 'mark', 'markCol', 'strap', 'pouch', 'scarf', 'shield', 'shieldCol', 'quiver', 'glove', 'hem', 'apronCol', 'pauld', 'sash', 'wear', 'blood', 'wseed', 'pack', 'cape', 'wraps', 'stole', 'bd', 'vs', 'hv', 'star', 'charm', 'straw', 'ms', 'pb', 'spk', 'gg', 'fur', 'rn', 'core', 'chn', 'kn', 'capeL', 'ge', 'asy', 'sil', 'stance', 'bare', 'mc', 'ag', 'sc', 'fc', 'trim', 'cw', 'hd', 'cln', 'ctr', 'cfb', 'cfr', 'cpm', 'hc2', 'la', 'prop', 'rr', 'wd', 'bdg', 'bot'];   /* prop (08.10.): Berufsding in der Hand; Artist 02.10.: Umhangform, Kapuzenform, Futter, Saum, Fibel, Fransen; R11: Umhangmuster, Kapuzen-Zweitfarbe */
 function baseSpec() {
   return { sp: 'human', skin: '#d6b089', hair: '#2b2118', cloth: '#4a3a28', pants: '#2f2519', boots: '#241b13', belt: '#2a2016',
     hooded: 0, hood: '', cloak: '', face: 'human', glow: '', armor: '', armorCol: '', helm: '', helmCol: '', crest: '', hs: 0, beard: 0,
-    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0, cpm: '', hc2: '', la: 0, prop: '', rr: 0, wd: 0 };
+    robe: '', apron: 0, tabard: '', mark: '', markCol: '', strap: 0, pouch: 0, scarf: '', shield: '', shieldCol: '', quiver: 0, glove: '', pauld: '', sash: '', wear: 0, blood: 0, wseed: 0, pack: 0, cape: '', wraps: 0, stole: '', bd: '', vs: 0, hv: 0, star: 0, charm: 0, straw: 0, pb: 0, spk: 0, gg: 0, fur: '', rn: '', core: '', chn: 0, kn: 0, capeL: 0, ge: '', asy: 0, sil: '', stance: 0, bare: 0, mc: '', ag: 0, sc: 0, fc: 0, trim: '', cw: '', hd: '', cln: '', ctr: '', cfb: '', cfr: 0, cpm: '', hc2: '', la: 0, prop: '', rr: 0, wd: 0, bdg: '', bot: 0 };
 }
 const darkOf = c => mix(c, '#16120e', 0.45);
 
@@ -381,6 +382,9 @@ function wanderLook(s, seed) {
   Object.assign(s, { armor: '', helm: '', skin: M, hair: M, hs: 0, beard: 0, face: 'mask', armorCol: M, helmCol: M, pauld: '', sil: '', tabard: '', mark: '', markCol: '',
     glow: pickH(['#7fd6e6', '#e6c46a', '#d65a4a', '#9ae07a'], h, 1), cloth: M, pants: D, boots: D, glove: M, belt: D, scarf: rag, wraps: rag ? 1 : 0, wear: pickH([1, 2, 2], h, 3) });
 }
+/* Aurelion-Rest (09.10.2026): Automaten-Streifen des Hochreichs sehen einheitlich aus — blank poliertes Messing, Messingplatten mit Nieten
+   (fig5 endgame L.bot), ein Leuchtauge im Topfhelm (bernstein oder kaltblau je Seriennummer); kein Wappenrock, damit die Platten sichtbar bleiben. */
+const PATROL_LOOK = { bot: 1, armorCol: '#b08a3e', helmCol: '#c09a4a', pauld: '#9a7a38', wear: 0, tabard: '', mark: '', markCol: '', pb: 1 };
 function varyMachine(s, seed) {
   const h = (seed * 1231) | 0, M = pickH([['#7a6038', '#8a7a58', '#8a7040'], ['#6a6a70', '#7a7a82', '#5a5a62'], ['#8a5436', '#9a6a44', '#7a4a2e'], ['#2e2c2a', '#3a3834', '#4a4238']], h, 0);
   Object.assign(s, { armorCol: M[0], helmCol: M[1], pauld: M[2], glow: pickH(['#8a5420', '#3a9ad8', '#9ad05a', '#d8b03a', '#c85a3a'], h, 1), wear: pickH([0, 0, 1, 2], h, 2), markCol: pickH(['#c8a050', '#b9c3d2', '#8a2a2a'], h, 3) });
@@ -667,6 +671,8 @@ function varyPeople(s, e, prof, named) {
     if (plain) { s.cloth = mix(s.cloth, '#18161a', 0.55); s.belt = '#3a3a3e'; }
     if (/Gefangen|Versklavt|Schuldknecht|Pferch|Schandpfahl/.test(prof)) s.gg = 1;
   } else if (reg === 'valen' && plain) s.cloth = mix(s.cloth, '#46505e', 0.38);   // Valen: Blaugrau
+  if (guard && !s.robe && s.helm && !['great', 'crown', 'visor', 'mech', 'skull', 'horned', 'plume'].includes(s.helm)) {   /* R4 (09.10.): Helmform je Fraktion — Valen Nasal, Kette Kessel, Händler/Söldner Kappe+Kamm, Wüste Tuch, Freie Kappe */
+    const FH = { valen: 'nasal', chain: 'kettle', merch: 'bascinet', wuest: 'scarf', frei: 'cap', zwerge: 'nasal' }[e.faction || reg]; if (FH) s.helm = FH; }
   if (guard && !s.robe) {                                            // Wachen: klar von Bürgern getrennt — Kamm in Wappenfarbe, Schulterstücke
     if (s.helm && !s.crest && s.helm !== 'great') s.crest = s.markCol || (reg === 'kette' ? '#5a1a1c' : reg === 'aurel' ? '#c8a050' : '#b9c3d2');
     if (!s.pauld && (s.armor === 'chain' || s.armor === 'leather')) s.pauld = s.armor === 'chain' ? '#6a6a70' : '#5a4632';
@@ -691,6 +697,11 @@ const MS_LIMB = ['larm', 'rarm', 'lleg', 'rleg'];
 export const woundOf = e => { const b = e?.body; if (!b || !e.alive || e.downed) return 0;
   const low = P => P && !P.mech && !P.lost && P.max > 0 && P.hp > 0 && P.hp < P.max * 0.5;
   const ll = low(b.lleg), rl = low(b.rleg); return (low(b.torso) && e.kind !== 'player' ? 1 : 0) + (ll && (!rl || b.lleg.hp <= b.rleg.hp) ? 2 : rl ? 4 : 0); };   /* 09.10.: der Held hinkt auch (nur Bein); die Seite hält er nicht (Waffenhände frei) */
+/* R4 Rangzeichen (09.10., Entscheidung 02.10.: „Rangabzeichen am Spieler automatisch“): ab Rang 2 (Index 1) einer Fraktion trägt der Held deren
+   Abzeichen auf der Brust — Farbe der Fraktion, ab Rang 4 (Index 3) mit Goldrand („+“). Höchster Rang zählt. */
+export const badgeOf = e => { if (e?.kind !== 'player' || e.coopHero || !GS?.ranks) return ''; let best = null, br = 0;
+  for (const [f, r] of Object.entries(GS.ranks)) if ((r ?? -1) >= 1 && r > br && FACTIONS[f]?.colors) { best = f; br = r; }
+  return best ? FACTIONS[best].colors[1] + (br >= 3 ? '+' : '') : ''; };
 export const bloodOf = e => !e || !e.alive || !e.maxHp ? 0 : e.hp < e.maxHp * 0.25 ? 2 : e.hp < e.maxHp * 0.5 ? 1 : 0;
 const HAT_PROF = { 'Flüchtling': 'wide', Reisender: 'wide' };
 const WEAR_PROF = { 'Flüchtling': 3, Bettler: 3, Bauer: 1, 'Tagelöhner': 2, Reisender: 1, 'Holzfäller': 1, 'Jägerbursche': 1, Fischer: 1, 'Ehemaliger Söldner': 2, 'Söldnerwache': 1 };
@@ -698,7 +709,7 @@ const PACK_PROF = new Set(['Reisender', 'Flüchtling', 'Händler', 'Kontorhändl
 function condition(s, e, eq) {
   const cs = Object.values(eq || {}).filter(i => i && i.cond != null).map(i => i.cond), avg = cs.length ? cs.reduce((a, b) => a + b, 0) / cs.length : 1;
   s.wear = Math.max(s.wear || 0, avg > 0.8 ? 0 : avg > 0.5 ? 1 : avg > 0.25 ? 2 : 3, WEAR_PROF[e.prof] || 0, e.captive ? 3 : 0);
-  s.blood = bloodOf(e); s.wd = woundOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;   /* N4 S3: Wunden-Haltung */
+  s.blood = bloodOf(e); s.wd = woundOf(e); s.bdg = badgeOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;   /* N4 S3: Wunden-Haltung */
   if (PACK_PROF.has(e.prof)) s.pack = 1;
   if (HAT_PROF[e.prof] && !s.helm && (((e.seed || 0) | 0) % 2)) { s.helm = HAT_PROF[e.prof]; s.helmCol = '#3a3026'; s.hooded = 0; }
   // Referenz 3: Schichten statt Einheitskittel — Schulterumhang in gedämpften Farben, Beinwickel, Handschuhe, Taschen (je Person fest)
@@ -807,7 +818,8 @@ export function humanSpec(e) {
   if (key === 'kelan') { s.tabard = '#d9d2c0'; s.markCol = '#9b2e26'; }
   const NL = NAMED_LOOK[key]; if (NL) Object.assign(s, NL);
   condition(s, e, eq);
-  if (e.robot) { Object.assign(s, ROBOT_LOOK); varyMachine(s, e.seed || 0); if (e.wanderBot) wanderLook(s, e.seed || 0); }   /* §5f; Wanderautomaten (03.10.) */
+  if (e.robot) { Object.assign(s, ROBOT_LOOK); varyMachine(s, e.seed || 0); if (e.wanderBot) wanderLook(s, e.seed || 0);   /* §5f; Wanderautomaten (03.10.) */
+    else if (e.faction === 'aurel') Object.assign(s, PATROL_LOOK, { glow: ((e.seed || 0) & 1) ? '#ffb040' : '#7fe0ff' }); }   /* Aurelion-Rest (09.10.): Automaten-Streife */
   else if (e.kind === 'npc' && !NAMED_LOOK[key] && !e.undead) varyCivil(s, e, prof);
   if (e.kind === 'npc' && !e.robot && !e.undead) varyPeople(s, e, prof, !!NAMED_LOOK[key]);
   else if (e.kind === 'player' && (e.scars | 0) > 0) s.sc = 1;   /* Artist Runde 4: Narben des Helden sieht man */
@@ -837,7 +849,7 @@ function hsInputs(e) {
   const v = hsSig; let n = 0;
   for (let i = 0; i < HS_ENT.length; i++) v[n++] = e[HS_ENT[i]];
   const p = e.pal; if (p) for (let i = 0; i < HS_PAL.length; i++) v[n++] = p[HS_PAL[i]];
-  v[n++] = bloodOf(e); v[n++] = woundOf(e);   /* N4 S3 */
+  v[n++] = bloodOf(e); v[n++] = woundOf(e); v[n++] = badgeOf(e);   /* N4 S3; R4 Rangzeichen */
   const b = e.body; if (b) for (let i = 0; i < 4; i++) { const P = b[HS_LIMB[i]]; v[n++] = P ? (P.mech ? 3 : P.lost ? 2 : P.hp <= 0 ? 1 : 0) : -1; }
   const tx = ((e.anchor?.x ?? e.x) || 0) / 32, ty = ((e.anchor?.y ?? e.y) || 0) / 32;   /* dieselben Grenzen wie regionOf und regionFarmer */
   v[n++] = (ty > 780 && tx > 560 ? 1 : 0) | (tx > 0 && tx < 200 ? 2 : 0) | (tx < 330 ? 4 : 0) | (tx > 700 ? 8 : 0);
@@ -929,6 +941,17 @@ function regionFarmer(s, e, prof, key) {
     if (fem) Object.assign(s, { robe: s.cloth, apron: 1, apronCol: '#6a6250' });
   }
 }
+/* R6 (09.10.2026): eigene Rüstung der Story-Bosse — Silhouette, Helm, Farben und Zier unterscheiden sich von jedem Spieler-Set (Blutkette, Totenkrone,
+   Generalspanzer bleiben für den Spieler „im Stil von“). Varg: schwarze Platte mit roten Ketten und Dornen; Garmadon: rostrote Königsplatte mit
+   Halsberge und schwarzer Krone; Todesritter: Visierhelm, blaue Runen; Hrodvar: bereifte Platte, Pelz, Eiskamm; Hauptmann der Toten: rostiger
+   Wappenrock über Platte. */
+const BOSS_LOOK = {
+  chain_master: { armor: 'plate', armorCol: '#1a1416', pauld: '#5a1418', pb: 2, chn: 1, spk: 1, rn: '#c03020', cloak: '#2a0a0c', capeL: 1, helm: 'great', helmCol: '#141012', crest: '#8a1a1c', glove: '#2a1416', kn: 1, tabard: '', sil: 'spikes' },
+  garmadon: { armor: 'plate', armorCol: '#3a2218', pauld: '#6a1a14', pb: 2, gg: 1, helm: 'crown', helmCol: '#1c1a1e', ge: '#e03a2a', rn: '#e03a2a', cloak: '#2a0a0c', capeL: 1, kn: 1, tabard: '#1a0a0c', mark: 'chevron', markCol: '#e03a2a', sil: 'spikes flames' },
+  death_knight: { armor: 'plate', armorCol: '#1e2430', pauld: '#3a4a5a', pb: 2, spk: 1, helm: 'visor', helmCol: '#22262e', crest: '#6fd8ff', ge: '#6fd8ff', rn: '#6fd8ff', cloak: '#0c0e12', capeL: 1, kn: 1, tabard: '', sil: 'flames' },
+  hrodvar: { armor: 'plate', armorCol: '#5d7383', pauld: '#8fb3c7', pb: 2, gg: 1, helm: 'great', helmCol: '#8fb3c7', crest: '#c8e6f5', rn: '#9fd8ff', ge: '#9fd8ff', cloak: '#16202a', capeL: 1, fur: '#d8e4ea', kn: 1, tabard: '#1d2a36', mark: 'chevron', markCol: '#9fd8ff' },
+  death_captain: { armor: 'plate', armorCol: '#403834', pauld: '#5a3a2a', pb: 1, asy: 1, helm: 'great', helmCol: '#50463f', crest: '#7a2a22', tabard: '#2a1416', mark: 'chevron', markCol: '#c05a3a', cloak: '#1c1012', wear: 2 },
+};
 /* P3.20–P3.23 Banditen- und Goblin-Rollen (08.10.2026, Spec §15: neu nur, wenn sichtbar anders): je Rolle Silhouette, Kleidung, Kopf und
    Ausrüstung fest — Späher leicht mit Kapuze und Köcher, Schläger breit mit nackten Armen, Plünderer mit Sack auf dem Rücken, Messerstecher
    maskiert, schwerer Bandit im Kettenhemd mit Topfhelm, Bandenführer mit Federhut und rotem Mantel; Goblin-Schamane mit Tierschädel und
@@ -1056,18 +1079,20 @@ export function monsterSpec(e, m) {
   else if (['wraith', 'shade', 'bone_knight', 'crypt_warden', 'necromancer', 'flesh_golem'].includes(t) && !e.boss && !e.rboss) varyDead(s, t, e.seed || 0, !!e.glow);   /* Artist Runde 6 */
   else if (t === 'bounty_hunter') varyHunter(s, e.seed || 0, e.tier || 0);
   const EL = { chain_master: ['blutkette', 'blutkettenhelm'], garmadon: ['totenkrone', 'schaedelhelm'], death_knight: ['totenkrone'], hrodvar: ['totenkrone'], death_captain: ['generalspanzer'] }[t];   // S14: Bosse im Endgame-Set
-  if (EL) for (const k of EL) Object.assign(s, ARMOR_LOOK[k], t === 'hrodvar' ? { armorCol: '#5d7383', rn: '#9fd8ff', cloak: '#16202a', pauld: '#8fb3c7' } : t === 'garmadon' ? { cloak: '#2a0a0c', rn: '#e03a2a', ge: '#e03a2a' } : {});
+  if (BOSS_LOOK[t]) Object.assign(s, BOSS_LOOK[t]);   /* R6 (09.10.): Story-Bosse in eigener Rüstung statt der Spieler-Sets (Entscheidung 02.10.: „Bosse tragen eigene Rüstung“) */
+  else if (EL) for (const k of EL) Object.assign(s, ARMOR_LOOK[k], t === 'hrodvar' ? { armorCol: '#5d7383', rn: '#9fd8ff', cloak: '#16202a', pauld: '#8fb3c7' } : t === 'garmadon' ? { cloak: '#2a0a0c', rn: '#e03a2a', ge: '#e03a2a' } : {});
   if (FOE_VARY.has(t) && !e.boss && !e.rboss) varyFoe(s, t, e.seed || 0);   /* Entwickler 02.10.: Varianten nach dem Boss-Set (EL), vor Umhangform und Elite-Aussehen */
   if (e.shield && !s.shield) { s.shield = 'round'; s.shieldCol = '#4a3f30'; s.mark = 'boss'; s.markCol = '#8a8172'; }
   const sd = ((e.seed || 0) | 0) % 2;                                   // Referenz 3: Räuber und Tote tragen, was sie haben
   s.wear = { goblin: 2, goblin_warrior: 2, bandit: 1 + sd, bandit_archer: 1 + sd, bandit_spear: 1 + sd, bounty_hunter: 1, ghoul: 3, skeleton: 2, crypt_warden: 2, death_captain: 2, cultist: 1, chain_brute: 1, kettenschuetze: 1, valen_soldier: 1 }[t] || 0;
-  s.blood = bloodOf(e); s.wd = woundOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;   /* N4 S3: Wunden-Haltung */
+  s.blood = bloodOf(e); s.wd = woundOf(e); s.bdg = badgeOf(e); s.wseed = (((e.seed || 0) * 3) | 0) % 4;   /* N4 S3: Wunden-Haltung */
   if (t === 'goblin' || t === 'goblin_warrior') s.wear = 2 + ((((e.seed || 0) * 5) | 0) >> 1) % 2;   /* Artist Runde 4: Goblins in Lumpen, mal geflickt, mal zerfetzt */
   if (!e.boss && (t === 'skeleton' || t === 'zombie' || t === 'ghoul' || t === 'bone_archer' || t === 'wraith')) s.wear = 1 + Math.abs(((e.seed || 0) * 37) | 0) % 3;   /* Artist Runde 6: Verwesungsgrad 1–3 je Toter */
   if (NEW_WEAR[t] != null) s.wear = NEW_WEAR[t] + (t === 'skel_brute' ? Math.abs(((e.seed || 0) * 37) | 0) % 2 : 0);   /* Entwickler 02.10. */
   if ((t === 'bandit' || t === 'bandit_spear') && ((e.seed | 0) % 2)) s.cape = '#5a1a1c';     // Referenz 3: rote Tücher der Räuber
   if (t === 'bandit' || t === 'bandit_spear' || t === 'goblin' || t === 'goblin_warrior') s.wraps = 1;
-  if (ROLE_LOOK[t]) { const { gob, ban, ...RL } = ROLE_LOOK[t]; Object.assign(s, RL); }   /* P3.20–P3.23 Rollen: Aussehen fest je Rolle (kein varyBandit/varyGoblin — die Rolle soll man erkennen) */
+  if (ROLE_LOOK[t]) { const { gob, ban, ...RL } = ROLE_LOOK[t]; Object.assign(s, RL); }
+  if ((m?.faction === 'bandit' || m?.faction === 'pirate') && !e.boss && !e.rboss && !s.sash && !s.tabard) s.sash = (m.faction === 'bandit' ? FACTIONS.bandit : FACTIONS.sea).colors[1];   /* R4 (09.10.): Erkennungsband — Rooks Bande rostrot, Seevolk sandhell */   /* P3.20–P3.23 Rollen: Aussehen fest je Rolle (kein varyBandit/varyGoblin — die Rolle soll man erkennen) */
   s.ms = msOf(e); s.hv = heavyOf(e.weaponKey) || (t === 'angel_blade' || t === 'angel_archer' || t === 'chain_brute' || t === 'death_captain' || t === 'hrodvar' || t === 'garmadon' || t === 'flesh_golem' ? 1 : 0);
   s.atlas = MON_ATLAS[t] || (e.goblin ? 'goblin' : null);   // Stil F
   if (t === 'skel_brute' || t === 'mutant_brute') s.hv = 1;
@@ -1096,7 +1121,7 @@ function resolve(s, k, soft = 1) {                                  // soft < 1:
   L = { ...s,
     skin: ramp(s.skin), hair: ramp(dk(s.hair, 0.15)), cloth: ramp(dk(s.cloth)), pants: ramp(dk(pants)), boots: s.boots ? ramp(s.boots) : null,
     belt: ramp(s.belt), leather: ramp('#5a4030'), apronR: s.apronCol ? ramp(s.apronCol) : null, hood: s.hooded ? ramp(dk(s.hood || darkOf(s.cloth))) : null, cloak: s.cloak ? ramp(dk(s.cloak)) : null,
-    armorR: s.armor ? ramp(dk(s.armorCol, 0.2)) : null, furR: s.fur ? ramp(s.fur) : null, pauldR: s.pauld ? ramp(s.pauld) : null, capeR: s.cape ? ramp(dk(s.cape, 0.1)) : null, stoleR: s.stole ? ramp(s.stole) : null, sashR: s.sash ? ramp(s.sash) : null, helmR: s.helm ? ramp(dk(s.helmCol || '#5a5852', 0.2)) : null, crest: s.crest ? ramp(s.crest) : null, trimR: s.trim ? ramp(s.trim) : null,
+    armorR: s.armor ? ramp(dk(s.armorCol, 0.2)) : null, furR: s.fur ? ramp(s.fur) : null, pauldR: s.pauld ? ramp(s.pauld) : null, capeR: s.cape ? ramp(dk(s.cape, 0.1)) : null, stoleR: s.stole ? ramp(s.stole) : null, sashR: s.sash ? ramp(s.sash) : null, bdgR: s.bdg ? ramp(s.bdg.replace('+', '')) : null, bdgHi: s.bdg && s.bdg.endsWith('+') ? ramp('#d8b048') : null, helmR: s.helm ? ramp(dk(s.helmCol || '#5a5852', 0.2)) : null, crest: s.crest ? ramp(s.crest) : null, trimR: s.trim ? ramp(s.trim) : null,
     clnR: s.cln ? ramp(s.cln) : null, ctrR: s.ctr ? ramp(s.ctr) : null, cfbR: s.cfb ? ramp(s.cfb) : null, hc2R: s.hc2 ? ramp(s.hc2) : null,
     robe: s.robe ? ramp(dk(s.robe, 0.22)) : null, tabard: s.tabard ? ramp(dk(s.tabard, 0.15)) : null, markR: s.markCol ? ramp(s.markCol) : null,
     scarf: s.scarf ? ramp(s.scarf) : null, shieldR: s.shield ? ramp(s.shieldCol) : null, glove: s.glove ? ramp(s.glove) : null,

@@ -382,3 +382,15 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
 38. Zweite Gischtinsel und kurzer Einstieg in Eren.
 
 **Entscheide:** Vampir = Titelklasse mit Blutdurst als Ressource, Schwäche im Sonnenlicht, sozialen Folgen (Zeugen melden, Orden jagt) und heilbar (Orden oder Heilquelle Sankt Serin). Der Blutfürst am Hof ist Kanzler Aldhelm. Reihenfolge: gemischt (abwechselnd groß und klein). Der große Audit läuft parallel mit drei starken Agenten, nur als Report (`docs/audit/MASTER_REPORT.md`); die NOW-Punkte setze ich danach um.
+
+## 5h. Entscheidungen vom 09.10.2026 (Fragerunde)
+
+- **E40 Totenland-Expansion:** Umfang **groß (C)** — Totenstadt mit Vierteln, Markt und Gesetzen, zweite Stadt, Rangprüfungen, Teilregionen, Gruftnetz, Diplomatie, Story-Bogen und Bossreihe bis Garmadon; in Teilen bauen. **Lebende dürfen die Totenstadt besuchen, mit Regeln** (Totensiegel/Maske/Schweigen; Handel und Aufträge erst mit Rang oder Pakt). **Vorhandene Fläche füllen**, die Karte wächst nicht. **Osten bleibt vorerst Hinterland** im Kriegsgraphen (Krieg erst nach Messung). **Seelen, Knochen und Grabgut werden echte Marktgüter** der Weltwirtschaft. **Nach Garmadons Tod** sind beide Ausgänge möglich: Thronfolgekampf oder Zerfall in Fürstentümer (je nach Weltlage/Handeln des Spielers).
+- **E41 Holz:** Gefällte Bäume wachsen **nach 10 Tagen** nach (Stumpf → Schösslinge → Baum).
+- **E42 Sternbilder:** **Beides** — doppelte Allerwelts-Sterne streichen (Punkte zurück) **und** ähnliche Klassen zusammenlegen (z. B. Barde + Kettenbarde).
+- **E43 Gold und Ruf:** Ruf **überall auf ±100 begrenzen** (Goblin-Sonderfall bleibt). Betriebssteuer und Einzahlgebühr **unterschiedlich nach Gebiet und Stadt** (statt fest 10 %/3 %).
+- **E38 Katana:** **eigene Waffenklasse** (eigener Skill, eigene Animationen, Meisterschaft).
+- **E37 Alte Pakete:** **als Nächstes** — T12 „Straßen haben Herren“ zuerst, dann T23 Fraktionsressourcen, danach Belagerung S3, T15 Messing.
+- **E13 Sprechblasen:** **Mischung** aus Sätzen und Symbolen.
+- **E21 NPC-Ziele:** Deserteurbanden **zählen zum Bandendeckel**; Kriegsmüdigkeit mit **Fahnenflucht ab Stufe 60** (−2 Stärke/Tag beim stärksten Heer), **ruht während einer Belagerung Varonheims**; Abwanderer **nicht** in die eigene Siedlung umleiten.
+- **Prolog (Nachricht 08.10.):** Am Ende des Prologs nur als **Nomade** weiter; eigene Prolog-Tafel.

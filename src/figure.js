@@ -916,6 +916,12 @@ const WDES = {
     C.limb(M.ir, [[11, 2], [9, 4], [8, 8], [9, 12], [11, 14]], 1.4, 1.4); C.limb(M.ir, [[11, 3], [14, 5], [15, 8], [14, 11], [11, 13]], 1.4, 1.4);   // Korbbügel
     C.poly(M.ir, [[11, 6], [14, 6], [14, 10], [11, 10]]); C.poly(M.st, [[14, 7], [55, 7.6], [59, 8], [55, 8.4], [14, 9]]);
     return { gx: 7, gy: 8, blade: [16, 54, 8] }; }],
+  /* E38 Katana (Entwickler 09.10.2026: eigene Waffenklasse): lange Wicklung für zwei Hände, runde Tsuba, Habaki, leicht gebogene Klinge
+     (Spitze hebt sich), Härtelinie nahe der Schneide. Gischtklinge: Griff aus heller Haifischhaut, Tsuba aus Messing.
+     Nebelklinge: länger, blasser Stahl, Nebelschleier an der Härtelinie. */
+  katana: [62, 14, (C, M) => katanaW(C, M, {})],
+  gischtklinge: [62, 14, (C, M) => katanaW(C, M, { ray: true })],
+  nebelkatana: [66, 14, (C, M) => katanaW(C, M, { long: 4, mist: true })],
   warhammer: [52, 20, (C, M) => {
     C.poly(M.wd, [[1, 8.8], [42, 8.8], [42, 11.2], [1, 11.2]]); C.poly(M.wr, [[2, 8.5], [10, 8.5], [10, 11.5], [2, 11.5]]);
     C.poly(M.st, [[37, 4], [45, 4], [45, 16], [37, 16]]); C.poly(M.st, [[45, 6.5], [49, 6.5], [49, 13.5], [45, 13.5]]);
@@ -1029,8 +1035,19 @@ const WDES = {
     C.limb(M.wd, [[5, 1], [10, 12], [12, 28], [10, 44], [5, 55]], 3, 3); C.poly(M.wr, [[10, 24], [14, 24], [14, 32], [10, 32]]);
     return { gx: 12, gy: 28, blade: null, str: [4, 2, 54], after: (set) => { for (let y = 2; y <= 54; y++) set(4, y, '#c9bfa6'); } }; }],
 };
+function katanaW(C, M, o) {                                         /* E38: gemeinsame Form der Katanas (Maße im 1er-Raster, wie WDES) */
+  const L = o.long || 0, Ry = o.ray ? C.partR('ray', ramp('#d8d2c0')) : M.wr;
+  C.ell(M.ir, 1.6, 7, 1.5, 1.9);                                    // Kashira (Knaufkappe)
+  C.poly(Ry, [[2.5, 5.5], [15, 5.6], [15, 8.4], [2.5, 8.5]]);         // Tsuka: lange Wicklung
+  C.ell(o.ray ? C.partR('brass', ramp('#b08a3a'), true) : M.ir, 16.4, 7, 1.5, 3.4);   // Tsuba (runde Scheibe, kleiner als eine Parierstange)
+  C.poly(M.ir, [[17.6, 5.7], [19.6, 5.6], [19.6, 8.3], [17.6, 8.4]]); // Habaki
+  C.poly(M.st, [[19.6, 5.3], [31, 4.6], [43 + L, 3.3], [52 + L, 1.8], [57 + L, 0.9], [61 + L, 1.4], [57.5 + L, 3.2], [48 + L, 5.0], [36, 6.7], [19.6, 8.5]]);   // Klinge mit Sori (Spitze hebt sich deutlich)
+  return { gx: 9, gy: 7, blade: [21, 34, 6], after: (set, S) => {   // Härtelinie (Hamon), leicht gewellt, nahe der Schneide
+    for (let x = 22; x <= 55 + L; x++) { const y = Math.round(7.7 - (x - 20) * 0.13 - (x % 5 < 2 ? 0.4 : 0)); set(x, y, o.mist ? '#dfe8f0' : '#ebe6da'); }
+    if (o.mist) for (let x = 26; x <= 50 + L; x += 6) set(x, Math.round(6.0 - (x - 20) * 0.12), '#bcd0e0'); } };
+}
 const WBY = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'mace', spear: 'spear', dagger: 'dagger', staff: 'staff', whip: 'chain_whip',
-  rapier: 'rapier', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand', bow: 'shortbow', throw: 'wurfmesser', sling: 'schleuder' };
+  rapier: 'rapier', katana: 'katana', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand', bow: 'shortbow', throw: 'wurfmesser', sling: 'schleuder' };
 export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '', bare = false) {   // bare: Bogen ohne Sehne (die Sehne zeichnet render.js beim Spannen)   // sc < 1: S14 Stil R — dieselbe Form im gröberen Zielraster gemalt
   const d = WDES[key] ? key : WBY[wtype] || 'longsword', [w0, h0, fn] = WDES[d], w = Math.ceil(w0 * sc), h = Math.ceil(h0 * sc);
   const C = new Canvas2(w, h);

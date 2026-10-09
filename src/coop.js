@@ -101,6 +101,7 @@ async function host() {
   await new Promise((ok, no) => { peer.on('open', ok); peer.on('error', e => no(new Error(e.type || 'Peer-Fehler'))); });
   S.coop = { role: 'host', code, guests: {}, bytes: 0, t0: now(), started: A.isRunning() };   /* aus dem laufenden Spiel geöffnet: wer bereit ist, kommt sofort dazu */
   A.coopHooks.hostTick = hostTick; A.coopHooks.remote = remoteControl; A.coopHooks.guestAct = guestAct; A.coopHooks.hostDied = hostDied; A.coopHooks.heirCount = heirCount; A.coopHooks.afterHeir = afterHeir;
+  A.coopHooks.card = (title, sub, snd) => broadcast({ t: 'card', title, sub, snd });   /* E22 im Koop (09.10.): Ereigniskarten auch beim Gast (ohne Pause, der Gast rechnet nichts) */
   A.coopHooks.key = k => { if (k !== 'enter' || A.UI.dialogueOpen() || A.UI.modalOpen) return false; A.keys.delete('enter'); openChat(t => { chatLine(S.player.name, t); muteLog = true; A.log(`${S.player.name}: ${t}`, 'party'); muteLog = false; broadcast({ t: 'chat', from: S.player.name, text: t }); }); return true; };
   A.onLog(e => { if (!muteLog) broadcast({ t: 'log', text: e.text, cat: e.cat }); });
   setInterval(() => { if (document.hidden) A.stepHidden(); }, 50);
@@ -213,7 +214,7 @@ function sendLobby(g, note) {
   sendTo(g, { t: 'lobby', hostName: S.player?.name || myName(), note: note || null, started: !!S.coop.started, party: partyList().filter(p => !A.byId(p.id)?.coopHero),
     saved: saved && saved.alive && !g.heirs ? { name: saved.name, level: saved.level, prof: saved.prof } : null, heirs: g.heirs ? g.heirs.map(h => ({ name: h.name, origin: A.ORIGINS[h.origin]?.name, level: h.level })) : null, locked: !!g.deadLevel && !g.heirs });
 }
-const INGAME = new Set(['world', 'quests', 'cam', 'log', 'toast']);   /* nur an Gäste, die schon im Spiel sind (nicht im Warteraum) */
+const INGAME = new Set(['world', 'quests', 'cam', 'log', 'toast', 'card']);   /* nur an Gäste, die schon im Spiel sind (nicht im Warteraum) */
 function broadcast(msg) { const G = A.S.coop?.guests; if (!G) return; const s = JSON.stringify(msg); for (const g of Object.values(G)) { if (INGAME.has(msg.t) && !g.entId) continue; try { g.conn.send(s); A.S.coop.bytes += s.length; } catch (e) { /* Verbindung tot: dropGuest kommt über close */ } } }
 function sendTo(g, msg) { const s = typeof msg === 'string' ? msg : JSON.stringify(msg); try { g.conn.send(s); A.S.coop.bytes += s.length; } catch (e) { /* siehe oben */ } }
 function partyList() { return (A.S.player ? A.partyMembers() : []).filter(m => m.alive && m.kind === 'npc' && (!A.raceOf || A.raceOf(m) === 'mensch')).map(   /* E17 ⚖ (09.10.): Gäste spielen nur Menschen — Goblin-, Skelett-, Zwergen-Gefährten bleiben beim Host */m => ({ id: m.id, name: m.name, prof: m.prof, level: m.level, taken: !!m.coopPilot })); }
@@ -313,17 +314,18 @@ function sendShop(m, g, npc) {
 }
 function guestShopDeal(m, g, d) {
   const S = A.S, I = A.ITEMS, npc = A.byId(d.npcId); if (!npc || npc.id !== g.shopNpc || A.shopRefusal(npc) || A.dist(npc, m) > 140) return sendTo(g, { t: 'toast', text: 'Der Händler ist nicht mehr da.' });
-  if (d.kind === 'buy') {
-    const it = I[d.key]; if (!it) return; const c = A.price(d.key, true, npc); if ((m.coopGold || 0) < c) return sendTo(g, { t: 'toast', text: 'Zu wenig Gold im Beutel.' });
-    if (it.good) { const town = S.towns[A.ecoTown(npc)]; if (!town || town.stock[d.key] < 1 || !A.addItem(m, d.key, 1)) return; town.stock[d.key] -= 1; }
-    else { const s = (npc._stock || []).find(x => x.key === d.key); if (!s || !A.addItem(m, d.key, 1)) return; s.count--; if (s.count <= 0) npc._stock.splice(npc._stock.indexOf(s), 1); }
-    m.coopGold -= c; A.log(`${g.name} kauft ${it.name} für ${c} Gold.`, 'economy');
-  } else {
-    const s = m.inv[d.idx]; if (!s || I[s.key]?.bound) return; const c = A.price(s.key, false, npc, s);
-    if ((s.count || 1) > 1) s.count--; else m.inv.splice(d.idx, 1);
-    if (I[s.key].good && A.ecoTown(npc)) S.towns[A.ecoTown(npc)].stock[s.key] += 1;
-    m.coopGold = (m.coopGold || 0) + c; A.log(`${g.name} verkauft ${I[s.key].name} für ${c} Gold.`, 'economy');
-  }
+  /* HB-30 (09.10.): derselbe Weg wie beim Helden (buy/sell): Stadtlager auch bei Ausrüstung, onItemGained, Handel-Fertigkeit der Gastfigur,
+     Sperre und Auftragsgegenstände. Dafür stehen kurz Gastfigur und Gastbeutel an Stelle von Held und Heldengold (wie runAs). */
+  const P = S.player, G0 = S.gold, key = d.kind === 'buy' ? d.key : m.inv[d.idx]?.key, n0 = m.inv.reduce((n, s) => n + (s.key === key ? (s.count || 1) : 0), 0), g0 = m.coopGold || 0;
+  if (!key || !I[key]) return;
+  if (d.kind === 'buy' && g0 < A.price(key, true, npc)) return sendTo(g, { t: 'toast', text: 'Zu wenig Gold im Beutel.' });   /* sonst stünde der Hinweis beim Host */
+  if (d.kind === 'sell' && (m.inv[d.idx].lock || I[key].bound)) return sendTo(g, { t: 'toast', text: 'Gesperrt oder gebunden — nicht verkäuflich.' });
+  S.player = m; S.gold = g0;
+  try { if (d.kind === 'buy') A.buy(npc, d.key, true); else A.sell(d.idx, npc, true); } catch (e) { console.error(e); }
+  finally { m.coopGold = S.gold; S.gold = G0; S.player = P; }
+  const n1 = m.inv.reduce((n, s) => n + (s.key === key ? (s.count || 1) : 0), 0);
+  if (n1 !== n0) A.log(`${g.name} ${d.kind === 'buy' ? 'kauft' : 'verkauft'} ${I[key].name} für ${Math.abs(m.coopGold - g0)} Gold.`, 'economy');
+  else sendTo(g, { t: 'toast', text: d.kind === 'buy' ? (g0 < A.price(key, true, npc) ? 'Zu wenig Gold im Beutel.' : 'Das geht gerade nicht (Tasche voll oder ausverkauft).') : 'Das verkauft man nicht (gesperrt, gebunden oder für einen Auftrag nötig).' });
   sendShop(m, g, npc); g.selfAt = 0;
 }
 
@@ -386,12 +388,12 @@ function hostTick(dt) {
     const fl = S.floats.filter(f => (f.maxLife || 900) - f.life < 60 && Math.hypot(f.x - m.x, f.y - m.y) < NEAR).slice(0, 12).map(f => ({ x: f.x, y: f.y, text: f.text, color: f.color, big: f.big, num: f.num, mine: f.num ? f.srcId === m.id : f.mine }));   /* Koop: „mine“ je Gast-Held neu berechnet (eigener Schaden statt immer der des Hosts), sonst zeigt „Reduziert“ beim Gast nur Krits */
     const pr = S.projectiles.filter(p => p.map === m.map && Math.hypot(p.x - m.x, p.y - m.y) < NEAR).map(p => ({ x: Math.round(p.x), y: Math.round(p.y), vx: p.vx, vy: p.vy, kind: p.kind, map: p.map }));
     if (upd.length || add.length || del.length || fx.length || fl.length || pr.length) sendTo(g, { t: 'ents', map: m.map, upd, add, del, fx, fl, pr });
-    if (now() - (g.selfAt || 0) > 200) { g.selfAt = now(); sendTo(g, { t: 'self', inv: m.inv, equip: m.equip, stamina: m.stamina, maxStamina: m.maxStamina, mana: m.mana, maxMana: m.maxMana, morale: m.morale, body: m.body, hp: m.hp, maxHp: m.maxHp, hotbar: m.hotbar, level: m.level, xp: m.xp, xpNext: m.xpNext, dodgeCd: m.dodgeCd, coopGold: m.coopGold || 0, attributes: m.attributes, attrPoints: m.attrPoints || 0, skills: m.skills, currentClass: m.currentClass, knownClasses: m.knownClasses, titleClass: m.titleClass, titleClasses: m.titleClasses, tgrade: m.tgrade, tree: m.tree, skillPoints: m.skillPoints || 0, abilities: m.abilities, spells: m.spells, ranks: m.ranks || null, titles: m.titles }); }
+    if (now() - (g.selfAt || 0) > 200) { g.selfAt = now(); sendTo(g, { t: 'self', inv: m.inv, equip: m.equip, stamina: m.stamina, maxStamina: m.maxStamina, mana: m.mana, maxMana: m.maxMana, morale: m.morale, body: m.body, hp: m.hp, maxHp: m.maxHp, hotbar: m.hotbar, level: m.level, xp: m.xp, xpNext: m.xpNext, dodgeCd: m.dodgeCd, coopGold: m.coopGold || 0, attributes: m.attributes, attrPoints: m.attrPoints || 0, skills: m.skills, currentClass: m.currentClass, knownClasses: m.knownClasses, titleClass: m.titleClass, titleClasses: m.titleClasses, tgrade: m.tgrade, tree: m.tree, skillPoints: m.skillPoints || 0, abilities: m.abilities, spells: m.spells, ranks: m.ranks || null, titles: m.titles, lastHit: m.lastHitAt && now() - m.lastHitAt < 5000 ? m.lastHitId : null, hitAge: m.lastHitAt ? Math.round(now() - m.lastHitAt) : null }); }   /* E2: Ersatz-Lebensbalken beim Gast */
   }
   if (S.cine) broadcast({ t: 'cam', x: Math.round(A.R.cam.x), y: Math.round(A.R.cam.y), z: A.R.cam.zoom, text: S.cine.shots?.[S.cine.i]?.text || '' }); else if (camOn) { camOn = false; broadcast({ t: 'cam', off: 1 }); }   /* Kamerafahrt: Gäste sehen mit */
   if (S.cine) camOn = true;
   if (wAcc >= 500) { const qs = JSON.stringify([S.quests, S.contracts || [], S.track || null]); if (qs !== lastQuests) { lastQuests = qs; broadcast({ t: 'quests', q: qs }); } }   /* Aufträge und Wegpunkt für die Gäste (nur bei Änderung) */
-  if (wAcc >= 500) { wAcc = 0; broadcast({ t: 'world', day: S.day, minute: S.minute, weather: S.weather, paused: !!S.paused, map: S.map, gold: S.gold, res: S.res, factions: S.factions, cine: S.cine ? { text: S.cine.shots[S.cine.i]?.text } : null, dlg: A.UI.dialogueOpen(), hostName: S.player.name }); }
+  if (wAcc >= 500) { wAcc = 0; broadcast({ t: 'world', day: S.day, minute: S.minute, weather: S.weather, paused: !!S.paused, map: S.map, gold: S.gold, res: S.res, factions: S.factions, facRes: S.facRes, cine: S.cine ? { text: S.cine.shots[S.cine.i]?.text } : null, dlg: A.UI.dialogueOpen(), hostName: S.player.name }); }
 }
 // Figur ohne schwere Felder für die erste Übertragung
 function lightEnt(e) { const o = {}; for (const k of Object.keys(e)) if (!HEAVY.has(k)) o[k] = e[k]; if (e.equip) o.equip = e.equip; return o; }
@@ -432,9 +434,10 @@ function onGuestData(raw) {
   if (d.t === 'travel') { if (S.map !== d.map) { S.map = d.map; S.ents[d.map] = keepLocal(S.ents[d.map] || []); S.coop.targets = {}; } return; }
   if (d.t === 'ents') { applyEnts(d); return; }
   if (d.t === 'cam') { S.coop.cam = d.off ? null : d; showCineText(d.off ? '' : d.text); return; }
-  if (d.t === 'self') { if (!me) return; Object.assign(me, { inv: d.inv, equip: d.equip, stamina: d.stamina, maxStamina: d.maxStamina, mana: d.mana, maxMana: d.maxMana, morale: d.morale, body: d.body, hp: d.hp, maxHp: d.maxHp, hotbar: d.hotbar, level: d.level, xp: d.xp, xpNext: d.xpNext, dodgeCd: d.dodgeCd, coopGold: d.coopGold, attributes: d.attributes, attrPoints: d.attrPoints, skills: d.skills, currentClass: d.currentClass, knownClasses: d.knownClasses, titleClass: d.titleClass, titleClasses: d.titleClasses, tgrade: d.tgrade, tree: d.tree, skillPoints: d.skillPoints, abilities: d.abilities, spells: d.spells, titles: d.titles }); if (d.ranks) S.ranks = d.ranks;   /* eigene Ränge des Gasts */ A.UI.refreshHUD(); if (['inventory', 'character'].includes(A.UI.modalOpen)) A.UI.refreshModal(me); if (A.UI.dialogueOpen() && tradeOpen) guestTrade(); return; }
-  if (d.t === 'world') { Object.assign(S, { day: d.day, minute: d.minute, weather: d.weather, paused: d.paused, gold: d.gold, res: d.res, factions: d.factions }); S.coop.hostMap = d.map; S.coop.hostBusy = d.paused || d.dlg; S.coop.cineText = d.cine?.text || null; return; }
+  if (d.t === 'self') { if (!me) return; Object.assign(me, { inv: d.inv, equip: d.equip, stamina: d.stamina, maxStamina: d.maxStamina, mana: d.mana, maxMana: d.maxMana, morale: d.morale, body: d.body, hp: d.hp, maxHp: d.maxHp, hotbar: d.hotbar, level: d.level, xp: d.xp, xpNext: d.xpNext, dodgeCd: d.dodgeCd, coopGold: d.coopGold, attributes: d.attributes, attrPoints: d.attrPoints, skills: d.skills, currentClass: d.currentClass, knownClasses: d.knownClasses, titleClass: d.titleClass, titleClasses: d.titleClasses, tgrade: d.tgrade, tree: d.tree, skillPoints: d.skillPoints, abilities: d.abilities, spells: d.spells, titles: d.titles }); if (d.ranks) S.ranks = d.ranks;   /* eigene Ränge des Gasts */ guestHitBar(d); A.UI.refreshHUD(); if (['inventory', 'character'].includes(A.UI.modalOpen)) A.UI.refreshModal(me); if (A.UI.dialogueOpen() && tradeOpen) guestTrade(); return; }
+  if (d.t === 'world') { Object.assign(S, { day: d.day, minute: d.minute, weather: d.weather, paused: d.paused, gold: d.gold, res: d.res, factions: d.factions }); if (d.facRes) S.facRes = d.facRes;   /* T23: Kodex „Mächte“ beim Gast */ S.coop.hostMap = d.map; S.coop.hostBusy = d.paused || d.dlg; S.coop.cineText = d.cine?.text || null; return; }
   if (d.t === 'toast') { A.UI.toast(d.text); return; }
+  if (d.t === 'card') { A.nameCard?.(d.title, d.sub || '', 3200); A.sfx?.(d.snd || 'bell', 0.4, 0.8); return; }   /* E22: Ereigniskarte vom Host */
   if (d.t === 'cards') { lobbyCardsData = d.cards; drawCards($('coop-cards'), d.cards); return; }
   if (d.t === 'shop') { shopData = d; guestShop(); return; }
   if (d.t === 'dlg') { if (d.close) { if (!shopData && !tradeOpen) A.UI.closeDialogue(); return; } const npc = A.byId(d.npcId) || { name: d.name }; A.UI.dialogue(npc, d.text, d.opts.map((text, i) => ({ text, fn: () => send({ t: 'cmd', kind: 'dlg', i }) }))); return; }
@@ -442,6 +445,8 @@ function onGuestData(raw) {
   if (d.t === 'log') { A.log(d.text, d.cat); return; }
   if (d.t === 'chat') { chatLine(d.from, d.text); A.log(`${d.from}: ${d.text}`, 'party'); return; }
 }
+/* E2 (09.10.): Ersatz-Lebensbalken beim Gast — der Gegner, den die eigene Figur zuletzt traf, zeigt 5 s seinen Balken (wie beim Host, render.js barTarget) */
+function guestHitBar(d) { const F = A.R.focus; if (!F) return; if (d.lastHit) { const e = A.byId(d.lastHit); if (e) { F.last = e; F.lastAt = now() - (d.hitAge || 0); } } }
 function keepLocal(list) { const S = A.S; return list.filter(e => e.kind === 'prop' || e === S.player || S.party.includes(e.id) || (!SENT.has(e.kind) && !e.transient)); }   /* Gast: nur was der Host nie schickt */
 // Gast: Warteraum. Eigenen Charakter erstellen (dieselbe Maske wie bei einer neuen Geschichte), gespeicherten weiterspielen
 // oder einen Gefährten übernehmen; dann „Bereit“. Der Host startet, wenn alle bereit sind (läuft das Spiel schon: sofort).
@@ -476,6 +481,7 @@ function applyEnts(d) {
       if (k === 'x' || k === 'y') { (T[e.id] ||= {})[k] = u[k]; if (Math.abs(e[k] - u[k]) > 160) e[k] = u[k]; continue; } e[k] = u[k]; } }
   for (const id of d.del) { const i = arr.findIndex(x => x.id === id); if (i >= 0 && arr[i] !== me && arr[i] !== S.player) arr.splice(i, 1); delete T[id]; }
   for (const [x, y, type] of d.fx) A.fx(x, y, type, 3);
+  { const h = me && d.fx.find(([x, y, t]) => (t === 'blood' || t === 'impact') && Math.hypot(x - me.x, y - me.y) < 520); if (h) A.sfx?.('hit', 0.6, Math.max(0.2, 1 - Math.hypot(h[0] - me.x, h[1] - me.y) / 520)); }   /* Koop 09.10.: Trefferklang beim Gast (vorher stumm), einmal je Paket */
   for (const f of d.fl) S.floats.push({ x: f.x, y: f.y, text: f.text, color: f.color, big: f.big, num: f.num, mine: f.mine, life: 900, maxLife: 900 });   /* Koop: num/mine übernehmen, sonst greift die Einstellung „Reduziert“ beim Gast nie */
   S.projectiles = d.pr.map(p => ({ ...p, life: 200 }));
 }
@@ -493,12 +499,14 @@ function guestKey(k, e) {
 }
 const pending = { use: false, dodge: false, slot: null, atk: false };   /* atk: ein kurzer Klick zwischen zwei Sendungen geht nicht verloren */
 // Gast: Gepäck und Tausch (Taste I). Wer zuerst aufhebt, hat es; hier gibt man ab, legt an oder benutzt. Der Host führt alles aus.
-let tradeOpen = false, shopData = null, shopSell = false;
+let tradeOpen = false, shopData = null, shopSell = false, shopConfirm = null, tradePage = 0, hostPage = 0;   /* HB-30: Rückfrage ab Selten, Seiten im Gepäck/Tausch */
 // Gast beim Händler: kaufen und verkaufen mit dem eigenen Beutel (Anteil am Auftragsgold, Verkäufe)
 function guestShop() {
   const d = shopData; if (!d) return; tradeOpen = false;
   const ch = shopSell
-    ? d.sell.map(s => s.price == null ? { text: `${s.name} — gebunden, unverkäuflich`, fn: () => {} } : { text: `Verkaufen: ${s.name}${s.count > 1 ? ' ×' + s.count : ''} — ${s.price} Gold`, fn: () => send({ t: 'cmd', kind: 'sell', npcId: d.npcId, idx: s.idx }) })
+    ? d.sell.map(s => s.price == null ? { text: `${s.name} — ${s.lock ? 'gesperrt' : 'gebunden'}, unverkäuflich`, fn: () => {} }
+      : s.rare && shopConfirm !== s.idx ? { text: `Verkaufen: ${s.name} — ${s.price} Gold (selten: nochmal klicken zum Bestätigen)`, fn: () => { shopConfirm = s.idx; guestShop(); } }   /* HB-30: Rückfrage ab Selten */
+      : { text: `${shopConfirm === s.idx ? 'Wirklich verkaufen' : 'Verkaufen'}: ${s.name}${s.count > 1 ? ' ×' + s.count : ''} — ${s.price} Gold`, fn: () => { shopConfirm = null; send({ t: 'cmd', kind: 'sell', npcId: d.npcId, idx: s.idx }); } })
     : d.buy.map(s => ({ text: `Kaufen: ${s.name}${s.count > 1 ? ' (' + s.count + ')' : ''} — ${s.price} Gold`, fn: () => send({ t: 'cmd', kind: 'buy', npcId: d.npcId, key: s.key }) }));
   ch.push({ text: shopSell ? 'Zum Kaufen' : 'Zum Verkaufen', fn: () => { shopSell = !shopSell; guestShop(); } }, { text: 'Gehen', fn: () => { shopData = null; A.UI.closeDialogue(); } });
   A.dialogue({ ...me, name: d.name }, `${d.name}${d.prof ? ', ' + d.prof : ''}. Dein Beutel: ${d.gold} Gold.\n${shopSell ? 'Was verkaufst du?' : 'Was kaufst du?'}`, ch);
@@ -507,20 +515,23 @@ function guestTrade() {
   if (!me) return; tradeOpen = true; const I = A.ITEMS, host = A.S.coop.hostName;
   const ch = [];
   if (me.coopGold > 0) ch.push({ text: `${me.coopGold} Gold an ${host} geben`, fn: () => send({ t: 'cmd', kind: 'gold' }) });
-  me.inv.slice(0, 14).forEach((it, idx) => { const d = I[it.key] || { name: it.key }, gear = d.slot && d.slot !== 'consumable';
+  if (tradePage * 14 >= me.inv.length) tradePage = 0; const P0 = tradePage * 14;   /* HB-30: alle Sachen über Seiten erreichbar (vorher nur die ersten 14) */
+  if (me.inv.length > 14) ch.push({ text: `Weitere Sachen ▸ (Seite ${tradePage + 1} von ${Math.ceil(me.inv.length / 14)})`, fn: () => { tradePage++; guestTrade(); } });
+  me.inv.slice(P0, P0 + 14).forEach((it, j) => { const idx = P0 + j, d = I[it.key] || { name: it.key }, gear = d.slot && d.slot !== 'consumable';
     ch.push({ text: `${d.name}${it.count > 1 ? ' ×' + it.count : ''} — an ${host} geben`, fn: () => send({ t: 'cmd', kind: 'give', idx }) });
     if (gear) ch.push({ text: `   ${d.name} anlegen`, fn: () => send({ t: 'cmd', kind: 'equip', idx }) });
     else if (d.use) ch.push({ text: `   ${d.name} benutzen`, fn: () => send({ t: 'cmd', kind: 'use', idx }) }); });
   ch.push({ text: 'Schließen', fn: () => { tradeOpen = false; A.UI.closeDialogue(); } });
   A.UI.dialogue(me, `Gepäck von ${me.name} · Beutel: ${me.coopGold || 0} Gold (Anteil an Auftragsgold)
 Was du zuerst aufhebst (E), gehört dir. Hier gibst du Sachen oder Gold an ${host} ab.${me.inv.length > 14 ? `
-(Nur die ersten 14 von ${me.inv.length} Sachen)` : ''}`, ch);
+(Sachen ${P0 + 1}–${Math.min(me.inv.length, P0 + 14)} von ${me.inv.length})` : ''}`, ch);
 }
 // Host: Tauschmenü mit einem Gast (Knopf oben rechts). Gibt Sachen aus dem Gepäck des Helden an die Gastfigur.
 function hostTrade() {
   const S = A.S, I = A.ITEMS, pilots = A.partyMembers().filter(m => m.coopPilot); if (!pilots.length) return A.UI.toast('Kein Gast steuert gerade eine Figur.');
-  const m = pilots[0], ch = [];
-  S.player.inv.slice(0, 16).forEach((it, idx) => { const d = I[it.key] || { name: it.key };
+  const m = pilots[0], ch = []; if (hostPage * 16 >= S.player.inv.length) hostPage = 0; const P0 = hostPage * 16;   /* HB-30: Seiten statt nur der ersten 16 */
+  if (S.player.inv.length > 16) ch.push({ text: `Weitere Sachen ▸ (Seite ${hostPage + 1} von ${Math.ceil(S.player.inv.length / 16)})`, fn: () => { hostPage++; hostTrade(); } });
+  S.player.inv.slice(P0, P0 + 16).forEach((it, j) => { const idx = P0 + j, d = I[it.key] || { name: it.key };
     ch.push({ text: `${d.name}${it.count > 1 ? ' ×' + it.count : ''} an ${m.coopName} (${m.name}) geben`, fn: () => { const x = S.player.inv[idx]; if (x !== it) return hostTrade(); if (A.giveItem(m, it)) { S.player.inv.splice(idx, 1); A.log(`Du gibst ${m.coopName} ${d.name}.`, 'party'); } else A.UI.toast(`${m.name}: Tasche voll`); hostTrade(); } }); });
   if (pilots.length > 1) ch.push({ text: `Nächster Gast (${pilots[1].coopName})`, fn: () => { pilots.push(pilots.shift()); hostTrade(); } });
   ch.push({ text: 'Schließen', fn: () => A.UI.closeDialogue() });
@@ -572,7 +583,7 @@ function showCineText(t) {
 // Für Tests ohne Netz (?dev): der Host bekommt einen Gast im selben Browser, der über eine Attrappe verbunden ist
 export function fakeGuest(api, entId) {
   A = api; const S = A.S; S.coop ||= { role: 'host', code: 'TEST00', guests: {}, bytes: 0, t0: now() };
-  A.coopHooks.hostTick = hostTick; A.coopHooks.remote = remoteControl; A.coopHooks.guestAct = guestAct;
+  A.coopHooks.hostTick = hostTick; A.coopHooks.remote = remoteControl; A.coopHooks.guestAct = guestAct; A.coopHooks.card = (title, sub, snd) => broadcast({ t: 'card', title, sub, snd });
   const c = { peer: 'fake', open: true, sent: [], send(s) { c.sent.push(s); if (c.sent.length > 50) c.sent.shift(); }, close() {} };
   S.coop.guests.fake = { id: 'fake', conn: c, name: 'Attrappe', entId, inp: null, at: 0, known: new Set(), last: {}, map: null, selfAt: 0 };
   const m = A.byId(entId); if (m) m.coopPilot = 'fake';

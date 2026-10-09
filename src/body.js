@@ -126,7 +126,7 @@ export const MECH_Q = {
   4: { name: 'Prototyp',     arm: 0.15,  leg: 0.10,  wear: 0.5 },
 };
 // S12: Prothese an ein verlorenes Glied. Sie kommt immer frisch: voller Zustand, keine Aufrüstung (vorher erbte sie den alten Stumpf).
-export function attachProsthesis(c, part, tier) { const P = c.body[part]; P.lost = false; P.mech = Math.max(1, Math.min(4, tier | 0)); P.mechCond = 100; P.mechUp = 0; delete P.mod; delete P.broken; delete P.splint; P.hp = P.max; syncHp(c); }   /* Behoben HB-15: ein alter Bruch deckelte sonst auch die frische Prothese auf 40 % */
+export function attachProsthesis(c, part, tier) { const P = c.body[part]; if ((tier | 0) >= 4) c.cellDay = S.day | 0;   /* T15: frisch geladen */ P.lost = false; P.mech = Math.max(1, Math.min(4, tier | 0)); P.mechCond = 100; P.mechUp = 0; delete P.mod; delete P.broken; delete P.splint; P.hp = P.max; syncHp(c); }   /* Behoben HB-15: ein alter Bruch deckelte sonst auch die frische Prothese auf 40 % */
 // Roadmap P3: Hand- und Fußmodule auf einer Prothese (c.body[k].mod). Nur auf Gliedern mit mech; wirken nur, solange die Prothese ≥ 30 % hat.
 export const MECH_MOD = {
   greifhand:   { part: 'arm', name: 'Greifhand',   arm: 0,    desc: 'Schwere Rüstung und Schild bremsen 30 % weniger; selbst ausbessern bis 90 %.' },
@@ -140,8 +140,13 @@ export const hasMod = (c, mod) => { if (!c?.body) return false; for (const k of 
 // Unter 30 % Zustand wirkt eine Prothese nicht, weder gut noch schlecht (sie hängt nur noch dran).
 export const mechBonus = (c, kind) => { if (!c.body) return 0; let b = 0;
   for (const s of ['l', 'r']) { const P = c.body[s + kind]; if (!P?.mech || (P.mechCond ?? 100) < 30) continue; const plus = (MECH_Q[P.mech] || MECH_Q[2])[kind] + (P.mechUp || 0) * 0.05 + (MECH_MOD[P.mod]?.[kind] || 0);   /* Roadmap P3: Modul-Bonus */
-    b += plus > 0 && (P.mechCond ?? 100) < 50 ? plus * 0.5 : plus; }   /* Roadmap P4: unter 50 % Zustand nur noch der halbe Vorteil (Nachteile bleiben ganz) */
+    b += plus > 0 && ((P.mechCond ?? 100) < 50 || (P.mech === 4 && cellEmpty(c))) ? plus * 0.5 : plus; }   /* T15 V10: Prototyp ohne Energiezelle nur halb */   /* Roadmap P4: unter 50 % Zustand nur noch der halbe Vorteil (Nachteile bleiben ganz) */
   return b; };
+/* T15 V10 (Entscheidung 01.10.): Prothesen der Stufe 4 (Prototyp) brauchen alle 3 Tage eine Energiezelle, sonst wirken sie nur halb.
+   Eine Zelle versorgt alle Prototypen einer Figur. Alte Stände ohne Ladetag gelten ab dem ersten Blick als geladen. */
+export const CELL_DAYS = 3;
+export const needsCell = c => ['larm', 'rarm', 'lleg', 'rleg'].some(k => c?.body?.[k]?.mech === 4);
+export const cellEmpty = c => needsCell(c) && (S.day | 0) - (c.cellDay ??= S.day | 0) >= CELL_DAYS;
 // Verschleiß eines getroffenen Prothesenglieds (Roadmap P1): nur echte Treffer, nur das getroffene Teil, Schrott doppelt so schnell.
 export function wearProsthesis(c, part, base = 1.2) { const P = c.body?.[part]; if (!P?.mech) return null; const was = P.mechCond ?? 100;
   P.mechCond = Math.max(0, was - base * (MECH_Q[P.mech] || MECH_Q[2]).wear); return { was, now: P.mechCond, broke: was >= 30 && P.mechCond < 30, half: was >= 50 && P.mechCond < 50 }; }

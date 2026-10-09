@@ -2,7 +2,7 @@
 import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=25';
 import * as CS from './cloudsave.js?v=25';
 import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=25';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf } from './render.js?v=25';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf, EMOTE, NEAR_SAY } from './render.js?v=25';
 import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=25';
 import { wearOf } from './buildings.js?v=25';
 import * as SP from './sprites.js?v=25';   /* Bestiarium: Gegnerbilder */
@@ -200,7 +200,7 @@ function effectsUI(body) {
     : '<div class="ledger">Keine besonderen Effekte. Du bist ein unbeschriebenes Blatt.</div>';
 }
 
-// S13 (Nutzer: „Codex/Handbuch im Spiel“): Taste H. Das Handbuch ist docs/GUIDE.md selbst (eine Quelle für Spieler und Doku; ohne ?dev
+// S13 (Nutzer: „Codex/Handbuch im Spiel“): Taste H. Das Handbuch ist docs/MECHANIKEN.md selbst (seit der Doku-Bereinigung 08.10. statt GUIDE.md) (eine Quelle für Spieler und Doku; ohne ?dev
 // ohne den Debug-Abschnitt), dazu alle Rangfolgen, alle Zustände mit Erklärung und die Gegner, die man schon getroffen hat. Suche filtert.
 let guideMd = null, codexTab = 'guide';
 const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -224,7 +224,7 @@ export function mdToHtml(md) {
 }
 function guideSections(md) {                                               // nach „## “ geteilt; Debug-Abschnitt nur mit ?dev
   const parts = md.split(/\n(?=## )/), dev = /[?&]dev/.test(location.search);
-  return parts.filter(p => dev || !/^## \d+\. Zum Ausprobieren/.test(p));
+  return parts.filter(p => dev || !/^## \d+\. (Zum Ausprobieren|Werkzeuge für Tests)/.test(p));
 }
 // S15 (Nutzer): Kapitel des Handbuchs öffnen sich im Spiel; der Code im Kodex schaltet alles frei
 function guideLock(sec) {
@@ -236,13 +236,13 @@ function guideLock(sec) {
   return null;
 }
 function codexUI(body) {
-  const tabs = [['guide', 'Handbuch'], ['teachers', 'Lehrer'], ['magic', 'Magie'], ['ranks', 'Ränge'], ['states', 'Zustände'], ['foes', 'Gegner']];
+  const tabs = [['guide', 'Handbuch'], ['teachers', 'Lehrer'], ['magic', 'Magie'], ['ranks', 'Ränge'], ['powers', 'Mächte'], ['states', 'Zustände'], ['foes', 'Gegner'], ['signs', 'Zeichen']];   /* T23: Mächte */
   body.innerHTML = `<div class="codex-top">${tabs.map(([k, l]) => `<button class="txtbtn${k === codexTab ? ' active' : ''}" data-t="${k}">${l}</button>`).join('')}<input id="codex-q" placeholder="Suchen …"><input id="codex-code" placeholder="Code" style="width:90px"><button class="txtbtn" id="codex-go">Einlösen</button></div><div id="codex-body" class="codex"></div>`;
   const q = $('codex-q'), cb = $('codex-body');
   const render = () => {
     const needle = q.value.trim().toLowerCase(), hit = t => !needle || t.toLowerCase().includes(needle);
     if (codexTab === 'guide') {
-      if (guideMd == null) { cb.innerHTML = '<div class="ledger">Lade das Handbuch …</div>'; fetch('docs/GUIDE.md').then(r => r.ok ? r.text() : Promise.reject()).then(t => { guideMd = t; render(); }).catch(() => { guideMd = ''; cb.innerHTML = '<div class="ledger">Das Handbuch liegt nicht bei (docs/GUIDE.md fehlt).</div>'; }); return; }
+      if (guideMd == null) { cb.innerHTML = '<div class="ledger">Lade das Handbuch …</div>'; fetch('docs/MECHANIKEN.md').then(r => r.ok ? r.text() : Promise.reject()).then(t => { guideMd = t; render(); }).catch(() => { guideMd = ''; cb.innerHTML = '<div class="ledger">Das Handbuch liegt nicht bei (docs/MECHANIKEN.md fehlt).</div>'; }); return; }
       const secs = guideSections(guideMd).map(s => { const lk = guideLock(s); return lk ? `${s.split('\n')[0]}\n\n*Noch unbekannt — ${lk}*\n` : s; }).filter(hit); cb.innerHTML = secs.length ? mdToHtml(secs.join('\n')) : '<div class="ledger">Nichts gefunden.</div>';   // S15: Kapitel öffnen sich im Spiel
     } else if (codexTab === 'magic') {                                     // S15 P5: Schulen, Zauber, Lehrer, Haltung der Mächte
       const SC = A.schools || {}, keys = A.spellKeys || [], p = S.player;
@@ -256,8 +256,20 @@ function codexUI(body) {
         <table class="rank-tab">${rows.map(([k, C]) => `<tr><td>${C.name}${C.parent && C.parent !== 'wanderer' ? ` <span class="ledger">(braucht ${[C.parent, ...(C.alt || [])].map(a => CLASSES[a]?.name).join(' oder ')}${C.chainRank != null ? `, Kettenrang ${FACTIONS.chain?.ranks?.[C.chainRank] || C.chainRank}` : ''})</span>` : ''}</td><td>${L.filter(t => t.cls.includes(k)).map(t => `${t.name} — ${t.where}`).join('<br>')}</td></tr>`).join('')}</table>`;
     } else if (codexTab === 'ranks') {
       cb.innerHTML = Object.entries(FACTIONS).filter(([f, F]) => F.ranks && (S.flags.codexAll || (S.factions[f] || 0) !== 0 || (S.ranks[f] ?? -1) >= 0) && hit(F.name + F.ranks.join(' '))).map(([f, F]) => { const G = A.rankGuide?.(f); return G ? `<h3>${F.name}</h3><div class="ledger">${G.next || ''}</div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : ''; }).join('');
+    } else if (codexTab === 'powers') {                                    /* T23: woher die Mächte ihre Kraft nehmen — nur bekannte Mächte (wie „Ränge“) */
+      const L = (A.facResKeys || []).filter(f => FACTIONS[f] && (S.flags.codexAll || (S.factions[f] || 0) !== 0 || (S.ranks[f] ?? -1) >= 0));
+      cb.innerHTML = `<div class="ledger">Jede Macht lebt von einer Sache. Wird sie knapp, wird die Macht schwach — und jede davon kannst du drehen. ▲/▼: seit gestern.</div>`
+        + (L.map(f => { const G = A.powerGuide?.(f); return G && hit(FACTIONS[f].name + G.name + G.does + G.lever) ? `<h3>${FACTIONS[f].name}</h3><div class="statline"><span>${G.name}</span><b>${G.val} ${G.unit}${G.arrow || ''}${G.stageName ? ' · ' + G.stageName : ''}</b></div>${G.extra ? `<div class="ledger">${G.extra}</div>` : ''}<div class="fx-row"><div><b>Was sie bewirkt:</b> ${G.does}</div></div><div class="fx-row"><div><b>Wie du sie änderst:</b> ${G.lever}</div></div>` : ''; }).join('')
+        || '<div class="ledger">Noch kennst du keine Macht gut genug.</div>');
     } else if (codexTab === 'states') {
       const D = A.fxDesc || {}; cb.innerHTML = Object.entries(D).filter(([k, d]) => A.codexKnown('states', k) && hit(k + d)).map(([k, d]) => `<div class="fx-row"><div>${d}</div></div>`).join('') || '<div class="ledger">Nichts gefunden.</div>';
+    } else if (codexTab === 'signs') {                                     /* E13 (Entwickler 09.10.): Sprechblasen — Formen und Zeichen erklärt */
+      const G = [['rede', 'Redet — zu weit weg, um es zu verstehen'], ['frage', 'Fragt etwas'], ['ausruf', 'Ruft laut'], ['zorn', 'Ist wütend, droht, ruft „Halt“ oder „Dieb“'], ['angst', 'Hat Angst, ruft um Hilfe'], ['freude', 'Freut sich, jubelt'], ['trauer', 'Trauert, klagt']];
+      const F = [['say', 'Glatte Kante', 'sagt etwas'], ['shout', 'Gezackte, helle Kante', 'ruft oder schreit'], ['hush', 'Gestrichelte Kante, schräge Schrift', 'flüstert, zögert, flieht']];
+      cb.innerHTML = `<div class="ledger">Alles Gesprochene steht in derselben Blase. Einfache Bewohner zeigen von weitem nur ein Zeichen; ab etwa ${Math.round(NEAR_SAY / 32)} Schritten hörst du den Satz. Benannte Figuren, Händler, Lehrer, Wachen, Wirte, Barden und Priester sprechen immer in Sätzen, Zwischensequenzen auch.</div>
+        <h3>Formen der Blase</h3><table class="rank-tab">${F.filter(([, a, b]) => hit(a + b)).map(([, a, b]) => `<tr><td><b>${a}</b></td><td>${b}</td></tr>`).join('')}</table>
+        <h3>Zeichen</h3>${G.filter(([, t]) => hit(t)).map(([k, t]) => `<div class="fx-row"><canvas data-gl="${k}" width="27" height="27" style="image-rendering:pixelated;background:#1a1612;border:1px solid #c8b89a;margin-right:8px"></canvas><div>${t}</div></div>`).join('')}`;
+      cb.querySelectorAll('canvas[data-gl]').forEach(c => { const E = EMOTE[c.dataset.gl], g = c.getContext('2d'); if (!E) return; g.fillStyle = E[0]; E[1].forEach((row, y) => { for (let x = 0; x < 7; x++) if (row[x] === '#') g.fillRect(3 + x * 3, 3 + y * 3, 3, 3); }); });
     } else {
       const seen = S.seenFoes || {}, list = Object.entries(MONSTERS).filter(([k]) => seen[k] && hit(MONSTERS[k].name));
       cb.innerHTML = list.length ? list.map(([k, m]) => `<div class="fx-row beast-row"><canvas class="beast-pic" data-mt="${k}" width="72" height="72"></canvas><div><b>${m.name}</b>${m.role ? ` · ${m.role}` : ''}${m.faction ? ` · ${FACTIONS[m.faction]?.name || m.faction}` : ''}<div class="ledger">Erschlagen: ${seen[k]}${m.lore ? ` · ${m.lore}` : ''}</div></div></div>`).join('')
@@ -654,6 +666,13 @@ export function sleepFade(text) {
   let d = $('sleep-fade'); if (!d) { d = document.createElement('div'); d.id = 'sleep-fade'; document.getElementById('viewport')?.appendChild(d); }
   d.innerHTML = `<div>☾</div><p>${text}</p><small>Zzz …</small>`; d.className = 'on';
   clearTimeout(d._t); d._t = setTimeout(() => { d.className = 'off'; }, 2400);
+}
+/* Lesbarkeit (Entwickler 09.10.): Textgröße aus den Optionen als CSS-Faktor --ts (style.css zoomt Leisten, Fenster, Dialoge, Kamerafahrt-Text).
+   Beim Start und bei jeder Änderung anwenden; danach ein resize, damit das Spielbild seine neue Größe übernimmt. */
+export function applyTextScale() {
+  const v = Math.max(0.8, Math.min(1.8, +(S.settings?.textScale ?? 1) || 1));
+  document.documentElement.style.setProperty('--ts', String(v)); document.documentElement.style.fontSize = '';
+  window.dispatchEvent(new Event('resize'));
 }
 export function toast(text, ms = 2200) {
   if (S._quiet) return;                                   // Selbsttest-Sandbox: keine Einblendungen
@@ -1127,7 +1146,7 @@ function itemPurpose(it) {
   if (it.good) return 'Handelsware: jede Stadt zahlt einen anderen Preis — billig kaufen, wo es viel gibt, teuer verkaufen, wo es fehlt.';
   if (it.res) return 'Baustoff: kommt in deinen Vorrat (Lager, Siedlung, Ausbessern).';
   if (it.slot === 'consumable') return USE_TXT[it.use] || 'Verbrauchsgut.';
-  if (it.slot === 'weapon') return `${{ sword: 'Schwert', axe: 'Axt', great: 'Zweihänder', mace: 'Streitkolben', hammer: 'Hammer', spear: 'Speer', polearm: 'Stangenwaffe', dagger: 'Dolch', rapier: 'Rapier', bow: 'Bogen', crossbow: 'Armbrust', staff: 'Stab', wand: 'Zauberstab', whip: 'Peitsche' }[it.wtype] || 'Waffe'}${it.twohand ? ' (zweihändig)' : ''}: ${it.ranged ? 'Fernkampf — braucht freie Sicht.' : it.twohand ? 'schwer und langsam, trifft hart und unterbricht Angriffe.' : 'Nahkampf.'}`;
+  if (it.slot === 'weapon') return `${{ sword: 'Schwert', axe: 'Axt', great: 'Zweihänder', mace: 'Streitkolben', hammer: 'Hammer', spear: 'Speer', polearm: 'Stangenwaffe', dagger: 'Dolch', rapier: 'Rapier', katana: 'Katana', bow: 'Bogen', crossbow: 'Armbrust', staff: 'Stab', wand: 'Zauberstab', whip: 'Peitsche' }[it.wtype] || 'Waffe'}${it.twohand ? ' (zweihändig)' : ''}: ${it.ranged ? 'Fernkampf — braucht freie Sicht.' : it.twohand ? 'schwer und langsam, trifft hart und unterbricht Angriffe.' : 'Nahkampf.'}`;
   if (it.slot === 'offhand') return 'Schild: blockt Treffer von vorn, wenn du in Deckung gehst.';
   if (it.armor) return 'Rüstung: mindert jeden Treffer um den Rüstungswert.';
   if (it.slot === 'material') return 'Material: für Aufträge, Handwerk oder zum Verkauf.';
@@ -1365,8 +1384,9 @@ function classUI(body) {
   const p = S.player;
   body.innerHTML = `<div class="ledger">Klassen werden in der Welt gelernt, nicht im Menü gewählt. Was du beherrschst, kannst du hier führen.</div>
     <div class="inv-grid" style="grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px">
-    ${(p.knownClasses || []).map(c => `<button class="build-item" data-c="${c}">${CLASSES[c].name}
-      <small>${c === p.currentClass ? 'aktiv' : 'wählen'}</small><br><span class="ledger">${CLASSES[c].desc || ''}${CLASSES[c].weak ? ` <i>Schwäche: ${CLASSES[c].weak}</i>` : ''}</span></button>`).join('')}</div>`;
+    ${(p.knownClasses || []).filter(c => !CLASSES[c]?.way).map(c => { const w = (p.knownClasses || []).find(k => CLASSES[k]?.way === c), C = CLASSES[w || c];   /* E42: ein Kettenweg steht bei seiner Schwesterklasse */
+      return `<button class="build-item" data-c="${c}">${CLASSES[c].name}${w ? ` · ${CLASSES[w].name}` : ''}
+      <small>${c === p.currentClass ? 'aktiv' : 'wählen'}</small><br><span class="ledger">${C.desc || ''}${C.weak ? ` <i>Schwäche: ${C.weak}</i>` : ''}${w ? ` <i>Weg der Kette: beide Fähigkeitssätze, Kettenarm im Sternbild.</i>` : ''}</span></button>`; }).join('')}</div>`;
   [...body.querySelectorAll('[data-c]')].forEach(b => b.onclick = () => { A.setClass(b.dataset.c); closeModal(); });
   // Titelklassen: neben der Grundklasse getragen; freigeschaltet nur durch Taten in der Welt
   const known = p.titleClasses || [];
@@ -1520,8 +1540,9 @@ function settleUI(body) {
       list.map(([k, b]) => bldCard(k, b)).join('') + '</div>').join('')}
       <div class="ledger bhint">Klick: Bauplan ansehen · Doppelklick: sofort platzieren. Rote Zahl = es fehlt Material.</div></div>
     <div><h3>${st.name}</h3>
-      <div class="ledger">Stufe: ${settleTier(st)} · Gebäude ${st.buildings.filter(b => b.built >= 1).length}/${st.buildings.length}
+      <div class="ledger">Stufe: ${A.campInfo ? A.campInfo(st).name : settleTier(st)} · Gebäude ${st.buildings.filter(b => b.built >= 1).length}/${st.buildings.length}
         · Bevölkerung ${A.population()}</div>
+      ${(() => { const C = A.campInfo?.(st); if (!C) return ''; return `<div class="ledger" title="Anziehung = Stimmung (bis 50) + Schutz durch Wachen und Palisade (bis 25) + Arbeit (Felder, Werkbank, Schmiede, Heiler, Brunnen; bis 25). Sie bestimmt, wie schnell Siedler kommen. Eine erreichte Stufe bleibt.">Anziehung <b>${C.attract}</b>/100 · Abgaben ${C.gold} Gold/Tag · Unterhalt ${C.up} Gold/Tag${C.next ? `<br><small>Nächste Stufe — ${C.next}</small>` : ''}${C.pact ? `<br><small>Abkommen: ${C.pact}</small>` : ''}</div>`; })()}
       ${st.stage === 2 ? '<div class="ledger" style="color:#d0563f">Schutzlos: Niemand arbeitet, Fremde meiden das Lager. Wirb in einer Schenke Lagerwachen an (beim Wirt, 80 Gold).</div>' : st.stage === 1 ? '<div class="ledger" style="color:#c9a24a">Geschwächt: Viele Schützer sind gefallen.</div>' : ''}
       ${A.campGuards?.() ? `<div class="ledger">Lagerwachen: ${A.campGuards()} (je 5 Gold Sold am Tag)</div>` : ''}
       ${(() => { const I = A.raidInfo?.(); if (!I) return ''; return `<div class="ledger" title="Reichtum lockt an, wer in der Nähe ist. Schutzgeld an eine Bande schützt auch das Lager.">Bedrohung · Reichtum ${I.W} · Überfallgefahr je Nacht <b>${Math.round(I.ch * 100)} %</b><br><small>${I.L.length ? I.L.map(x => `◆ ${x.label} — ${x.dist} Felder`).join(' · ') : 'Keine Macht in der Nähe, nur Wölfe.'}</small></div>`; })()}
@@ -1623,8 +1644,9 @@ function facUI(body) {
       <div style="margin-top:10px">${Object.keys(FACTIONS).map(k => `<div class="fac-row ${k === selFac ? 'sel' : ''}" data-f="${k}">
         <span>${FACTIONS[k].name}</span><b>${S.factions[k] > 0 ? '+' : ''}${Math.round(S.factions[k])}</b></div>`).join('')}</div></div>
     <div><h3>${f.name}</h3><div class="ledger">${f.desc}</div>
-      <div class="statline"><span>Ansehen</span><b>${rep > 0 ? '+' : ''}${Math.round(rep)} · ${A.repTier(selFac).name}</b></div>
+      <div class="statline" title="Ansehen reicht von −100 bis +100 (die befreiten Grubenstämme bis +300)."><span>Ansehen</span><b>${rep > 0 ? '+' : ''}${Math.round(rep)} · ${A.repTier(selFac).name}</b></div>
       <div class="ledger">${(t => t.price == null ? 'Kein Handel, Wachen greifen an.' : `Preise ${t.price < 1 ? '−' + Math.round((1 - t.price) * 100) + ' %' : t.price > 1 ? '+' + Math.round((t.price - 1) * 100) + ' %' : 'normal'}${t.greet ? ', ' + (t.price < 1 ? 'herzliche' : 'kühle') + ' Begrüßung' : ''}.`)(A.repTier(selFac))}${(S.bounty || {})[selFac] ? ` Kopfgeld: <b>${S.bounty[selFac]} Gold</b>.` : ''}</div>
+      ${(G => G ? `<div class="statline" title="${G.does} — ${G.lever}"><span>Ressource</span><b>${G.name} ${G.val} ${G.unit}${G.arrow || ''}${G.stageName ? ' · ' + G.stageName : ''}</b></div>` : '')(A.powerGuide?.(selFac))}
       <div class="statline"><span>Rang</span><b>${rank >= 0 ? f.ranks[Math.min(rank, f.ranks.length - 1)] : 'Kein Mitglied'}</b></div>
       <h3 style="margin-top:14px">Rangfolge</h3>
       ${(G => G ? `<div class="ledger"><b>${G.next}</b></div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.state === 'done' ? '✔' : x.state === 'next' ? '➜' : '·'} ${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : '')(A.rankGuide(selFac))}
@@ -2056,7 +2078,9 @@ function settingsUI(body) {
       <h3 style="margin-top:14px">Kamerafahrten</h3>
       <div class="ctx-actions"><button id="cineAuto">${S.settings.cineAuto ? 'Laufen automatisch weiter' : 'Warten auf „Weiter“ (Leertaste/Enter)'}</button></div>
       <h3 style="margin-top:14px">Textgröße</h3>
-      <div class="ctx-actions"><button data-t="0.9">Klein</button><button data-t="1">Normal</button><button data-t="1.15">Groß</button></div>
+      <div class="ctx-actions">${[[0.9, 'Klein'], [1, 'Normal'], [1.2, 'Groß'], [1.4, 'Sehr groß'], [1.6, 'Riesig']].map(([v, n]) =>
+        `<button data-t="${v}" class="${(S.settings.textScale ?? 1) === v ? 'on' : ''}">${n}</button>`).join('')}</div>
+      <div style="font-size:11px;color:var(--dim);margin-top:4px">Vergrößert Schrift und Leisten im ganzen Spiel, auch Kamerafahrten. Das Spielbild wird dabei etwas kleiner.</div>
     </div>
     <div><h3>Steuerung</h3><div class="ledger">
       WASD — Bewegen<br>Linksklick / Leertaste — Angriff<br><b>Strg + Angriff</b> — Neutrale angreifen (Ruf-Folgen)<br>E — Interagieren<br>Q — Ausweichen<br>V — Schleichen an/aus<br>Umschalt (halten) — Deckung; im ersten Augenblick eines Hiebs parieren<br>R — Pferd pfeifen / absitzen<br>1–9, 0 — Fähigkeiten und Zauber<br>Rechtsklick auf eine Figur — auswählen (Infos rechts)<br>Esc / Leertaste — Kamerafahrt überspringen<br>
@@ -2076,7 +2100,7 @@ function settingsUI(body) {
       <div class="ledger" id="cs-msg"></div>
     </div></div>`;
   [...body.querySelectorAll('[data-v]')].forEach(b => b.onclick = () => { S.settings.violence = b.dataset.v; refreshModal(); });
-  [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { document.documentElement.style.fontSize = (14 * +b.dataset.t) + 'px'; S.settings.textScale = +b.dataset.t; });
+  [...body.querySelectorAll('[data-t]')].forEach(b => b.onclick = () => { S.settings.textScale = +b.dataset.t; applyTextScale(); refreshModal(); });   /* 09.10.: wirkt jetzt wirklich (vorher nur Grundschrift, alles andere in px) */
   $('mot').onclick = () => { S.settings.motion = !S.settings.motion; refreshModal(); };
   [...body.querySelectorAll('[data-dn]')].forEach(b => b.onclick = () => { S.settings.dmgNums = b.dataset.dn; refreshModal(); });   /* Kampf-Feedback: Schadenszahlen Aus/Reduziert/Voll */
   [...body.querySelectorAll('[data-art]')].forEach(b => b.onclick = () => { S.settings.art = b.dataset.art; A.setArt?.(b.dataset.art); refreshModal(); });   // Nutzer S13: Stil wählbar

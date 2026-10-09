@@ -229,7 +229,7 @@ function cardHTML(v, k, pin) {
   return `<div class="n">${esc(n.name)}</div><div class="s">${TYPE[n.type || ''] || 'Talent'} · ${STX[st] || st} · ${esc(K.name)}</div>
     <div>${esc(n.desc)}</div>${n.designIntent ? `<div class="i">Absicht: ${esc(n.designIntent)}</div>` : ''}
     ${req ? `<div class="r">Braucht: ${esc(req)}</div>` : ''}${n.excl && SKILL_TREE[n.excl] ? `<div class="r">Schließt aus: ${esc(SKILL_TREE[n.excl].name)}</div>` : ''}
-    ${st === 'sealed' ? `<div class="r">Versiegelt — ${esc(info.where || '')}</div>` : ''}
+    ${st === 'sealed' ? `<div class="r">Versiegelt — ${esc(info.where || (CLASSES[SKILL_BRANCHES[n.branch]?.cls]?.way ? `Kettenweg ${CLASSES[SKILL_BRANCHES[n.branch].cls].name}. ${v.A.clsWhere?.(SKILL_BRANCHES[n.branch].cls) || ''}` : ''))}</div>` : ''}
     ${rest && st !== 'sealed' ? `<div class="rest">Ruht, solange du nicht ${esc(owner || 'in dieser Rolle')} bist (oder eine Folgeklasse davon).</div>` : ''}
     ${!v.comp && SKILL_BRANCHES[n.branch]?.cls && !n.ab && n.type !== 'keystone' ? `<div class="i">Wertestern: wirkt immer, auch wenn eine andere Klasse aktiv ist.</div>` : ''}
     ${pin ? `<div class="act">${st === 'open' ? `<button class="gold" data-learn="${k}" ${pts(v) < 1 ? 'disabled' : ''}>Lernen (1 Punkt)</button>` : ''}<button data-close="1">Schließen</button></div>${st === 'open' && pts(v) < 1 ? '<div class="i">Kein Punkt frei: einer auf jeder zweiten Stufe und je bestandener Klassenprüfung.</div>' : ''}` : ''}`;
@@ -250,7 +250,7 @@ function learn(v, k) {
   v.rings.push({ x: to.x, y: to.y, u: 0, wait: from.length ? 0.9 : 0, dots: Array.from({ length: 14 }, (_, i) => ({ a: i / 14 * 6.28, v: 30 + (i * 37 % 30) })) });
 }
 // Neu erschienene Sterne einer Klasse blenden ein (nach der Aufnahme)
-export function skyReveal(cls) { const v = V; if (!v) return; let i = 0; for (const [k, n] of Object.entries(SKILL_TREE)) if (n.sky === cls) v.reveal.set(k, -0.2 * i++); }
+export function skyReveal(cls) { const v = V; if (!v) return; let i = 0; for (const [k, n] of Object.entries(SKILL_TREE)) if (n.sky === cls || n.branch === cls) v.reveal.set(k, -0.2 * i++); }   /* E42: auch der Kettenarm eines Wegs */
 // Probe: Zahlen der laufenden Ansicht (für den Selbsttest)
 // Ein Bild sofort zeichnen (Kamera am Ziel) — für Bilder und Proben, auch wenn der Tab im Hintergrund steht
 export function skyFrame() { const v = V; if (!v) return false; Object.assign(v.cam, { x: v.cam.tx, y: v.cam.ty, z: v.cam.tz }); draw(v, performance.now(), true); return true; }

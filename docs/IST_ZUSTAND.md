@@ -3844,6 +3844,7 @@ Wunsch des Entwicklers: „die Schmiede etc. soll ein GUI haben“.
   - Kein Lager („Das Lager gehört dem Host.“), kein Speichern.
 - **Handel für Gäste** (`sendShop`, `guestShopDeal`, `guestShop`):
   - eine **Dialogliste** mit bis zu 16 Waren. Bezahlt wird aus dem eigenen Beutel (`coopGold`).
+  - **Stand 09.10. (Agent Quests): F-07/HB-30 behoben** — Gasthandel läuft über `buy`/`sell` des Hosts (Lager, `onItemGained`, Fertigkeit), Sperre/gebunden unverkäuflich, Rückfrage ab Selten, Tausch blättert; live mit `?coopLocal` geprüft. Die folgende Liste ist der alte Befund:
   - **Fehlversuche (F-07, mittel — HB-30 weiter offen):**
     - Gastkäufe von Ausrüstung buchen das Stadtlager nicht (der Host-Kauf zieht 0,5).
     - Gastverkäufe füllen es nur bei Stadtwaren.
@@ -3896,7 +3897,7 @@ Nach Schwere sortiert. „live“ = im Spiel nachgestellt, „Code“ = nur gele
 - **F-06 — 4 legendäre Sets nur durch Mord (Code und live).**
   - Sternwacht (Konrad), Rooks General (Rook), Ordensmeister (Kelan), Grundteile Hochritter (Oda) gibt es nur aus dem Grab ihres Trägers.
   - Für den Spieler gibt es keinen Hinweis. Ob das gewollt ist, muss der Entwickler entscheiden. — game.js:2844 (`ELITE_KIT`, `eliteKit`).
-- **F-07 — Koop-Gast-Handel unvollständig (Code; HB-30).**
+- **F-07 — Koop-Gast-Handel unvollständig (Code; HB-30).** ✔ behoben 09.10. (Agent Quests, siehe Koop).
   - Keine Lagerbuchung für Ausrüstung, kein `onItemGained`, kein Fertigkeitszuwachs.
   - Gesperrte Teile sind verkäuflich, keine Rückfrage ab Selten.
   - Gepäck/Tausch zeigt nur 14 bzw. 16 Teile. — coop.js:313 (`guestShopDeal`), 509, 522.
@@ -4113,3 +4114,49 @@ Gemessen mit `RF.simFight('aldhelm', { level, weapon:'longsword', gear:{ chest, 
 | 2.5 Sühne | kein Rückweg aus Verhasst | Mittler (Nix/Grisk/Sael): Gold 6 je fehlendem Punkt (min. 150) oder 20 Eisen → Ruf −59, alle 10 Tage | Softlock Bande/Goblins/Tote |
 
 Alle Werte vorläufig; messen mit `RF.simFight` und im Spiel.
+
+## Goldfluss über 30 Spieltage — Betriebe vor/nach Unterhalt (09.10.2026, Agent)
+
+Gemessen auf Stand s14c (Kopie, Speichern gesperrt), 30 × `ECO.ecoDay()` hintereinander, Marktpreise laufen mit (Angebot drückt den Preis).
+
+| Lauf | Betriebe | Einnahmen 30 Tage (Kasse) | Betriebssteuer | Unterhalt | ⌀ je Tag |
+|---|---|---|---|---|---|
+| vorher (nur Steuer) | Magitech Aurelheim + Hof Nordfurt, je 1 Gehilfe | 2902 | 296 | – | 97 |
+| nachher (Steuer + Unterhalt 2 × Stufe) | dieselben | 2990 | 299 | 120 | 100 |
+| Median-Betrieb nachher | Stall Nordfurt (kleiner Betrieb, ohne Gehilfe) | 44 | 0 | 60 | 1,5 |
+
+- „Einnahmen“ = was in der Kasse landet (Gewinn nach Lohn, Unterhalt und Steuer). Der Unterschied vorher/nachher bei den zwei starken Betrieben liegt im Marktverlauf (Preise sinken mit dem eigenen Angebot: Tag 1 ≈ 198, Tag 30 ≈ 75 Gold für beide zusammen) — der Unterhalt (4 Gold/Tag) ist bei ihnen klein.
+- Beim Median-Betrieb frisst der Unterhalt rund die Hälfte des Gewinns (ohne Unterhalt ≈ 104 in 30 Tagen). Gewollt: schwache Betriebe tragen sich knapp, starke bleiben stark.
+- Siedlung: Unterhalt 1 Gold je drei fertige Bauten (10 Bauten = 3 Gold/Tag); Abgaben Weiler 3, Dorf 8 Gold/Tag. Im Stand s14c gibt es keine Siedlung — Messung im Spiel offen (🔍).
+
+## Totenwaren als Marktgüter (E40.5) — Händlerzüge über 30 Spieltage vorher/nachher (09.10.2026, Agent)
+
+Stand s14c (Kopie, Speichern gesperrt), 30 × `ECO.ecoDay()`; gezählt werden neu losgeschickte Händlerzüge und ihr Einkaufswert.
+
+| Lauf | Züge (30 Tage) | Wert | davon Totenware | Totenorte im Handel |
+|---|---|---|---|---|
+| vorher | 181 | 13 757 Gold | – | keine (Vharnholm 19 Köpfe, Schwarze Feste 8 — vom Handel ausgeschlossen) |
+| nachher | 159 | 13 094 Gold | 5 Züge, 492 Gold | Vharnholm → Aurelheim (2 × Seelenphiolen, 1 × Knochen), Kreuzweg → Vharnholm (2 × Grabgut) |
+
+- Lager nach 30 Tagen: Vharnholm Knochen 62 (Verkauf 1 Gold), Seelen 6 (20), Grabgut 0 (48); Schwarze Feste Knochen 32, Seelen 10 (14); Aurelheim zahlt für Seelen 121, für Knochen 9; Varonheim Seelen 61; Kreuzweg Grabgut 9 (6); Orte ohne Totenkundige zahlen Mindestpreis (Seelen 14, Knochen 1).
+- Weniger Züge insgesamt (−22): die langen Wege Vharnholm ↔ Aurelheim/Kreuzweg belegen Plätze unter dem Deckel von 16 Zügen, und der Zufall verschiebt sich. Lebensmittel- und Werkzeugzüge sind weiter die Masse.
+- Spielerseite: Seelen von Vharnholm (≈ 20) nach Aurelheim (≈ 120) sind die stärkste Handelsspanne der Welt (⚖ beobachten — Deckel ist ×3 Wert, Weg gefährlich +8 % Überfall).
+
+## Fraktionsressourcen (T23 S1–S5) — 60 Spieltage ohne Spieler (09.10.2026, Agent)
+Messung: Stand `rotfall.backup.s14c` (Tag 4), `RF.dayTick()` 60-mal hintereinander (Spiel pausiert, also ohne Tributzüge/Feldzüge in Bewegung — Ankunft der Tributzüge und Feldzugsschlachten fehlen in dieser Messung), alle T23-Scheiben aktiv. Werte am Tagesende.
+
+| Tag | Korn Valen | Eifer | Seelen | Handel | Köpfe | Aurelion (Tage) | Salz | Tributdörfer Nahrung/Hunger/Einw. (Grauwasser, Hohlstein, Eisenried) | Zoll |
+|---|---|---|---|---|---|---|---|---|---|
+| 9 | 229 | 1 | 57 | 54 | 56 | 4,5 | 32 | 5/2/24 · 11/0/28 · 36/0/20 | 1,00 |
+| 19 | 314 | 4 | 107 | 99 | 56 | 3,1 | 43 | 0/4/17 · 1/2/26 · 8/1/15 | 1,09 |
+| 29 | 161 | 5 | 157 | 93 | 56 | 0,6 | 52 | 0/6/11 · 0/4/20 · 0/3/7 | 1,19 |
+| 44 | 300 | 4 | 200 | 89 | 56 | 0,4 | 50 | 0/9/5 · 0/7/5 · 0/6/5 | 1,29 |
+| 64 | 186 | 5 | 200 | 99 | 56 | 0,5 | 47 | 0/13/5 · 0/11/5 · 0/10/5 | 1,29 |
+
+Befunde (alle ⚖, Entscheidung beim Entwickler):
+- **Tribut aus dem Dorfmarkt (F3):** Die Tributdörfer verbrauchen 13 Korn am Tag und erzeugen 1,3–2,6 (der Rest kam bisher über Händlerzüge, Lager um 12–15 Korn). 25 Korn alle 5 Tage leeren sie; der Tribut-Hunger zählt hoch und alle 5 Tage zieht je Dorf ein Bewohner weg (Abwanderung bleibt laut Spec als Spitze). Einwohner (Wirtschaft) fallen in 40 Tagen auf den Boden 5. Vorher: Vorrat 60, +5 am Tag Ernte = Tribut genau gedeckt.
+- **Seelen:** +7 am Tag aus 7 Totenorten, ein Heer der Toten bleibt bestehen (Deckel 110) → Seelen am Deckel 200 ab Tag ~39, „Gruft satt“ (gemischte Heere, Phiolen ×0,7) ab Tag ~22 dauerhaft.
+- **Eifer:** Die Toten halten 7 Orte (≥ 4) → +1 alle 5 Tage → Eifer 5 ab Tag ~24 dauerhaft: Kreuzzug alle 7 Tage, Ordensüberfall auf Grubenhort 70 %, Ordensheiler +15 %.
+- **Handel:** steigt auf 89–99 (Spec erwartet „Messe als Normalzustand“) → Messe in Eren/Nordfurt an jedem Händler-Agendatag (alle 5 Tage), 12–16 Züge unterwegs (Deckel 16), neue Züge 5–6 am Tag.
+- **Aurelion:** Ein Handelsschiff wird zum Wrack (Werft ohne Barren/Holz), Import 50 % → Nahrung 0,5 Tage ab Tag ~25, Magitech 31 Tage. Stufe „knapp“ dauerhaft: Zoll +0,1 je Agendatag bis zum Deckel 1,3, Frachtauftrag Kupferhafen; der Gesandte kauft nichts, weil Nordfurt selbst bei 0 Korn steht (gewollter Kornmangel).
+- **Kette:** 56 Köpfe (50 Gefangene + 3 Tributdörfer × 2) → Feldzug 25, Stoßtrupp 11, Heerzug 45 (= alte Mitte, Eichung ⚖). Der Spec-Normalwert (12–20 Köpfe) traf nicht zu: 30 versklavte Arbeiter (Bergmann, Feldarbeiter …) zählen mit.
