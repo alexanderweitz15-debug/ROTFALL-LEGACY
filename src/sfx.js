@@ -1,6 +1,6 @@
 // Klangsynthese (WebAudio, keine Dateien). Jeder Klang stützt einen sichtbaren Effekt:
 // Schwung = gefilterter Rauschsweep (schwer = tiefer/länger), Treffer = Tonabfall + Rauschstoß, Metall = Bandpass-Klirren.
-import { S } from './state.js?v=29';
+import { S } from './state.js?v=30';
 
 let ac = null, noiseBuf = null, master = null, wind = null;
 function ctx() {

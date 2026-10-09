@@ -2,12 +2,12 @@
 // Nachfrage je Stadt, Händlerzüge mit Zweck, Überfälle und Zerstörung wirken auf das Angebot. Dazu die Spielerseite:
 // Handel in jeder Stadt, eigene Karawane, Betriebe kaufen und ausbauen, Lieferaufträge.
 // Läuft einmal am Tag (ecoDay). Arbeiter sind die NPCs der Welt: wer tot, am Boden oder in der Gruppe des Helden ist, arbeitet nicht.
-import { S, log, chronicle, chance, ri, rnd, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=29';
-import { ITEMS, GOODS, TOWNS, FAC_RES } from './data.js?v=29';
+import { S, log, chronicle, chance, ri, rnd, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=30';
+import { ITEMS, GOODS, TOWNS, FAC_RES } from './data.js?v=30';
 /* T23 S4 Händler: Handelswert der Gilde (S.facRes.merch.v, 0–100). Lesen/Schreiben hier, weil sim.js economy.js importiert (kein Rückimport). */
 export const merchV = () => { const v = S.facRes?.merch?.v; return typeof v === 'number' && isFinite(v) ? v : FAC_RES.merch.def; };
 export function merchAdd(n) { const R = (S.facRes ||= { day: -1 }); R.merch ||= { v: null, stage: 1 }; R.merch.v = clamp(Math.round((merchV() + n) * 10) / 10, 0, FAC_RES.merch.max); return R.merch.v; }
-import { LOCATIONS, HOUSES, TS, TOWN_PLAN, MAPS } from './world.js?v=29';
+import { LOCATIONS, HOUSES, TS, TOWN_PLAN, MAPS } from './world.js?v=30';
 
 // Waren, die in Städten gehandelt werden. GOODS (data.js) ist die volle Liste.
 export const FOOD = ['grain', 'meat'];

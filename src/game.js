@@ -1,19 +1,19 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, keepRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=29';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=29';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=29';
-import * as R from './render.js?v=29';
-import * as HB from './buildings.js?v=29';
-import * as UI from './ui.js?v=29';
-import * as SIM from './sim.js?v=29';
-import * as B from './body.js?v=29';
-import * as SP from './sprites.js?v=29';
-import * as ECO from './economy.js?v=29';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=29';   /* Roadmap P8 */
-import { drawAtlas, revealAround, explored } from './atlas.js?v=29';
-import { skyVisible, skyHidden } from './sky.js?v=29';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
-import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=29';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=30';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=30';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=30';
+import * as R from './render.js?v=30';
+import * as HB from './buildings.js?v=30';
+import * as UI from './ui.js?v=30';
+import * as SIM from './sim.js?v=30';
+import * as B from './body.js?v=30';
+import * as SP from './sprites.js?v=30';
+import * as ECO from './economy.js?v=30';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=30';   /* Roadmap P8 */
+import { drawAtlas, revealAround, explored } from './atlas.js?v=30';
+import { skyVisible, skyHidden } from './sky.js?v=30';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
+import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=30';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -15477,7 +15477,7 @@ function resDaily(R, first) {                                         /* Tagesqu
   if (S.after?.zeal != null || SIM.undNodeCount() >= O.holdNodes) {   /* S3 Eifer: Land der Toten (≥ 4 Orte) nährt ihn höchstens alle 5 Tage; ohne Anlass −0,5 je 10 Tage */
     const A = AF(); A.zealAt ??= day;
     if (SIM.undNodeCount() >= O.holdNodes && day - (A.zealHold ?? -99) >= O.holdEvery) { A.zealHold = day; witchZeal(1); log(`Die Toten halten ${SIM.undNodeCount()} Orte — der Orden predigt den Kreuzzug (Eifer ${resFmt('order', A.zeal)}).`, 'faction'); }
-    else if ((A.zeal || 0) > 0 && day - A.zealAt >= O.decayEvery) { A.zeal = Math.max(0, A.zeal - O.decay); A.zealAt = day; }
+    if ((A.zeal || 0) > 0 && day - A.zealAt >= O.decayEvery) { A.zeal = Math.max(0, A.zeal - O.decay); A.zealAt = day; }   /* E48: Abklingen läuft unabhängig vom Anstoß durch das Land der Toten */
     R.order.v = A.zeal || 0;
   }
   const M = FAC_RES.merch, RM = R.merch;   /* S4 Händler: drei Tage unter 15 → Handelssperre, die Große Karawane bleibt 3 Tage im Tor */
@@ -21106,7 +21106,7 @@ function debugSections() {
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
       'Welt-Ereignis-Karte: drei nacheinander (E22, nebenbei mit Glocke, eine Kriegskarte hält die Welt an)': () => { worldCard('SEUCHE IN PROBEDORF', 'In Probedorf geht das Fleckfieber um.'); worldCard('SCHLACHT BEI PROBEFURT', 'Das Heer der Toten gegen Valens Aufgebot.', { war: true, snd: 'drum' }); worldCard('TURNIER IN PROBESTADT', 'Ein Herold ruft zum Turnier.'); UI.toast(`Warteschlange: ${EV_CARDS.length} Karten (warten auf Gespräche, Fenster, Kamerafahrten)`, 2600); },
       'Koop: Attrappen-Gast steuert den nächsten Gefährten (Karte + Treffer-Balken prüfen; Ergebnis als Hinweis)': () => { const m = partyMembers().find(x => x !== p && raceOf(x) === 'mensch'); if (!m) return UI.toast('Kein menschlicher Gefährte in der Gruppe.'); if (S.coop && S.coop.role !== 'host') return UI.toast('Nur ohne echten Koop.');
-        import('./coop.js?v=29').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
+        import('./coop.js?v=30').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
           const sent = F.conn.sent.map(s => JSON.parse(s).t); UI.toast(`Koop-Probe: Karte an Gast ${sent.includes('card') ? 'ja' : 'nein'}, letzter Gasttreffer ${m.lastHitId ? 'gemerkt' : '— (kein Feind nah)'}. Attrappe trennen: Eintrag darunter.`, 6000); window.__fakeGuest = F; }); },
       'Ereignis-Reste: Karten Spuk vorbei, Parade, Ratsbeschluss (nacheinander)': () => { worldCard('DER SPUK IST VORBEI', 'Spuk am Brunnen von Probedorf — Probedorf schläft wieder.'); worldCard('PARADE DER SONNENLEGION', 'Mittags vom Westtor zum Palast von Aurelheim.', { snd: 'horn' }); worldCard('BESCHLUSS DES HOHEN RATES', 'Probethema — 5 zu 2', { snd: 'horn' }); },
       'Handelskontakt: Kette abschließen (Kutscher der nächsten Stadt) + Handelsbrief sofort': () => { const L = ECO.TOWN_LOCS.filter(l => S.towns?.[l.key]).sort((a, b) => Math.hypot(a.x - p.x / TS, a.y - p.y / TS) - Math.hypot(b.x - p.x / TS, b.y - p.y / TS))[0]; if (!L) return UI.toast('Keine Stadt.'); tradeContact(L.key, `${FIRST_M[0]} der Kutscher`); tradeContactTick(true); },
@@ -27965,7 +27965,7 @@ function boot() {
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
-    openCoop: () => import('./coop.js?v=29').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
+    openCoop: () => import('./coop.js?v=30').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
@@ -28028,7 +28028,7 @@ function boot() {
       const act = b.dataset.act;
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
-      else if (act === 'coop') { import('./coop.js?v=29').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
+      else if (act === 'coop') { import('./coop.js?v=30').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { $('cr-fac-wrap')?.classList.remove('hidden'); creation.facRow?.(); setSlot(newSlot('single'));   /* Fraktions-Starts: Freischaltungen neu lesen */   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -28039,7 +28039,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=29').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=30').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
