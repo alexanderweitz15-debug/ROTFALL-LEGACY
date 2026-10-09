@@ -1,19 +1,19 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, keepRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=28';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=28';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=28';
-import * as R from './render.js?v=28';
-import * as HB from './buildings.js?v=28';
-import * as UI from './ui.js?v=28';
-import * as SIM from './sim.js?v=28';
-import * as B from './body.js?v=28';
-import * as SP from './sprites.js?v=28';
-import * as ECO from './economy.js?v=28';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=28';   /* Roadmap P8 */
-import { drawAtlas, revealAround, explored } from './atlas.js?v=28';
-import { skyVisible, skyHidden } from './sky.js?v=28';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
-import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=28';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=29';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=29';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=29';
+import * as R from './render.js?v=29';
+import * as HB from './buildings.js?v=29';
+import * as UI from './ui.js?v=29';
+import * as SIM from './sim.js?v=29';
+import * as B from './body.js?v=29';
+import * as SP from './sprites.js?v=29';
+import * as ECO from './economy.js?v=29';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=29';   /* Roadmap P8 */
+import { drawAtlas, revealAround, explored } from './atlas.js?v=29';
+import { skyVisible, skyHidden } from './sky.js?v=29';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
+import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=29';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -6997,6 +6997,8 @@ function doInteract(target = null) {
     return;
   }
   if (t.type === 'board') return boardMenu(boardTown(t));             // Phase 2: Aufträge annehmen und abgeben
+  if (t.crownSeal) { if (S.after?.capital?.seal) return; if (!addItem(S.player, 'kronsiegel')) return UI.toast('Kein Platz im Gepäck.'); ((S.after ||= {}).capital ||= {}).seal = 'taken'; S.ents.world = S.ents.world.filter(e => e !== t);
+    log('Du nimmst das Kronsiegel Varonheims an dich. Varon oder Brandt im Exil werden es wiederhaben wollen.', 'quest'); UI.toast('KRONSIEGEL', 2000); return; }   /* S3d */
   if (t.tentLoot) return tentSteal(t);                               /* T21-2 / E51: Bandenbeute im Zelt */
   if (t.bandLoot && !t.opened) return bandLootOpen(t);               /* E2*/
   if ((t.type === 'crate' || t.type === 'chest') && !t.opened) {
@@ -11769,6 +11771,7 @@ function capitalMigrate() {                                        /* §5g.1: Va
 // Läden schließen, Knochenwachen und Trümmer, die Welt merkt es sich (S.after.capital). Die Bewohner verstecken sich von selbst (besetzt).
 function capitalFall(why = 'Heerzug') {
   const k = 'varonheim', P = TOWN_PLAN[k]; if (!P) return; const A = AF(), [sx, sy] = P.square;
+  if (S.evac?.state === 'run') { const L = evacEsc().find(e => e.varonKing) || evacEsc().find(e => e.varonMarshal); if (L) evacArrive(L); else evacAbort('Der Zug des Königs ist zerschlagen.'); }   /* S3c: fällt die Stadt während des Zugs, ist er entkommen */
   const ex = SIM.exileOf(), evac = !!S.flags.varonEvac;
   A.capital = { fell: S.day | 0, why, exile: ex, kingLost: !ex, ruler: S.flags.varonDead ? 'Brandt' : 'Varon', evac, retaken: null, scattered: [] };
   if (!evac) {                                                     /* der Hof zerfällt (Nutzer: bleibt) — nur wer den König vorher fortbrachte, rettet ihn */
@@ -11777,6 +11780,7 @@ function capitalFall(why = 'Heerzug') {
     S.flags.varonFreed = [0, 1, 2];
   }
   if (S.cult?.end === 'ruling') { S.cult.end = 'hidden'; cultAfter('hidden'); chronicle('Aldhelm verliert den Hof', 'news', 'Ohne Stadt kein Reichsverweser. Der Kelch zieht sich in die Krypta zurück.'); }
+  if (!evac) fallFlight();   /* S3c §2.3: bist du im Burgbezirk, flieht der König zu Fuß — begleite ihn */
   ensureVaronExile(); ensureVaronCourt(); capitalScene('fell');   /* T17: der Fall als Szene (nur in der Welt, nie in Proben) */   /* F-A: die Burg leert sich sofort, kein zweiter Varon */
   if (afterLive()) {
     S.ents.world = S.ents.world.filter(e => !e.capGuard);
@@ -11797,8 +11801,9 @@ function ensureVaronExile() {
   const [sx, sy] = TOWN_PLAN[k].square;
   const put = (name, prof, dx, dy, o = {}) => { const q = freeSpotNear('world', sx + dx, sy + dy, 3); if (!q) return null; const c = makeChar({ name, prof, x: q.x, y: q.y, level: 12, faction: 'valen', traits: ['diszipliniert'] });
     Object.assign(c, { exileCourt: true, varonCourt: true, exile: true, transient: true, visitor: true, anchor: { x: c.x, y: c.y }, schedulePos: { x: c.x, y: c.y } }, o); S.ents.world.push(c); return c; };
-  if (!S.flags.varonDead) { const v = put('Varon', 'König im Exil', 0, -3, { varonKing: true, level: 26, greet: '„Ein König ohne Stadt. Sieh mich nicht so an.“' }); if (v) { v.equip.weapon = mkItem('longsword'); v.equip.chest = mkItem('plate_cuirass'); recalc(v); B.fullHeal(v); } }
-  put('Brandt', 'Marschall', 3, -2, { varonMarshal: true, brave: true, greet: S.flags.varonDead ? '„Ich führe, was vom Hof übrig ist. Viel ist es nicht.“' : '„Wir sind in einem Kontor untergekommen. Ein Kontor! Für den König!“' });
+  const flee = S.evac?.state === 'flee';   /* S3c §2.3: König und Brandt sind noch zu Fuß unterwegs */
+  if (!S.flags.varonDead && !flee) { const v = put('Varon', 'König im Exil', 0, -3, { varonKing: true, level: 26, greet: '„Ein König ohne Stadt. Sieh mich nicht so an.“' }); if (v) { v.equip.weapon = mkItem('longsword'); v.equip.chest = mkItem('plate_cuirass'); recalc(v); B.fullHeal(v); } }
+  if (!flee) put('Brandt', 'Marschall', 3, -2, { varonMarshal: true, brave: true, greet: S.flags.varonDead ? '„Ich führe, was vom Hof übrig ist. Viel ist es nicht.“' : '„Wir sind in einem Kontor untergekommen. Ein Kontor! Für den König!“' });
   put('Ysmay', 'Spitzelmeisterin', -4, -1, { varonSpy: true, trait: 'misstrauisch', hooded: true, greet: '„Die Toten haben keine Spione. Das macht mich fast arbeitslos.“' });
   put('Hagen', 'Schmied', 5, 1, { shop: true, market: false, smith: true, pool: ['longsword', 'kite_shield', 'chain_hauberk', 'iron_helm', 'kronharnisch', 'kronhelm'], greet: '„Den Amboss haben wir gerettet. Die Esse nicht.“' });
   for (let i = 0; i < 4; i++) { const q = freeSpotNear('world', sx + (i - 1.5) * 3, sy + 2, 3); if (!q) continue; const g = guardChar('valen', q, 'Königsgarde', ri(10, 13)); Object.assign(g, { exileCourt: true, guard: true, transient: true, visitor: true, post: k }); S.ents.world.push(g); }
@@ -12056,7 +12061,7 @@ const courtEnts = () => S.ents.world.filter(e => e.varonCourt && !e.exileCourt);
 const courtDrop = pred => { S.ents.world = S.ents.world.filter(e => !(e.varonCourt && !e.exileCourt && pred(e))); };
 let viaB = 0;                                                         /* Kellertreppe B (Kanzlei ↔ Katakomben) */
 function ensureVaronCourt() {
-  S.ents.world = S.ents.world.filter(e => !((e.varonCourt && !e.exileCourt) || e.courtProp || e.keepGate)); S.ents.varonburg = [];
+  S.ents.world = S.ents.world.filter(e => e.evacEsc || !((e.varonCourt && !e.exileCourt) || e.courtProp || e.keepGate)); S.ents.varonburg = [];   /* S3c: der Zug des Königs bleibt */
   const H = id => HOUSES.find(h => h.id === id), thr = H('varon_throne'), nob = H('varon_nobles'), kan = H('varon_kanzlei'), ver = H('varon_verlies'), smi = H('varon_schmiede');
   if (!thr || !nob || !kan || !ver || !smi) return;
   if (SIM.capitalFallen()) return ensureCapitalOccupied(thr);   /* Belagerung S3a: die Toten halten die Burg */
@@ -12347,6 +12352,12 @@ function evacPts() {
 }
 const evacEsc = () => S.ents.world.filter(e => e.evacEsc && e.alive);
 const evacMayAsk = () => (S.ranks?.valen ?? -1) >= 1 || keepKnight() || !!S.flags.varonAudience;
+function crownSealChoice(npc, choices) {                            /* S3d: das Kronsiegel dem Hof im Exil zurückgeben (einmalig, Valen +5) */
+  if (!npc.exileCourt || !(npc.varonKing || npc.varonMarshal) || S.after?.capital?.seal !== 'taken' || !hasItem(S.player, 'kronsiegel')) return;
+  choices.unshift({ text: 'Das Kronsiegel zurückgeben', fn: () => { removeItem(S.player, 'kronsiegel', 1); S.after.capital.seal = 'given'; addRep('valen', 5);
+    UI.dialogue(npc, npc.varonKing ? '„Mein Siegel. Aus den Händen der Toten.“ Er dreht es lange zwischen den Fingern. „Die Krone vergisst das nicht.“ (Valen +5)' : '„Das Kronsiegel? Bei allen Göttern.“ Brandt verbeugt sich tief. „Der Hof steht in deiner Schuld.“ (Valen +5)', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
+    chronicle('Das Kronsiegel kehrt zurück', 'news', `${S.player.name} brachte das Kronsiegel aus dem besetzten Varonheim zum Hof im Exil.`); } });
+}
 function evacChoices(npc, choices) {
   if (!((npc.varonMarshal && !npc.exileCourt) || npc.siegeMarshal)) return; const n = capNode(), day = S.day | 0;
   if (!n?.siege || n.owner !== 'valen' || S.flags.varonFled || S.evac?.state || (S.flags.varonDead && S.cult?.end === 'ruling')) return;
@@ -12380,12 +12391,14 @@ function evacStart(route) {
   }
 }
 function evacFollow(e, dt) {                                         /* Begleiter: dicht beim Helden, im Kampf normale KI */
+  if (S.evac?.state === 'flee') { const Pt = evacPts(); if (!Pt || e.downed) return false; const [gx, gy] = Pt.gate, [mx, my] = Pt.mark, tx = e.x / TS > gx + 1 ? gx : mx, ty = e.x / TS > gx + 1 ? gy : my;   /* §2.3: sie laufen selbst zum Sammelplatz */
+    seek(e, Math.atan2(ty * TS - e.y, tx * TS - e.x), 1.45 * dt / 16, dt, { x: tx * TS, y: ty * TS }); return true; }
   const p = S.player; if (e.threatId || e.angry || e.downed) return false; const d = dist(e, p);
   if (d > 70) { seek(e, Math.atan2(p.y - e.y, p.x - e.x), (d > 220 ? 1.7 : 1.35) * dt / 16, dt, p); return true; }
   e.vx = e.vy = 0; return true;
 }
 function evacTick() {
-  const E = S.evac; if (!E || E.state !== 'run') return; const Pt = evacPts(), p = S.player, esc = evacEsc(), lead = esc.find(e => e.varonKing) || esc.find(e => e.varonMarshal);
+  const E = S.evac; if (E?.state === 'flee') return fleeTick(E); if (!E || E.state !== 'run') return; const Pt = evacPts(), p = S.player, esc = evacEsc(), lead = esc.find(e => e.varonKing) || esc.find(e => e.varonMarshal);
   if (!Pt || !lead) return evacAbort('Vom Zug des Königs ist niemand mehr übrig.');
   if (SIM.capitalFallen()) return evacArrive(lead);                   /* fällt die Stadt während des Zugs: wer draußen ist, ist entkommen */
   const n = capNode(), [gx, gy] = Pt.gate, [mx, my] = Pt.mark, lx = lead.x / TS, ly = lead.y / TS;
@@ -12410,7 +12423,30 @@ function evacArrive(lead) {
 function evacAbort(why) {
   S.ents.world = S.ents.world.filter(e => !e.evacEsc); S.evac = null; ensureVaronCourt(); log(why, 'quest');
 }
-function evacLoad() { if (S.evac?.state === 'run') { S.evac = null; ensureVaronCourt(); log('Der Zug des Königs kehrte in die Burg zurück.', 'quest'); } }   /* der Zug ist flüchtig */
+/* §2.3 Flucht beim Fall (Spieler im Burgbezirk): Varon, Brandt und zwei Gardisten laufen selbst über Burgtor und Westtor zum Sammelplatz,
+   die Knochenwachen jagen sie. Wer sie begleitet (Held in 30 Feldern bei der Ankunft), bekommt Valen +5. Stirbt Varon, führt Brandt. ⚖ immer Weg A. */
+function fallFlight() {
+  const p = S.player, Pt = evacPts(), [kx, ky] = CAPITAL.keep; if (!Pt || p.map !== 'world' || S.flags.varonDead || S.evac?.state || Math.hypot(p.x / TS - kx, p.y / TS - ky) > 45) return false;
+  S.evac = { state: 'flee', day: S.day | 0, route: 'tor', start: S.day * 1440 + S.minute }; const out = [];
+  [['Varon', 'König', 26, { varonKing: true }], ['Brandt', 'Marschall', 16, { varonMarshal: true }], ['Gardist', 'Königsgarde', 12, {}], ['Gardist', 'Königsgarde', 12, {}]].forEach(([n, pr, lv, o], i) => {
+    const q = freeSpotNear('world', kx + (i % 2 ? 1 : -1) * (1 + (i >> 1)), ky + 2, 2); if (!q) return; const g = guardChar('valen', q, pr, lv);
+    Object.assign(g, { name: n, transient: true, brave: true, evacEsc: true, evacFlee: true, anchor: null, ...o }); S.ents.world.push(g); out.push(g); });
+  const king = out.find(e => e.varonKing); if (king) for (const e of S.ents.world) if (e.kind === 'enemy' && e.alive && e.heldGuard === 'varonheim' && dist(e, king) < 30 * TS) e.aggroId = king.id;
+  log('Der König flieht zu Fuß! Varon, Brandt und zwei Gardisten laufen durch Burgtor und Westtor zum Sammelplatz an der Königsstraße — die Toten jagen sie. Begleite sie.', 'quest'); UI.toast('DER KÖNIG FLIEHT — BEGLEITE IHN', 3200);
+  return true;
+}
+function fleeTick(E) {
+  const Pt = evacPts(), esc = evacEsc(), lead = esc.find(e => e.varonKing) || esc.find(e => e.varonMarshal), p = S.player;
+  const done = why => { S.ents.world = S.ents.world.filter(e => !e.evacEsc); S.evac = null; ensureVaronExile(); if (why) log(why, 'quest'); };
+  if (!Pt || !lead) return done(S.flags.varonDead ? 'Der König ist auf der Flucht gefallen. Marschall Brandt führt den Hof ins Exil.' : 'Die Flucht ist vorbei.');
+  const near = (e, x, y, r) => Math.hypot(e.x / TS - x, e.y / TS - y) < r;
+  if (near(lead, Pt.mark[0], Pt.mark[1], 5) || S.day * 1440 + S.minute - E.start > EVAC.mins) {
+    const with_ = p.map === 'world' && dist(p, lead) < 30 * TS; if (with_) addRep('valen', 5);
+    return done(`${lead.varonKing ? 'König Varon' : 'Marschall Brandt'} ist entkommen und zieht ins Exil.${with_ ? ' Du hast ihn begleitet. (Valen +5)' : ''}`);
+  }
+}
+function evacLoad() { if (S.evac?.state === 'flee') { S.evac = null; ensureVaronExile(); return; }   /* §2.3: beim Laden gilt die Flucht als gelungen */
+  if (S.evac?.state === 'run') { S.evac = null; ensureVaronCourt(); log('Der Zug des Königs kehrte in die Burg zurück.', 'quest'); } }   /* der Zug ist flüchtig */
 function evacHomeDay() {                                             /* Belagerung gehalten: am nächsten Tag kehrt der Hof heim */
   const F = S.flags; if (F.varonFled?.why !== 'evac' || SIM.capitalFallen() || capNode()?.siege) return false;
   F.varonEvac = F.varonFled.evac0; delete F.varonFled; S.evac = null; ensureVaronExile(); ensureVaronCourt();
@@ -12430,6 +12466,8 @@ function ensureCapitalOccupied(thr) {
   for (const dx of [-2, 2]) { const e = spawnEnemy('bone_knight', 'world', kx + dx, ky + 1, { level: 10 }); if (e) Object.assign(e, { keepGate: true, transient: true, heldGuard: 'varonheim', anchor: { x: e.x, y: e.y } }); }
   for (let i = 0; i < 4; i++) { const e = spawnEnemy(pick(['skeleton', 'zombie', 'ghoul']), 'world', kx + ri(-12, 12), ky - ri(2, 5), { level: 8 }); if (e) Object.assign(e, { keepGate: true, transient: true, anchor: { x: e.x, y: e.y } }); }
   if (thr) W.push({ id: uid(), kind: 'prop', type: 'bones', map: 'world', x: (thr.x + (thr.w >> 1)) * TS + TS / 2, y: (thr.y + 2) * TS + 4, r: 8, solid: false, transient: true, courtProp: true, label: 'Ein Leichnam auf dem Thron' });
+  const kan = HOUSES.find(h => h.id === 'varon_kanzlei');   /* S3d: das Kronsiegel liegt einmal in der besetzten Kanzlei */
+  if (kan && !S.after?.capital?.seal) W.push({ id: uid(), kind: 'prop', type: 'chest', map: 'world', x: (kan.x + 2) * TS + TS / 2, y: (kan.y + 2) * TS + TS / 2, r: 10, solid: true, transient: true, courtProp: true, crownSeal: true, label: 'Pult der Kanzlei — das Kronsiegel' });
 }
 function buildVaronburg() { ensureVaronCourt(); return freeSpotNear('world', CAPITAL.keep[0], CAPITAL.keep[1] + 2, 2); }   /* Rückfall für alte Aufrufe: die Burg liegt in der Welt */
 /* SC-01 (08.10.): buildVaronburgOld (eigene Burgkarte vor dem Umbau S2) entfernt — die Burg liegt seit S2 in der Welt; Text in Git-Historie */
@@ -15970,9 +16008,10 @@ function tentAmbush(B0) {
   log(`Hinterhalt! ${B0.name} haben den Diebstahl bemerkt und holen sich ihre Beute zurück.`, 'combat'); UI.toast('HINTERHALT', 1800); return n;
 }
 /* N3-Rest (Spec npc_eigene_ziele §5.2): Deserteure kämpfen als Speerträger/Banditen (Valen) bzw. Banditen (Kette) und tragen Valen-Blau bzw. Kettenrot
-   (nur Aussehen, sprites.js monsterSpec liest e.deserter). Gleich viele Zufallszüge wie vorher (ein pick). */
+   (nur Aussehen über e.elook, das sprites.js monsterSpec zuletzt anwendet). Gleich viele Zufallszüge wie vorher (ein pick). */
+const DESERTER_LOOK = { valen: { cloak: '#2f4260', hood: '#24324a', scarf: '#b9c3d2' }, chain: { cloak: '#2a0e10', hood: '#1e1416', scarf: '#5a1a1c' } };
 function bandKinds(b, amb = false) { return b?.origin === 'deserter' ? ['bandit_spear', 'bandit'] : b?.origin === 'chainDeserter' ? ['bandit'] : amb ? ['bandit', 'bandit_archer'] : ['bandit', 'bandit', 'bandit_archer', 'bandit_spear']; }
-function bandLook(e, b) { if (e && (b?.origin === 'deserter' || b?.origin === 'chainDeserter')) e.deserter = b.origin === 'deserter' ? 'valen' : 'chain'; return e; }
+function bandLook(e, b) { if (e && (b?.origin === 'deserter' || b?.origin === 'chainDeserter')) { e.deserter = b.origin === 'deserter' ? 'valen' : 'chain'; e.elook = { ...(e.elook || {}), ...DESERTER_LOOK[e.deserter] }; } return e; }
 const deserterOf = e => { const b = e?.bandId && (S.bands || []).find(x => x.id === e.bandId); return b?.origin === 'deserter' ? 'valen' : b?.origin === 'chainDeserter' ? 'chain' : e?.deserter || null; };
 function tentThiefTick() {
   const p = S.player; if (!p || (p.map || 'world') !== 'world') return;
@@ -16389,7 +16428,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith && !(npc.dwarf && !S.flags.dwarfFriend)) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });   /* Zwergenschmiede erst als Freund der Halle */
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost(npc)} Gold)${zealHealMul(npc) > 1 ? ' — der Orden verlangt mehr, solange sein Eifer brennt' : ''}`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); leaveChoices(npc, choices);   /* NPC-Ziele N2 */ if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); envoyChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); geroChoices(npc, choices); evacChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); leaveChoices(npc, choices);   /* NPC-Ziele N2 */ if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); envoyChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); geroChoices(npc, choices); evacChoices(npc, choices); crownSealChoice(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -21035,7 +21074,7 @@ function debugSections() {
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
       'Welt-Ereignis-Karte: drei nacheinander (E22, nebenbei mit Glocke, eine Kriegskarte hält die Welt an)': () => { worldCard('SEUCHE IN PROBEDORF', 'In Probedorf geht das Fleckfieber um.'); worldCard('SCHLACHT BEI PROBEFURT', 'Das Heer der Toten gegen Valens Aufgebot.', { war: true, snd: 'drum' }); worldCard('TURNIER IN PROBESTADT', 'Ein Herold ruft zum Turnier.'); UI.toast(`Warteschlange: ${EV_CARDS.length} Karten (warten auf Gespräche, Fenster, Kamerafahrten)`, 2600); },
       'Koop: Attrappen-Gast steuert den nächsten Gefährten (Karte + Treffer-Balken prüfen; Ergebnis als Hinweis)': () => { const m = partyMembers().find(x => x !== p && raceOf(x) === 'mensch'); if (!m) return UI.toast('Kein menschlicher Gefährte in der Gruppe.'); if (S.coop && S.coop.role !== 'host') return UI.toast('Nur ohne echten Koop.');
-        import('./coop.js?v=28').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
+        import('./coop.js?v=29').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
           const sent = F.conn.sent.map(s => JSON.parse(s).t); UI.toast(`Koop-Probe: Karte an Gast ${sent.includes('card') ? 'ja' : 'nein'}, letzter Gasttreffer ${m.lastHitId ? 'gemerkt' : '— (kein Feind nah)'}. Attrappe trennen: Eintrag darunter.`, 6000); window.__fakeGuest = F; }); },
       'Ereignis-Reste: Karten Spuk vorbei, Parade, Ratsbeschluss (nacheinander)': () => { worldCard('DER SPUK IST VORBEI', 'Spuk am Brunnen von Probedorf — Probedorf schläft wieder.'); worldCard('PARADE DER SONNENLEGION', 'Mittags vom Westtor zum Palast von Aurelheim.', { snd: 'horn' }); worldCard('BESCHLUSS DES HOHEN RATES', 'Probethema — 5 zu 2', { snd: 'horn' }); },
       'Handelskontakt: Kette abschließen (Kutscher der nächsten Stadt) + Handelsbrief sofort': () => { const L = ECO.TOWN_LOCS.filter(l => S.towns?.[l.key]).sort((a, b) => Math.hypot(a.x - p.x / TS, a.y - p.y / TS) - Math.hypot(b.x - p.x / TS, b.y - p.y / TS))[0]; if (!L) return UI.toast('Keine Stadt.'); tradeContact(L.key, `${FIRST_M[0]} der Kutscher`); tradeContactTick(true); },
@@ -25249,6 +25288,33 @@ export function selftest() {
       return Object.values(res).every(Boolean);
     } finally { S.war = W0; if (A0 === undefined) delete S.after; else S.after = A0; S.ents.world = E1; S.flags = fl; S.ranks.valen = rk; Object.assign(S.factions, fa); S.evac = ev0; if (S.evac === undefined) delete S.evac; Object.assign(p, pk); UI.closeDialogue(); ensureVaronExile(); ensureVaronCourt(); }
   }));
+  ok('Belagerung S3c §2.3: fällt die Stadt mit dir im Burgbezirk, flieht der König zu Fuß (kein zweiter Varon im Exil); am Sammelplatz zieht er ins Exil, Begleiter Valen +5; Laden zählt als entkommen', sandbox(() => {
+    const W0 = structuredClone(S.war), A0 = S.after ? structuredClone(S.after) : undefined, E1 = S.ents.world, fl = structuredClone(S.flags), fa = { ...S.factions }, ev0 = S.evac, p = S.player, pk = { map: p.map, x: p.x, y: p.y };
+    S.ents.world = E1.slice();
+    try {
+      const Pt = evacPts(); if (!Pt) return true; delete S.flags.varonDead; S.evac = null; S.war.nodes.varonheim.owner = 'undead'; (S.after ||= {}).capital = { fell: S.day | 0, exile: SIM.exileOf(), retaken: null };
+      p.map = 'world'; p.x = CAPITAL.keep[0] * TS; p.y = (CAPITAL.keep[1] + 4) * TS; const go = fallFlight(); ensureVaronExile();
+      const run = go && S.evac?.state === 'flee' && evacEsc().some(e => e.varonKing) && !S.ents.world.some(e => e.exileCourt && e.varonKing);
+      const k = evacEsc().find(e => e.varonKing), v0 = S.factions.valen || 0; k.x = Pt.mark[0] * TS; k.y = Pt.mark[1] * TS; p.x = k.x + 40; p.y = k.y; evacTick();
+      const safe = !S.evac && !evacEsc().length && S.ents.world.some(e => e.exileCourt && e.varonKing) && (S.factions.valen || 0) === Math.min(100, v0 + 5);
+      S.evac = { state: 'flee' }; evacLoad(); const load = !S.evac;
+      const res = { run, safe, load }; if (!Object.values(res).every(Boolean)) console.warn('S3c-2.3-Probe', JSON.stringify(res));
+      return Object.values(res).every(Boolean);
+    } finally { S.war = W0; if (A0 === undefined) delete S.after; else S.after = A0; S.ents.world = E1; S.flags = fl; Object.assign(S.factions, fa); S.evac = ev0; if (S.evac === undefined) delete S.evac; Object.assign(p, pk); ensureVaronExile(); ensureVaronCourt(); }
+  }));
+  ok('Belagerung S3d Kronsiegel: liegt einmal in der besetzten Kanzlei, kein zweites nach dem Nehmen; dem Hof im Exil zurückgegeben → Valen +5', sandbox(() => {
+    const A0 = S.after ? structuredClone(S.after) : undefined, W1 = S.ents.world, fa = { ...S.factions }, p = S.player, inv0 = p.inv.slice(); S.ents.world = W1.slice();
+    try {
+      (S.after ||= {}).capital = {}; const thr = HOUSES.find(h => h.id === 'varon_throne'); if (!thr) return true;
+      ensureCapitalOccupied(thr); const t = S.ents.world.find(e => e.crownSeal); if (!t) return false; doInteract(t);
+      const took = S.after.capital.seal === 'taken' && hasItem(p, 'kronsiegel') && !S.ents.world.includes(t); S.ents.world = S.ents.world.filter(e => !e.crownSeal);
+      ensureCapitalOccupied(thr); const once = !S.ents.world.some(e => e.crownSeal);
+      const brandt = { id: 'tb', kind: 'npc', exileCourt: true, varonMarshal: true, name: 'Brandt' }, ch = [], v0 = S.factions.valen || 0; crownSealChoice(brandt, ch); ch[0]?.fn(); UI.closeDialogue();
+      const given = S.after.capital.seal === 'given' && !hasItem(p, 'kronsiegel') && (S.factions.valen || 0) === Math.max(-100, v0 + 5);
+      const res = { took, once, given }; if (!Object.values(res).every(Boolean)) console.warn('Kronsiegel-Probe', JSON.stringify(res));
+      return Object.values(res).every(Boolean);
+    } finally { if (A0 === undefined) delete S.after; else S.after = A0; S.ents.world = W1; Object.assign(S.factions, fa); p.inv = inv0; }
+  }));
   ok('Belagerung S3d: Welle 4 der Rückeroberung sammelt sich im Burghof und ankert am Thron, die Knochenwachen am Burgtor zählen zu ihr; am Tag der Befreiung hält die Torwache niemanden an (Gnadentag)', sandbox(() => {
     const W0 = structuredClone(S.war), W1 = S.ents.world, fl = structuredClone(S.flags), P0 = structuredClone(S.keepPass || {}), p = S.player;
     S.ents.world = W1.slice();
@@ -27837,7 +27903,7 @@ function boot() {
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
-    openCoop: () => import('./coop.js?v=28').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
+    openCoop: () => import('./coop.js?v=29').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
@@ -27900,7 +27966,7 @@ function boot() {
       const act = b.dataset.act;
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
-      else if (act === 'coop') { import('./coop.js?v=28').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
+      else if (act === 'coop') { import('./coop.js?v=29').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { $('cr-fac-wrap')?.classList.remove('hidden'); creation.facRow?.(); setSlot(newSlot('single'));   /* Fraktions-Starts: Freischaltungen neu lesen */   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -27911,7 +27977,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=28').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=29').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */

@@ -1,6 +1,6 @@
 // S14 Stil R: handgezeichnete 16×16-Symbole für Verbrauchsgüter und Material (Nutzer: „restliche Sprites“).
 // Zeichen → Farbe je Symbol; '.' leer, 'o' Kontur. Waffen und Rüstung kommen weiter aus den echten Sprites (render.js iconR).
-import { G, ramp, mix, toCanvas } from './sprites.js?v=28';   /* Regel-Symbole (09.10.) */
+import { G, ramp, mix, toCanvas } from './sprites.js?v=29';   /* Regel-Symbole (09.10.) */
 const O = '#1c1512';
 /* Fischen (08.10.2026): ein Fischumriss, je Art eigene Farben (B Rücken, b Bauch, w Auge, T Schwanz) */
 const FISH_ROWS = ['................', '................', '................', '................', '.....oooooo...oo', '...ooBBBBBBo.oTo',
