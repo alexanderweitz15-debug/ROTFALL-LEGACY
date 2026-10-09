@@ -386,12 +386,12 @@ export function routeLines(town, o = {}) {
     .map(k => { const why = riskWhy(town, k, o), p = riskOf(town, k, 1, o); return { to: k, p, days: tripDays(town, k), why, txt: `Nach ${townName(k)} (${tripDays(town, k)} ${tripDays(town, k) > 1 ? 'Tage' : 'Tag'}): ${why.filter(w => w.add > 0).length ? `${Math.round(p * 100)} % — ${why.map(w => w.txt).join('; ')}` : `ruhig (${Math.round(p * 100)} %)${why.length ? ' — ' + why.map(w => w.txt).join('; ') : ''}`}` }; })
     .sort((x, y) => y.p - x.p);
 }
-function caravanDay() {
+export function caravanDay() {   /* export nur für die Probe „Umweg“ */
   const E = S.eco;
   for (const c of [...E.caravans]) {
     if (!c.raided && chance(riskOf(c.from, c.to, c.guards, { detour: c.detour }))) {
       c.raided = true; noteRaid(c.from, c.to);   /* N1: die Strecke merkt es sich */ const lost = Math.ceil(c.n * (0.5 + rnd() * 0.5)); c.n -= lost; merchAdd(-FAC_RES.merch.raid);   /* T23 S4: ein überfallener Zug kostet die Gilde */
-      const bd = raidBand(c.from, c.to);   /* T12 B2: war es eine Bande, bekommt sie die Beute */
+      const bd = raidBand(c.from, c.to, { detour: c.detour });   /* T12 B2: war es eine Bande, bekommt sie die Beute */   /* 🐞→✔ Fehlersuche 09.10.: auf dem Umweg (N1) zählen Banden nicht — vorher bekam die Bande der Hauptstraße trotzdem die Beute */
       if (bd) onBandRaid(bd, lost, c.good, `einen Zug nach ${townName(c.to)}`);
       else log(`Räuber überfielen einen Händlerzug nach ${townName(c.to)}: ${lost} ${ITEMS[c.good].name} verloren.`, 'economy');
       if (chance(0.3)) chronicle(bd ? `${bd.name} überfielen einen Händlerzug nach ${townName(c.to)}` : `Ein Händlerzug nach ${townName(c.to)} wurde überfallen`, 'news');

@@ -3,7 +3,7 @@ import { S, clamp, seasonOf } from './state.js?v=27';
 import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=27';
 import * as HB from './buildings.js?v=27';
 import { ITEMS, MONSTERS, FACTIONS, NPCS } from './data.js?v=27';
-import { buildOf, crawling, lightR, eyeOf } from './body.js?v=27';
+import { buildOf, crawling, lightR, eyeOf, lifeOf } from './body.js?v=27';
 import * as SP from './sprites.js?v=27';
 import { trailPt, WAGON_GAP } from './sim.js?v=27';
 import { ICON_R } from './iconsR.js?v=27';
@@ -296,7 +296,7 @@ function drawEmote(e, now) {
   E[1].forEach((row, y) => { for (let x = 0; x < 7; x++) if (row[x] === '#') ctx.fillRect(sx + x * px, sy + y * px, px, px); });
   ctx.globalAlpha = 1;
 }
-const barK = e => e.barMax ? e.barHp / e.barMax : e.hp / (e.maxHp || 1);   /* HB2-01: Balken = Rumpf */
+const barK = e => { if (e.body) { const [h, m] = lifeOf(e); return h / m; } return e.barMax ? e.barHp / e.barMax : e.hp / (e.maxHp || 1); };   /* 09.10. (Entwickler): Balken = Gesamtleben aller Körperteile (vorher HB2-01: nur Rumpf); Koop-Gäste ohne Körper: Rumpfwert vom Wirt */
 function drawBossBar() {
   const p = S.player; if (!p) return;
   const b = (VIS.arr === S.ents[S.map] ? VIS.boss : S.ents[S.map]).find(e => e.boss && e.alive && Math.hypot(e.x - p.x, e.y - p.y) < 520);   /* PERF-R: Bossliste aus visibleEnts */
@@ -711,6 +711,10 @@ function paintWalls(o, m, cx, cy) {
     const tx = x0t + i, ty = y0t + j; if (!isW(tx, ty)) continue;
     const X = i * 16, Y = j * 16, N = isW(tx, ty - 1), Sd = isW(tx, ty + 1), Wd = isW(tx - 1, ty), E = isW(tx + 1, ty), house = inHouse(tx, ty);
     if (castleAt(tx, ty) && !house) { paintCastleTile(P, tx, ty, X, Y, N, Sd, Wd, E); continue; }
+    if (house && houses.some(b => b.type === 'tent' && tx >= b.x && tx < b.x + b.w && ty >= b.y && ty < b.y + b.h)) {   /* T21: Zeltwand aus Stoff statt Mauerquader */
+      P('#5e5040', X, Y, 16, 16); for (let k = 3; k < 16; k += 5) P('#4a3e30', X + k, Y, 1, 16);
+      if (!N) P('#7a6a50', X, Y, 16, 1); if (!Sd) { P('#3e3428', X, Y + 10, 16, 6); P('#2a2218', X, Y + 15, 16, 1); }
+      continue; }
     if (!N) P('#6a6258', X, Y, 16, 1);                    // Kantenlicht oben/links, Schatten rechts
     if (!Wd) P('#5e574d', X, Y, 1, 16);
     if (!E) P('#1e1b17', X + 15, Y, 1, 16);
@@ -1238,6 +1242,7 @@ function drawMageTower(e, now) {
   ctx.restore();
 }
 function drawPropPixel(e, now) {
+  if (e._tent) return;                                                   /* T21: steht als begehbares Zelt (HOUSES, Bild tentSprite) */
   if (e.type === 'mage_tower') return drawMageTower(e, now);             // S15 P6
   if (e.type === 'tower_gate') return;                                   // das Tor ist Teil des Turmbilds
   const PA = SP.PROP_ATLAS[e.type] && SP.atlasOn() && SP.atlasSprite(SP.PROP_ATLAS[e.type]);   // Stil F: Objekt aus dem Blatt, in seiner eigenen Größe

@@ -1112,6 +1112,22 @@ export const STIGMA = {
     bandit: { price:1,   deny:false, report:null,    greet:'„Ein Skelett mit Geld. Heute ist mein Glückstag.“' },
     undead: { price:0.9, deny:false, report:null,    greet:'„Willkommen, Stiller.“' },
   },
+  /* E44 (Entwickler 09.10., T15 V9): Messing. Sichtbar sind Roboterauge (immer) und Prothesen (Arme ohne Umhang/Handschuhe, Beine ohne Umhang/Beinzeug).
+     report 'inq' = der Orden notiert es ab min sichtbaren Teilen; spy = ab so vielen Teilen verweigert der Kanzler die Audienz (Spionverdacht). */
+  brass: {
+    order:  { price:1.25, deny:false, report:'inq', min:2, greet:'„Messing statt Fleisch. Das Licht sieht, was du ersetzt hast.“' },
+    valen:  { price:1.1,  deny:false, report:null, spy:2,  greet:'„Aurelisches Blech. Bist du einer von denen?“' },
+    chain:  { price:1.2,  deny:false, report:null,    greet:'„Omega schmiedet Fesseln, keine Arme.“' },
+    zwerge: { price:1.0,  deny:false, report:null,    greet:'„Aurelische Arbeit. Hält, bis sie bricht.“' },
+    aurel:  { price:0.85, deny:false, report:null,    greet:'„Gute Arbeit. Wer hat dich versorgt? Für Leute wie dich gibt es Nachlass.“' },
+    merch:  { price:1.1,  deny:false, report:null,    greet:'„Messing klappert beim Handeln. Das kostet extra.“' },
+    goblin: { price:1.0,  deny:false, report:null,    greet:'„Glänzt. Grubenhort mag, was glänzt.“' },
+    sea:    { price:1.1,  deny:false, report:null,    greet:'„Salzwasser frisst Messing. Und dich gleich mit.“' },
+    wuest:  { price:1.1,  deny:false, report:null,    greet:'„Die Sonne macht dein Blech heiß. Bleib im Schatten.“' },
+    frei:   { price:1.1,  deny:false, report:null,    greet:'„Hier misstraut man Blech. Und denen, die es tragen.“' },
+    bandit: { price:1.0,  deny:false, report:null,    greet:'„Schönes Blech. Bringt beim Hehler was.“' },
+    undead: { price:1.0,  deny:false, report:null,    greet:'„Halb Fleisch, halb Ding. Fast schon einer von uns.“' },
+  },
 };
 export const SKILL_BRANCHES = {
   combat:  { name:'Kampf', desc:'Wer vorne steht.' },
@@ -1517,11 +1533,11 @@ export const FAC_RES = {
     does: 'Valens Heere wachsen, solange die Städte der Krone Korn haben (über 10 Korn: +3 Stärke am Tag, sonst +1). Das Feldheer isst Nordfurts Weizen.',
     lever: 'Korn in eine Valen-Stadt liefern (Nordfurt zuerst) hilft der Krone. Wer Aurelions Gesandten Nordfurts Korn kaufen lässt, schwächt sie.',
     say: ['Valens Kornspeicher sind leer. Die Heere der Krone wachsen kaum noch — wer Korn nach Nordfurt bringt, ändert das.', 'Valens Speicher füllen sich wieder. Die Krone hebt Männer aus wie gewohnt.', 'Valens Speicher sind voll. Die Heere der Krone wachsen schnell.'] },
-  order:  { name: 'Eifer', unit: 'von 5', lt: 2, ge: 4, def: 0, max: 5, holdNodes: 4, holdEvery: 5, decay: 0.5, decayEvery: 10, crusadeWin: 1, crusadeLoss: 1, kammer: 1,
+  order:  { name: 'Eifer', unit: 'von 5', lt: 2, ge: 4, def: 0, max: 5, holdNodes: 4, holdEvery: 5, decay: 1, decayEvery: 5,   /* E48: kühlt schneller ab (vorher 0,5 je 10 Tage) */ crusadeWin: 1, crusadeLoss: 1, kammer: 1,
     does: 'Je mehr Eifer, desto öfter zieht der Kreuzzug (alle 12 − Eifer Tage) und desto sicherer siegt er. Ab Eifer 2 jagt die Inquisition Hexen, ab 3 reiten doppelte Streifen und Ordensheiler verlangen mehr, ab 4 überfällt der Orden Grubenhort fast sicher.',
-    lever: 'Eifer steigt mit verbrannten Hexen, gewonnenen Kreuzzügen und Land der Toten (4 Orte und mehr). Wer Angeklagte rettet, senkt ihn; ohne Anlass kühlt er alle 10 Tage ab.',
+    lever: 'Eifer steigt mit verbrannten Hexen, gewonnenen Kreuzzügen und Land der Toten (4 Orte und mehr). Wer Angeklagte rettet, senkt ihn; ohne Anlass kühlt er alle 5 Tage um eins ab.',
     say: ['Der Eifer des Ordens ist erkaltet. Keine Hexenjagd, Andachten statt Streifen — und der Händler in Lichtenrain gibt Weihwasser billiger.', 'Der Orden predigt wie gewohnt. Der Eifer hält sich.', 'Der Orden brennt vor Eifer: Der Kreuzzug zieht früher, Inquisitoren reiten doppelt, und Grubenhort ist in Gefahr. Wer Angeklagte rettet, kühlt ihn ab.'] },
-  undead: { name: 'Seelen', unit: '', lt: 21, ge: 120, def: 60, max: 200, start: [20, 5], node: 1, battle: 0.3, newArmy: 30, armyBase: 20, armyDiv: 5, armyMax: 50, fill: 1, host: 40, kammer: 30, crusade: 10, vial: 2, raidHalf: 0.5, vialLow: 1.5, vialHigh: 0.7,
+  undead: { name: 'Seelen', unit: '', lt: 21, ge: 120, def: 60, max: 200, start: [20, 5], node: 1, decay: 0.04,   /* E48: 4 % je Tag verwehen */ battle: 0.3, newArmy: 30, armyBase: 20, armyDiv: 5, armyMax: 50, fill: 1, host: 40, kammer: 30, crusade: 10, vial: 2, raidHalf: 0.5, vialLow: 1.5, vialHigh: 0.7,
     does: 'Seelen stellen neue Heere auf (30 Seelen je Heer, Stärke 20 + Seelen/5) und füllen die Besatzungen. Satte Gruft (120+): gemischte Heere, billige Phiolen. Leere Gruft (20 und weniger): kein neues Heer, halb so viele Dorfüberfälle.',
     lever: 'Jede Schlacht gibt den Toten Seelen — auch eine verlorene. Wer Dörfer hält, die Seelenkammer im Turm zerschlägt und Kreuzzüge gewinnt, lässt die Gruft hungern; wer den Toten dient, füttert sie (Überfälle, Erheben, Phiolen am Totentempel).',
     say: ['Die Gräber schweigen. Der Gruft fehlen Seelen — kein neues Heer steigt auf, die Besatzungen füllen sich nicht.', 'Die Gruft hat wieder genug Seelen, um neue Heere aufzustellen.', 'Die Gruft ist satt. Die Heere der Toten kommen gemischt — Schützen, Elite, Monster. Seelenphiolen werden billig.'] },

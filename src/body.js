@@ -49,6 +49,10 @@ export function syncHp(c) {
 }
 /* Anzeige-Leben (Balken, HUD, Gruppe, Ziel, Boss): Rumpf bei Figuren mit Körper, sonst hp/maxHp */
 export const barOf = c => c && c.barMax ? [c.barHp, c.barMax] : [c?.hp || 0, c?.maxHp || 1];
+/* Anzeige 09.10. (Entwickler: „die Trefferanzeige soll das gesamte Leben zeigen, nicht nur den Körper“): Summe aller Körperteile (Glieder
+   zählen mit, verlorene als leer). Liegt der Rumpf oder Kopf bei 0, ist der Balken leer — am Boden bzw. tot. barOf bleibt für die Spiellogik. */
+export const lifeOf = c => { if (!c?.body) return barOf(c); if (c.body.torso.hp <= 0 || c.body.head.hp <= 0) return [0, 1];
+  let h = 0, m = 0; for (const p of PARTS) { const P = c.body[p]; m += P.max; if (!P.lost) h += clamp(P.hp, 0, P.max); } return [h, m || 1]; };
 export const vital = c => c.body ? c.body.torso.hp : c.hp;            // > 0 heißt: nicht am Boden
 export const isDisabled = (c, p) => !!c.body && c.body[p].hp <= 0;
 // S14 (Nutzer): ohne Arme kein Hieb, ohne Beine kein Gehen — nur Kriechen
@@ -108,6 +112,7 @@ export function healPart(c, part, amount) {
 }
 // Verteilt Heilung auf die am schwersten verletzten Teile (für Tränke und Magie).
 export function heal(c, amount) {
+  if (c.lifeBlood != null) c.lifeBlood = Math.min(100, c.lifeBlood + amount * 0.5);   /* Blut (09.10.): Heilung bringt auch Blut zurück */
   if (!c.body) { c.hp = Math.min(c.maxHp, c.hp + amount); return; }
   for (let guard = 0; amount > 0.1 && guard < 12; guard++) {
     const p = c.body.torso.hp <= 0 ? 'torso' : worstPart(c, true); if (!p) break;   // wer am Boden liegt, braucht zuerst den Rumpf
@@ -116,7 +121,7 @@ export function heal(c, amount) {
   }
   syncHp(c);
 }
-export function fullHeal(c) { if (!c.body) { c.hp = c.maxHp; return; } for (const p of PARTS) if (!c.body[p].lost && !c.body[p].mech) c.body[p].hp = Math.max(c.body[p].hp, topOf(c.body[p])); syncHp(c); }   /* Behoben HB-16: Medizin heilt kein Messing */
+export function fullHeal(c) { delete c.lifeBlood;   /* Blut wieder voll */ if (!c.body) { c.hp = c.maxHp; return; } for (const p of PARTS) if (!c.body[p].lost && !c.body[p].mech) c.body[p].hp = Math.max(c.body[p].hp, topOf(c.body[p])); syncHp(c); }   /* Behoben HB-16: Medizin heilt kein Messing */
 // Roadmap P1 (Bionik-Qualität): Stufe 1 Schrott ist schlechter als ein echtes Glied, 2 Aurelion gleichwertig, 3 Meisterstück besser,
 // 4 Prototyp selten und am besten. wear = wie schnell sie sich abnutzt (×), name für Anzeige und Händler.
 export const MECH_Q = {
@@ -166,6 +171,10 @@ export const eyeCrit = c => eyeOf(c)?.crit || 0;
 export function attachEye(c, q) { c.eye = { q: Math.max(1, Math.min(4, q | 0)), cond: 100 }; c.lens = true; return c.eye; }
 export function wearEye(c, amt) { const E = c?.eye; if (!E?.q) return null; const was = E.cond ?? 100;
   E.cond = Math.max(0, was - amt * (EYE_Q[E.q] || EYE_Q[2]).wear); return { was, now: E.cond, broke: was >= 30 && E.cond < 30 }; }
+/* E44 (T15 V9): sichtbares Messing — Roboterauge immer; Arme, wenn weder Umhang noch Handschuhe sie decken; Beine, wenn weder Umhang noch Beinzeug */
+export function brassOf(c) { if (!c?.body) return 0; const E = c.equip || {}; let n = c.eye?.q ? 1 : 0;
+  for (const k of ['larm', 'rarm']) if (c.body[k]?.mech && !E.cloak && !E.hands) n++;
+  for (const k of ['lleg', 'rleg']) if (c.body[k]?.mech && !E.cloak && !E.legs) n++; return n; }
 /* Roadmap P4: alle Bionik-Teile einer Figur mit Zustand (Glieder mit mech und das Auge) — für Öl, Selbstwartung, Händler */
 export const bionicParts = c => [...['larm', 'rarm', 'lleg', 'rleg'].filter(k => c?.body?.[k]?.mech).map(k => ({ k, name: PART_NAME[k], cond: c.body[k].mechCond ?? 100 })), ...(c?.eye?.q ? [{ k: 'eye', name: 'Roboterauge', cond: c.eye.cond ?? 100 }] : [])];
 export function setBionicCond(c, k, v) { v = Math.max(0, Math.min(100, v)); if (k === 'eye') { if (c.eye) c.eye.cond = v; } else if (c.body?.[k]?.mech) c.body[k].mechCond = v; }
