@@ -12,13 +12,13 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
-import { ATLAS } from './ref5_atlas.js?v=28';
-import { ITEMS, RACES, FACTIONS } from './data.js?v=28';
-import { S as GS } from './state.js?v=28';   /* R4 Rangzeichen (09.10.): Fraktionsrang des Helden */   // Nutzer S13: Sprites aus dem Referenzblatt
-import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=28';
+import { ATLAS } from './ref5_atlas.js?v=29';
+import { ITEMS, RACES, FACTIONS } from './data.js?v=29';
+import { S as GS } from './state.js?v=29';   /* R4 Rangzeichen (09.10.): Fraktionsrang des Helden */   // Nutzer S13: Sprites aus dem Referenzblatt
+import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=29';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
-import { ATK_U } from './anim.js?v=28';   /* Kampfanimation Scheibe 1 */
-import { paintR, paintTuckR, paintBeastR, paintHorseNSR, paintPetNSR, paintFowlR, PET_NS_TYPES, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=28';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { ATK_U } from './anim.js?v=29';   /* Kampfanimation Scheibe 1 */
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, paintPetNSR, paintFowlR, PET_NS_TYPES, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=29';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
@@ -1006,8 +1006,7 @@ export function monsterSpec(e, m) {
     if (t === 'bandit_archer') s.quiver = 1;
     if (t === 'bounty_hunter') { s.hood = '#1e1c1a'; s.cloak = '#2a2622'; s.scarf = ''; s.strap = 1; s.quiver = 0;   // Kopfgeldjäger: schwarz; ab Stufe 3 (§72) Kettenhemd und Helm — sichtbar stärker
       if ((e.tier || 0) >= 3) { s.armor = 'chain'; s.armorCol = '#6a6a66'; s.hooded = 0; s.helm = 'nasal'; s.helmCol = '#7a7874'; } }
-    if (t === 'bandit_spear') { s.hooded = 0; s.helm = 'cap'; s.helmCol = '#5a4e40'; s.hood = '#4a3a26'; s.cloak = '#3e3222'; s.scarf = '#b8a070'; }   // Speerträger: Kappe statt Kapuze, helles Halstuch
-  } else if (t === 'sea_raider' || t === 'sea_harpooner' || t === 'whitebeard') {   // S14 Seevolk: Teerjacke, Kopftuch, Ohrring; Weißbart riesig mit weißem Bart
+    if (t === 'bandit_spear') { s.hooded = 0; s.helm = 'cap'; s.helmCol = '#5a4e40'; s.hood = '#4a3a26'; s.cloak = '#3e3222'; s.scarf = '#b8a070'; }   // Speerträger: Kappe statt Kapuze, helles Halstuch  } else if (t === 'sea_raider' || t === 'sea_harpooner' || t === 'whitebeard') {   // S14 Seevolk: Teerjacke, Kopftuch, Ohrring; Weißbart riesig mit weißem Bart
     Object.assign(s, { hooded: 0, armor: 'leather', armorCol: '#2c2a26', cloth: t === 'sea_harpooner' ? '#3a3a2c' : '#2c3a44', pants: '#3a3226', sash: '#8a2a20', strap: 1, helm: 'scarf', helmCol: ['#7a2a20', '#2a4a6a', '#6a5a2a'][(e.seed | 0) % 3], beard: (e.seed | 0) % 2 });
     if (t === 'sea_harpooner') Object.assign(s, { helm: 'hat', helmCol: '#2a2622', quiver: 0 });
     if (t === 'whitebeard') Object.assign(s, { bd: 'bullig', hv: 1, pb: 1, helm: 'hat', helmCol: '#141414', hair: '#e8e4dc', beard: 1, beardLong: 1, cloak: '#141c24', capeL: 1, armor: 'plate', armorCol: '#3a3e44', pauld: '#8a8a86', fur: '#d8d2c4', chn: 1, glove: '#4a3a2a' });

@@ -412,3 +412,4 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
 - **E48 Seelen/Eifer (T23):** sollen **langsamer** an den Deckel laufen (stärkeres Abklingen), damit Spielerhandlungen sichtbar wirken.
 - **E49 Aurelion nach Wohlstand:** soll **stärker wirken** — auch Wachen, Preise und Automaten-Streifen.
 - **E50 Kurzschluss:** das getroffene Glied versagt 1 s — Arm: kein Hieb/Block, Bein: stark verlangsamt; dazu doppelter Verschleiß.
+- **E51 T21 Zelte:** Leute in Zelten — ja, flüchtig (nachts ein Schläfer je Zelt, bezahlte Bande sitzt friedlich darin). Bandenbeute stehlen — ja, nachts ungesehen (halbe Beute als Ware, Bande wird feindlich, Hinterhalt).
