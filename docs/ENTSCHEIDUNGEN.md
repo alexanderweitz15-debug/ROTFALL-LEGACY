@@ -411,3 +411,4 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
 - **E47 Gesetze der Stillen:** gelten **nur in Vharnholm**.
 - **E48 Seelen/Eifer (T23):** sollen **langsamer** an den Deckel laufen (stärkeres Abklingen), damit Spielerhandlungen sichtbar wirken.
 - **E49 Aurelion nach Wohlstand:** soll **stärker wirken** — auch Wachen, Preise und Automaten-Streifen.
+- **E50 Kurzschluss:** das getroffene Glied versagt 1 s — Arm: kein Hieb/Block, Bein: stark verlangsamt; dazu doppelter Verschleiß.
