@@ -4174,3 +4174,11 @@ Befunde (alle ⚖, Entscheidung beim Entwickler):
 | 60/50 | 0 | 15 | 29 | 11 | 0 | 0 | 0 | 0 | 15 | 1 | 0 | 11 | 10 |
 
 **Befund:** Ab Stufe 30 sind untote Nahkämpfer (Skelett, Knochenritter, Todesritter, Ghul, Fleischgolem) und Mutanten 1-gegen-1 ohne Risiko (0 %). Was noch beißt: Fernkampf (Schützen, Nekromant, Geist) und Speer (Abstand). Frühspiel streut stark (Knochenritter/Golem töten Stufe 8, Goblinkrieger Stufe 8–15). Die Spec T24 verlangt Druck über Gruppengröße und Rollenmix statt Lebenspunkte — Entscheidung E52 offen.
+
+### Messung 09.10. — Schadensdeckel ×6 (E-A5)
+Faktoren in `resolveSwing` (game.js), die sich multiplizieren: kritisch ×1,8 (Waffen bis ×2,8: Leitwolfzahn), Heilig gegen Untote ×2,1, Hinrichten bis ×1,5 (unter 20–50 % Leben), roh gegen Ungepanzerte bis ×1,35, Messingarme bis ×1,42 (zwei Prototypen + Klingenhand), Hinterhalt ×3 von hinten (×1,5 von vorn), Meuchelstich des Hofspions ×3.
+- Gewöhnliche Treffer: ×1 bis ×2,8 (nur Krit) — weit unter dem Deckel.
+- Hinterhalt + Krit (Dolch von hinten): ×3 × 1,8 = 5,4 — knapp darunter; mit Krit-Waffe ×2,6–2,8: 7,8–8,4 → Deckel greift.
+- Kleriker/Paladin gegen Untote mit Krit und Hinrichten: ×2,1 × 2,8 × 1,5 ≈ 8,8 → Deckel greift.
+- Schlimmster Stapel ohne Hinterhalt ≈ 17, mit Hinterhalt/Meuchelstich > 100 — der Deckel kappt beides auf ×6.
+**Ergebnis:** Der Deckel ×6 trifft nur gestapelte Sonderfälle; Hinterhalt + gewöhnlicher Krit (×5,4) bleibt ungedeckelt. Empfehlung: so lassen.

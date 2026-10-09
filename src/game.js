@@ -2530,6 +2530,7 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
     faction: m.faction, boss: !!m.boss, ...opts,
   };
   if (!e.boss && (opts.level == null || opts.zone) && !map.startsWith('__')) e.level = zoneLevel(map, tx, ty, m);   // Phase 1: Gebietsspanne
+  if (ENDBOSSES.has(mtype) && !map.startsWith('__')) e.level = Math.max(e.level, (S.player?.level || 1) - 3);   /* E-A2 (Entwickler 09.10.): nur Endbosse wachsen mit — Stufe = max(fest, Held − 3) */
   e.maxHp = e.hp = Math.round(m.hp * (1 + Math.min(e.level, 30) * 0.04 + Math.max(0, e.level - 30) * 0.02) * BAL.hp * (bossScaled(e) ? BOSS.hp : 1));   /* E52: über Stufe 30 nur noch +2 % Leben je Stufe */ if (bossScaled(e)) e.bossV = 1;   // bossV: schon nach BOSS bemessen (Ladeprüfung)
   if (!e.boss && !opts.noVariant && !m.prey && !e.servant && !map.startsWith('__') && !S._quiet && Math.random() < 0.18) applyVariant(e, m);   // S13: Gegnervarianten (eigener Zufall: die Weltfolge bleibt stabil)
   if (HUMANOID.has(mtype)) { const b0 = pick(Object.keys(B.BUILDS)); e.build = m.build || b0; B.initBody(e, e.maxHp); }   // Menschenähnliche haben Trefferzonen   /* P3.20: Rolle legt den Körperbau fest (Zufall wird trotzdem gezogen — Folge bleibt) */
@@ -2673,6 +2674,7 @@ function zoneLevel(map, tx, ty, m) {
 /* E52 (Entwickler 09.10., T24): Spätspiel-Druck über Gruppen und Rollen statt Lebenspunkte — ab Heldenstufe 20/35/50 bringt eine Begegnung in
    Gebieten ab Gefahr 3 einen, zwei oder drei Begleiter mit Rolle (Schildträger, Schütze, Heiler) aus der eigenen Fraktion mit.
    E53: frühe Gebiete (Gefahr 1–2) bekommen statt Knochenritter, Fleischgolem und Goblinkrieger deren leichtere Verwandte. */
+const ENDBOSSES = new Set(['garmadon', 'omega', 'aldhelm', 'chain_master', 'whitebeard']);   /* E-A2: Endbosse der großen Geschichten (⚖ Auswahl) */
 const SCALE_STEPS = [[50, 3], [35, 2], [20, 1]], SCALE_ORDER = ['shield', 'ranged', 'heal'];
 const SCALE_ROLES = { undead: { shield: 'bone_knight', ranged: 'bone_archer', heal: 'necromancer' }, bandit: { shield: 'bandit_merc', ranged: 'bandit_archer', heal: 'bandit_medic' },
   goblin: { shield: 'goblin_warrior', ranged: 'goblin_archer', heal: 'goblin_shaman' }, chain: { shield: 'chain_brute', ranged: 'kettenschuetze' }, pirate: { shield: 'sea_raider', ranged: 'sea_harpooner' },
@@ -6342,7 +6344,7 @@ function updateNpc(e, dt) {
   }
   // Ordenswachen und der Pakt: ab Ruf −25 beim Orden erkennen sie einen Paktgebundenen und greifen an (Leine, Buße wie sonst;
   // danach misstrauisch statt sofort wieder zornig — sonst eine Endlosschleife aus Niederschlag und Aufrichten).
-  if (e.guard && !e.bondGuard && !S.bond && !S.jail && e.faction === 'order' && pactBound() && (S.factions.order || 0) <= -25 && !(e.wary > clock()) && p.alive && !p.downed && p.map === e.map && dist(e, p) < 220) {
+  if (e.guard && !e.bondGuard && !S.bond && !S.jail && e.faction === 'order' && orderShuns() && (S.factions.order || 0) <= -25 && !(e.wary > clock()) && p.alive && !p.downed && p.map === e.map && dist(e, p) < 220) {
     e.angry = true; e.brave = true; e.aggroId = p.id; e.sawPlayer = clock();
     log(`${e.name}: „Paktgebundener! Im Namen des Ordens — steh!“`, 'combat'); return;
   }
@@ -9409,7 +9411,7 @@ const boardShut = town => { const lord = townFac(town);
   if (DEAD_BOARD.has(town)) return deadWelcome() ? null : 'Knochentafeln in der Schrift der Stillen. Lesen und annehmen darf nur, wer zur Schar gehört: ein Rang bei den Toten (Garmadon in seiner Gruft, Sael in Vharnholm) oder der Pakt (Ysra in der Großen Nekropole).';   /* P5 A: Brett der Stillen; E40 S2: auch Beinhausen */
   if (town === 'deephall' && !S.flags.dwarfFriend) return 'Runen, die du nicht lesen sollst. Erst wenn der König dich als Freund der Halle anerkennt, hängt hier etwas für dich.';   /* 03.10.: wie der Handel der Zwerge */
   if (S.war?.nodes?.[town]?.owner === 'undead' || S.razed?.[town]) return 'Die Zettel sind abgerissen. Unter den Toten schreibt niemand Aushänge.';
-  if (repTier(lord)?.price === null || (lord === 'order' && pactBound())) return 'Jemand hat deinen Namen auf einen Zettel geschrieben und durchgestrichen. Für dich hängt hier nichts.';
+  if (repTier(lord)?.price === null || (lord === 'order' && orderShuns())) return 'Jemand hat deinen Namen auf einen Zettel geschrieben und durchgestrichen. Für dich hängt hier nichts.';
   return null; };
 /* Entwickler 03.10.2026: Tributdörfer (Grauwasser, Hohlstein, Eisenried) gehören sich selbst — Hilfe und Aufträge zählen für die Freien,
    vor und nach Vargs Fall. Verträge eines Tributoffiziers sind Kettengeschäft (C.fac = 'chain'). conFac: Fraktion eines Vertrags. */
@@ -9451,7 +9453,7 @@ const conReady = C => C.state === 'active' && (C.kind === 'supply' ? (S.res.wood
 function giverMark(npc) {
   if (!npc || npc.kind !== 'npc' || npc.alive === false || npc.downed || npc.hostile || npc.angry || npc.enc || npc.robot || S.party.includes(npc.id)) return null;
   if (stigmaOf(npc)?.deny && !npc.guard && npc.key !== 'aldis') return null;
-  if (pactBound() && npc.faction === 'order') return null;
+  if (orderShuns() && npc.faction === 'order') return null;
   for (const [k, H] of Object.entries(S.questHeir || {})) if ((npc.id === H.id || npc.key === H.key) && S.quests[k]?.state === 'active' && questComplete(k)) return { k: 'turnin' };   /* P3.x Nachfolger: Abgabe-Siegel beim Erben des Auftrags */
   let offer = false;
   for (const k of giverQuests(npc)) { const st = S.quests[k], Q = QUESTS[k];
@@ -16433,9 +16435,14 @@ function talk(npc) {
   if (npc.fleeing || npc.afraid > now) return npcShun(npc, '„Bleib weg von mir!“', 'angst');
   if (npc.threatId && byId(npc.threatId)?.alive) return npcShun(npc, '„Nicht jetzt — siehst du nicht, was hier los ist?!“', 'ausruf');
   if (npc.kind === 'npc' && !npc.robot) { if (rel >= 30) emote(npc, 'freude', 1400); else if (rel <= -20) emote(npc, 'zorn', 1400); }
-  if (pactBound() && npc.faction === 'order')                // Folge des Paktes: der Orden spricht nicht mit den Toten
+  if (orderShuns() && npc.faction === 'order')                // Folge des Paktes: der Orden spricht nicht mit den Toten
     return UI.dialogue(npc, npc.key === 'kelan' ? '„Ich habe Männer begraben, die ehrlicher gestorben sind, als du lebst. Geh.“'
-      : '„Weiche, Paktgebundener. Der Orden spricht nicht mit denen, die den Toten gehören.“', leave);
+      : '„Weiche, Paktgebundener. Der Orden spricht nicht mit denen, die den Toten gehören.“', [
+      ...(npc.key !== 'kelan' ? [{ text: `Ich will Sühne leisten. (${ATONE_COST} Gold für das Kloster)`, fn: () => {   /* E-A1 */
+        if (S.gold < ATONE_COST) return UI.dialogue(npc, '„Sühne kostet. Mehr, als du bei dir trägst.“', leave);
+        S.gold -= ATONE_COST; S.flags.pactAtoned = S.day | 0; S.factions.order = Math.max(S.factions.order || 0, -24); UI.refreshHUD();
+        log('Du leistest Sühne beim Orden. Der Pakt bleibt — aber der Orden spricht wieder mit dir, und der Weg zum Kleriker steht offen.', 'faction');
+        UI.dialogue(npc, '„Das Licht vergibt nicht. Aber es hört zu. Geh in Frieden — und vergiss nicht, was du bist.“', leave); } }] : []), ...leave]);
   const choices = [];
   // Quests des Gebers
   for (const [k, Q] of Object.entries(QUESTS)) {
@@ -18277,6 +18284,8 @@ function gradeTalk(npc) {
 const treeAbilities = c => Object.keys(c.tree || {}).map(k => SKILL_TREE[k]?.grants).filter(Boolean);   // aktive Talentknoten
 const titleFull = (c = S.player) => (c?.titleClasses || []).length >= MAX_TITLES;
 const pactBound = (c = S.player) => (c?.titleClasses || []).some(k => TITLE_CLASSES[k].faction === 'undead');
+const orderShuns = () => pactBound() && !S.flags.pactAtoned;   /* E-A1 (Entwickler 09.10.): nach der Sühne spricht der Orden wieder mit dir (Kleriker möglich) */
+const ATONE_COST = 250;   /* ⚖ */
 function unlockTitle(key, where) {
   const p = S.player, T = TITLE_CLASSES[key];
   p.titleClasses ||= [];
@@ -19750,6 +19759,7 @@ function graveTalk(t) {
 }
 function timeSkip(years) {
   const p = S.player, d = years * 60; S.legacy.skipGen = S.legacy.gen;
+  { const q0 = S._quiet; S._quiet = true; try { for (let i = 0; i < 20; i++) { S.day += d / 20; dayTick(); } } finally { S._quiet = q0; } S.day -= d; }   /* E-A4: die Welt läuft 20 Tagesschritte weiter (Kriege, Märkte, Fraktionen) */
   S.day += d; syncClock(); p.bornDay = (p.bornDay || S.day) - d;
   for (const c of [p, ...partyMembers()]) { c.age = (c.age || 25) + years;
     /* Fehlersuche §5e.10: woundDay() heilt Brüche je Kalendertag, aber dayTick() feuert beim Zeitsprung nur einmal —
@@ -19896,6 +19906,7 @@ function heirRules(old, c) {
   if (S.mount) S.mount.mut = Math.min(S.mount.mut ?? 50, 50);
   for (const m of partyMembers()) if (m !== c && !m.coopHero) { m.morale = clamp((m.morale ?? 50) - 15, 0, 100); if (m.friend && !m.kin && !m.childId && !m.spouse) m.friend = false; }
   S.gold = Math.floor(S.gold * 0.7);   /* Erbe: Gold, Lager, halber Ruf, Siedlung. Persönliche Waffen bleiben am Grab. */
+  if ((old.titleClasses || []).includes('monk') && (S.factions.bandit || 0) < 0) S.factions.bandit = Math.min(0, S.factions.bandit + 30);   /* E-A4 (Entwickler 09.10.): Rooks Feindschaft galt dem Mönch, sie endet mit seinem Tod */
   for (const f of Object.keys(S.factions)) S.factions[f] = Math.round(S.factions[f] * (S.factions[f] > 0 ? 0.5 : 0.8));   /* Audit 3.13: nur guter Ruf halbiert sich; Hass verblasst nur auf 80 % — der Tod ist keine Sühne */
 }
 function adoptSuccessor(c) {
@@ -21657,7 +21668,7 @@ export function simFight(mtype, o = {}) {
 /* ===== Welt-Benchmark (Entwickler 09.10., nur ?dev): Wie verläuft die Welt ohne den Spieler? =====
    RF.worldBench({ seeds, diffs, days }) legt je Weltsamen × Schwierigkeit ein NEUES Spiel an (newGame ohne Prolog), parkt den Helden weit weg
    in der Tiefe (p.map 'deep': nichts materialisiert vor Ort, kein Feldzug zählt ihn als Mitstreiter) und spult Tag um Tag vor wie update():
-   jede Spielminute die Sekunden-Haken von Feldzug und Überfall, alle 10 Minuten Tribut, Großereignis, Folgen und Aurelion, jede Stunde hourTick
+   jede Spielminute die Sekunden-Haken von Feldzug und Überfall, alle 30 Minuten Tribut, Großereignis, Folgen und Aurelion, jede Stunde hourTick
    (Kriegszug alle 6 Std., Weltereignis 10 %), jeden Tag dayTick (warDay mit capThreatDay, bigDay, keepSiegeDay …). S._quiet bleibt an (kein
    Speichern, keine Karten); S._bench schaltet Weltereignisse, Folgen (afterLive) und Ortsherren trotzdem ein; S._sink zählt Protokoll und
    Chronik mit. Der Stand im Speicher ist danach eine Testwelt: bis zum Neuladen sperrt die Bank das Schreiben aller rotfall.*-Schlüssel.
@@ -21703,13 +21714,15 @@ function benchRecord(R) {
 export function benchDays(n, R, light = false) {
   for (let i = 0; i < n; i++) {
     if (light) { for (let k = 0; k < 4; k++) SIM.warTick(); S.day++; keepSiegeDay(); SIM.warDay(); }
-    else for (let m = 0; m < 1440; m++) {   /* wie update(): Minute, Stunde, Tag */
+    else for (let m = 0; m < 1440; m++) {   /* wie update(): Minute, Stunde, Tag; R.ms misst die Rechenzeit je Teil */
       S.minute += 1; if (S.minute >= 1440) { S.minute -= 1440; S.day++; }
-      const C = S.campaign; if (C && C.phase !== 'done' && C.phase !== 'rat') campTick(); if (S.deadRaid) raidTick();
-      if (m % 10 === 0) { tribTick(); chainTick(); bigSecond(); afterSecond(); aurelTick(); }
-      const h = Math.floor(S.minute / 60); if (h !== lastHour) { lastHour = h; hourTick(h); }
-      if (S.day !== lastDay) { lastDay = S.day; dayTick(); }
+      const T = R && (R.ms ||= { min: 0, ten: 0, hour: 0, day: 0 }); let t = performance.now(); const lap = k => { if (T) { const n = performance.now(); T[k] += n - t; t = n; } };
+      const C = S.campaign; if (C && C.phase !== 'done' && C.phase !== 'rat') campTick(); if (S.deadRaid) raidTick(); lap('min');
+      if (m % 30 === 0) { tribTick(); chainTick(); bigSecond(); afterSecond(); aurelTick(); lap('ten'); }   /* im Spiel jede Sekunde; hier alle 30 Spielminuten (Rechenzeit) */
+      const h = Math.floor(S.minute / 60); if (h !== lastHour) { lastHour = h; hourTick(h); lap('hour'); }
+      if (S.day !== lastDay) { lastDay = S.day; dayTick(); lap('day'); }
     }
+    if (!light) { S.fx = []; S.floats = []; }   /* ohne update() verfallen Effekte nie — sie würden sich nur stapeln */
     if (R) benchRecord(R);
   }
   return R;
@@ -21746,7 +21759,7 @@ function benchSummary(runs) {
   return out;
 }
 export function worldBench(o = {}) {
-  const { seeds = [11, 23, 37, 41, 59, 73], diffs = ['schwer', 'sehr_schwer'], days = 250, slice = 350 } = o;
+  const { seeds = [11, 23, 37, 41, 59, 73], diffs = ['schwer', 'sehr_schwer'], days = 250, slice = 350, manual = false } = o;   /* manual: kein Zeitgeber — B.step() selbst rufen (Hintergrund-Tabs drosseln setTimeout) */
   if (window.__bench && !window.__bench.done) return window.__bench;   /* läuft schon */
   benchLock();
   const B = window.__bench = { opts: { seeds, diffs, days }, todo: diffs.flatMap(diff => seeds.map(seed => ({ seed, diff }))), runs: [], cur: null, done: false, t0: Date.now(), status: 'startet' };
@@ -21760,9 +21773,9 @@ export function worldBench(o = {}) {
       B.status = `Welt ${B.runs.length + 1}/${B.runs.length + 1 + B.todo.length} (Samen ${R.seed}, ${R.diff}): Tag ${R.days}/${days}`;
       if (R.days >= days) { benchFinish(R); B.runs.push(R); B.cur = null; }
     } catch (err) { console.error(err); B.errors = [...(B.errors || []), String(err?.stack || err)]; if (B.cur) { B.cur.error = String(err); benchFinish(B.cur); B.runs.push(B.cur); B.cur = null; } }
-    setTimeout(step, 0);
+    if (!manual) setTimeout(step, 0);
   };
-  setTimeout(step, 0); return B;
+  B.step = step; if (!manual) setTimeout(step, 0); return B;
 }
 export function selftest() {
   const fame0 =structuredClone(S.fame || null), anom0 = S.anomaly || null, after0 = structuredClone({ a: S.after ?? null, r: S.resettle ?? null });   /* Folgen §5c: S.after bleibt vom Test unberührt */   // S15: Ruhm und Anomalie bleiben vom Test unberührt
@@ -23485,6 +23498,15 @@ export function selftest() {
       const res = { none, two, swap, hp }; if (!Object.values(res).every(Boolean)) console.warn('E52-Probe', JSON.stringify(res));
       return Object.values(res).every(Boolean);
     } finally { S.ents.world = W0; p.level = lv; S.flags.scaleHint = fl; }
+  })());
+  ok('Audit-Entscheidungen 09.10.: E-A2 Endbosse wachsen mit (Held − 3), andere Bosse nicht; E-A1 Sühne hebt die Ordenssperre des Paktgebundenen', (() => {
+    const W0 = S.ents.world, p = S.player, lv = p.level, tc = p.titleClasses, at = S.flags.pactAtoned; S.ents.world = W0.slice();
+    try {
+      p.level = 45; const g = spawnEnemy('garmadon', 'world', 10, 10, { level: 18 }), h = spawnEnemy('hrodvar', 'world', 12, 10, { level: 11 }); const grow = g.level === 42 && h.level === 11;
+      p.titleClasses = ['necromancer']; delete S.flags.pactAtoned; const shun = orderShuns(); S.flags.pactAtoned = 1; const atone = !orderShuns() && pactBound();
+      const res = { grow, shun, atone }; if (!Object.values(res).every(Boolean)) console.warn('Audit-Probe', JSON.stringify(res), g.level, h.level);
+      return Object.values(res).every(Boolean);
+    } finally { S.ents.world = W0; p.level = lv; p.titleClasses = tc; if (at == null) delete S.flags.pactAtoned; else S.flags.pactAtoned = at; }
   })());
   ok('E41 Nachwachsen (09.10.): Stumpf wird nach 10 Tagen wieder ein fester Baum, vorher nicht, nie im Bild oder unter dem Helden', sandbox(() => {
     const p = stage(), d = S.day | 0, mk = (x, y, age) => { const s = { id: uid(), kind: 'prop', type: 'stump', map: '__a', x, y, r: 8, solid: false, stumpDay: d - age }; S.ents.__a.push(s); return s; };
