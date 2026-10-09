@@ -1544,10 +1544,11 @@ function planRelations() {
     list.sort((a, b) => (a.id < b.id ? -1 : 1));
     const L = list.length; if (L < 3) continue;
     list.forEach((c, i) => {
-      const f = list[(i + 1 + (c.plan.n % 3)) % L], rv = list.filter(o => o !== c && o !== f && o.homeId !== c.homeId);
-      c.rel = { friend: f.id, rival: rv.length && c.plan.n % 4 === 0 ? rv[(c.plan.n >> 2) % rv.length].id : null };   // jeder Vierte hat einen Rivalen
+      const pn = c.plan?.n ?? i;   /* Benchmark-Fund 09.10.: Zugezogene (emigrate/settleIn) haben noch keinen Plan — vorher brach hier der ganze Tageslauf ab */
+      const f = list[(i + 1 + (pn % 3)) % L], rv = list.filter(o => o !== c && o !== f && o.homeId !== c.homeId);
+      c.rel = { friend: f.id, rival: rv.length && pn % 4 === 0 ? rv[(pn >> 2) % rv.length].id : null };   // jeder Vierte hat einen Rivalen
     });
-    for (const c of list) if (c.rel.rival) { const o = list.find(x => x.id === c.rel.rival); o.rel.foe = c.id; }   // Abneigung ist gegenseitig
+    for (const c of list) if (c.rel?.rival) { const o = list.find(x => x.id === c.rel.rival); if (o?.rel) o.rel.foe = c.id; }   // Abneigung ist gegenseitig
   }
 }
 // §41 Stufe 2: je Stadt ein Jäger (bestehende Stände: ein Tagelöhner oder Holzfäller wird es) — Jagdgebiet = nächste Wildnis.
@@ -19757,9 +19758,9 @@ function graveTalk(t) {
     { text: 'Das Epitaph lesen', fn: () => UI.dialogue(p, t.epitaph.replace(/<br>/g, '\n'), [{ text: 'Weiter', fn: () => graveTalk(t) }]) },
     { text: `Epilog: Was von ${rec.name} bleibt`, fn: () => { rec.heard = true; UI.dialogue(p, epilogText(rec), [{ text: 'Weiter', fn: after }]); } }, ...leave]);
 }
-function timeSkip(years) {
+function timeSkip(years, o = {}) {   /* o.world === false: ohne Weltlauf (Probe) */
   const p = S.player, d = years * 60; S.legacy.skipGen = S.legacy.gen;
-  { const q0 = S._quiet; S._quiet = true; try { for (let i = 0; i < 20; i++) { S.day += d / 20; dayTick(); } } finally { S._quiet = q0; } S.day -= d; }   /* E-A4: die Welt läuft 20 Tagesschritte weiter (Kriege, Märkte, Fraktionen) */
+  if (o.world !== false) { const q0 = S._quiet; S._quiet = true; try { for (let i = 0; i < 20; i++) { S.day += d / 20; dayTick(); } } finally { S._quiet = q0; } S.day -= d; }   /* E-A4: die Welt läuft 20 Tagesschritte weiter (Kriege, Märkte, Fraktionen) */
   S.day += d; syncClock(); p.bornDay = (p.bornDay || S.day) - d;
   for (const c of [p, ...partyMembers()]) { c.age = (c.age || 25) + years;
     /* Fehlersuche §5e.10: woundDay() heilt Brüche je Kalendertag, aber dayTick() feuert beim Zeitsprung nur einmal —
@@ -21718,9 +21719,10 @@ export function benchDays(n, R, light = false) {
       S.minute += 1; if (S.minute >= 1440) { S.minute -= 1440; S.day++; }
       const T = R && (R.ms ||= { min: 0, ten: 0, hour: 0, day: 0 }); let t = performance.now(); const lap = k => { if (T) { const n = performance.now(); T[k] += n - t; t = n; } };
       const C = S.campaign; if (C && C.phase !== 'done' && C.phase !== 'rat') campTick(); if (S.deadRaid) raidTick(); lap('min');
-      if (m % 30 === 0) { tribTick(); chainTick(); bigSecond(); afterSecond(); aurelTick(); lap('ten'); }   /* im Spiel jede Sekunde; hier alle 30 Spielminuten (Rechenzeit) */
-      const h = Math.floor(S.minute / 60); if (h !== lastHour) { lastHour = h; hourTick(h); lap('hour'); }
-      if (S.day !== lastDay) { lastDay = S.day; dayTick(); lap('day'); }
+      if (m % 30 === 0) { SIM.pumpRoads(4); tribTick(); chainTick(); bigSecond(); afterSecond(); aurelTick(); lap('ten'); }   /* pumpRoads wie roadTick: sonst bleiben Wegsuchen der Reisenden ewig offen */   /* im Spiel jede Sekunde; hier alle 30 Spielminuten (Rechenzeit) */
+      const h = Math.floor(S.minute / 60), safe = fn => { try { fn(); } catch (err) { if (!R) throw err; const k = String(err?.message || err).slice(0, 80); (R.errs ||= {})[k] = (R.errs[k] || 0) + 1; if (!R.errAt) R.errAt = `${S.day | 0}: ${String(err?.stack || err).split('\n').slice(0, 4).join(' / ')}`; } };   /* wie loop(): ein Fehler bricht nur den Takt ab, die Welt läuft weiter (gezählt in R.errs) */
+      if (h !== lastHour) { lastHour = h; safe(() => hourTick(h)); lap('hour'); }
+      if (S.day !== lastDay) { lastDay = S.day; safe(dayTick); lap('day'); }
     }
     if (!light) { S.fx = []; S.floats = []; }   /* ohne update() verfallen Effekte nie — sie würden sich nur stapeln */
     if (R) benchRecord(R);
@@ -23507,6 +23509,10 @@ export function selftest() {
       const res = { grow, shun, atone }; if (!Object.values(res).every(Boolean)) console.warn('Audit-Probe', JSON.stringify(res), g.level, h.level);
       return Object.values(res).every(Boolean);
     } finally { S.ents.world = W0; p.level = lv; p.titleClasses = tc; if (at == null) delete S.flags.pactAtoned; else S.flags.pactAtoned = at; }
+  })());
+  ok('Fund 09.10.: planRelations übersteht Bewohner ohne Tagesplan (Zugezogene) — der Tageslauf bricht nicht mehr ab', (() => {
+    const t = Object.keys(TOWN_PLAN).find(k => VILLAGERS.filter(c => c.homeTown === k).length >= 3); if (!t) return true; const c = VILLAGERS.find(x => x.homeTown === t), pl = c.plan, rl = c.rel;
+    try { c.plan = undefined; planRelations(); return !!c.rel; } catch (e) { console.error(e); return false; } finally { c.plan = pl; planRelations(); if (!rl) delete c.rel; }
   })());
   ok('E41 Nachwachsen (09.10.): Stumpf wird nach 10 Tagen wieder ein fester Baum, vorher nicht, nie im Bild oder unter dem Helden', sandbox(() => {
     const p = stage(), d = S.day | 0, mk = (x, y, age) => { const s = { id: uid(), kind: 'prop', type: 'stump', map: '__a', x, y, r: 8, solid: false, stumpDay: d - age }; S.ents.__a.push(s); return s; };
@@ -26597,7 +26603,7 @@ export function selftest() {
     try { S.legacy.deeds = []; S.flags.garmadonSlain = 1; const a = newDeeds(), b = newDeeds(); const once = a.length === 1 && b.length === 0;
       const txt = epilogText({ name: 'Ahn', year: 20, location: 'Eren', cause: 'Pfeil', level: 12, gen: 1, fame: 70, deeds: a, fac: { valen: 50, order: -50 }, family: 'Brenna', settlements: 1 });
       const says = /Garmadon/.test(txt) && /singt man/.test(txt) && /ehrte/.test(txt) && /verflucht/.test(txt) && /Brenna/.test(txt);
-      p.age = 30; const lv = p.level; timeSkip(20); const aged = p.age === 50 && S.day === d0 + 1200 && p.level > lv && S.legacy.skipGen === S.legacy.gen;
+      p.age = 30; const lv = p.level; timeSkip(20, { world: false }); const aged = p.age === 50 && S.day === d0 + 1200 && p.level > lv && S.legacy.skipGen === S.legacy.gen;
       return once && says && aged;
     } finally { S.flags = f0; S.legacy = lg; S.day = d0; S.bands = b0; S.contracts = c0; syncClock(); }
   }));
