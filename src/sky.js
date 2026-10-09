@@ -3,8 +3,8 @@
 // Kampf, Magie, Überleben), je Klasse eins, je Titelklasse eins, dazu das Sternbild der Gefährten. Sterne = Knoten aus
 // SKILL_TREE (Lage: n.sky, n.pos aus data.js). Zustände und Lernen kommen aus game.js (A.nodeState, A.learnNode …) — diese Datei
 // zeichnet nur. Der Himmel läuft in einem eigenen Canvas im Fenster, nicht in der Spielschleife; er hält an, sobald das Fenster zu ist.
-import { S, partyMembers } from './state.js?v=26';
-import { SKILL_TREE, SKILL_BRANCHES, SKIES, CLASSES } from './data.js?v=26';
+import { S, partyMembers } from './state.js?v=27';
+import { SKILL_TREE, SKILL_BRANCHES, SKIES, CLASSES } from './data.js?v=27';
 
 const TYPE = { keystone: 'Schlüsselstern', notable: 'Merkmal', active: 'Aktive Fähigkeit', '': 'Talent' };
 const STX = { learned: 'gelernt', open: 'lernbar', locked: 'gesperrt', sealed: 'versiegelt', barred: 'ausgeschlossen' };

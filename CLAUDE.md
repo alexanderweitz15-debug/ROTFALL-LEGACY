@@ -42,7 +42,7 @@ There is no linter. After editing a file, at least parse-check it (e.g. with aco
 - **Line endings differ per file:** `buildings.js`, `data.js`, `sim.js`, `sky.js` and `docs/ROADMAP_ZENTRAL.md` are CRLF; all other source files (including `game.js`) are LF. Edit byte-exact; never let a tool (e.g. Git-Bash `sed -i`) rewrite a whole file's line endings. The Edit tool inserts LF, so use a byte-exact script for the CRLF files.
 - **RNG split:** game logic draws from the seeded `rnd()` (state.js); visuals use `vrnd` (Math.random). New `rnd()` calls shift random-dependent probes.
 - **Save format RFZ1** (gzip, 15 bit per char) since 01.10.; old JSON saves still load (`unpackAll` before `boot()`, then `loadRaw`).
-- **Cache key:** every import and `index.html` use `?v=N` (currently `v=25`). When shipping, bump it everywhere (index.html + all `import … from './x.js?v=N'` + `import('./coop.js?v=N')`), plus the visible version label in `index.html`. `src/coop.js` also has `VER`, which must match.
+- **Cache key:** every import and `index.html` use `?v=N` (currently `v=27`). When shipping, bump it everywhere (index.html + all `import … from './x.js?v=N'` + `import('./coop.js?v=N')`), plus the visible version label in `index.html`. `src/coop.js` also has `VER`, which must match.
 - New save fields must tolerate being missing (old saves). Migrations go into `continueGame()` / the `ensure*()` functions it calls.
 - Keep world generation deterministic: `world.js` uses the seeded `rnd()` from state.js; adding RNG calls there shifts the whole world.
 - Every new mechanic needs an in-game hint for the player (log, toast, tooltip or dialogue) and a debug entry. Also add it to `docs/MECHANIKEN.md`.

@@ -1,14 +1,14 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
-import { S, clamp, seasonOf } from './state.js?v=26';
-import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=26';
-import * as HB from './buildings.js?v=26';
-import { ITEMS, MONSTERS, FACTIONS, NPCS } from './data.js?v=26';
-import { buildOf, crawling, lightR, eyeOf } from './body.js?v=26';
-import * as SP from './sprites.js?v=26';
-import { trailPt, WAGON_GAP } from './sim.js?v=26';
-import { ICON_R } from './iconsR.js?v=26';
-import { airPos, airPt } from './economy.js?v=26';
-import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance, HIT_RX } from './anim.js?v=26';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { S, clamp, seasonOf } from './state.js?v=27';
+import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=27';
+import * as HB from './buildings.js?v=27';
+import { ITEMS, MONSTERS, FACTIONS, NPCS } from './data.js?v=27';
+import { buildOf, crawling, lightR, eyeOf } from './body.js?v=27';
+import * as SP from './sprites.js?v=27';
+import { trailPt, WAGON_GAP } from './sim.js?v=27';
+import { ICON_R } from './iconsR.js?v=27';
+import { airPos, airPt } from './economy.js?v=27';
+import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance, HIT_RX } from './anim.js?v=27';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -2922,7 +2922,7 @@ function drawBaked(key, e, box, fn) {
    Nur Anzeige: dieselben Regeln wie canPlace/tryPlace in game.js (feste Kachel, fremder Bau im Feld, Abstand > 400). */
 const PLACE_RANGE = 400;
 let BLDICO = null, bldImgs = {};
-import('./icons.js?v=26').then(m => { BLDICO = m; }).catch(() => {});
+import('./icons.js?v=27').then(m => { BLDICO = m; }).catch(() => {});
 function bldImage(type) {
   if (!BLDICO?.bldURL) return null;
   let im = bldImgs[type];

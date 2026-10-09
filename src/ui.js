@@ -1,18 +1,18 @@
 // Oberfläche: Panels, Modale, Dialog, Chronik. Spiel-Logik hängt über bind() dran.
-import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=26';
-import * as CS from './cloudsave.js?v=26';
-import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=26';
-import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf, EMOTE, NEAR_SAY } from './render.js?v=26';
-import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=26';
-import { wearOf } from './buildings.js?v=26';
-import * as SP from './sprites.js?v=26';   /* Bestiarium: Gegnerbilder */
-import { townState, townPrice } from './sim.js?v=26';
-import { GOODS } from './data.js?v=26';
-import { target as ecoTarget } from './economy.js?v=26';
-import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q, barOf } from './body.js?v=26';
-import { sfx, ambience } from './sfx.js?v=26';
-import * as SKY from './sky.js?v=26';   /* Klassen und Talente, Scheibe 2: Sternenhimmel */
-import * as ATL from './atlas.js?v=26';   /* Karte Scheibe 1: Ortskarte-Panel bekommt das gezeichnete Ortssymbol (drawLocIcon) */
+import { S, onLog, timeStr, year, partyMembers, byId, clamp, dist, seasonOf, SEASONS, SAVE_KEY, saveData, readRaw } from './state.js?v=27';
+import * as CS from './cloudsave.js?v=27';
+import { ITEMS, RARITY, RARITY_VALUE, ARMOR_SETS, AFFIXES, LEGENDS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, MONSTERS, MEMORY_TEXT, QUESTS, SKILL_NAMES, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES } from './data.js?v=27';
+import { drawPortraitTo, drawItemIconTo, drawFigureTo, cam, mountPalOf, EMOTE, NEAR_SAY } from './render.js?v=27';
+import { LOCATIONS, locAt, nearestLocations, TS, MAPS, TOWN_PLAN, townAt, DUNGEONS, HOUSES } from './world.js?v=27';
+import { wearOf } from './buildings.js?v=27';
+import * as SP from './sprites.js?v=27';   /* Bestiarium: Gegnerbilder */
+import { townState, townPrice } from './sim.js?v=27';
+import { GOODS } from './data.js?v=27';
+import { target as ecoTarget } from './economy.js?v=27';
+import { PARTS, PART_NAME, partState, buildOf, BUILDS, MECH_Q, MECH_MOD, EYE_Q, barOf } from './body.js?v=27';
+import { sfx, ambience } from './sfx.js?v=27';
+import * as SKY from './sky.js?v=27';   /* Klassen und Talente, Scheibe 2: Sternenhimmel */
+import * as ATL from './atlas.js?v=27';   /* Karte Scheibe 1: Ortskarte-Panel bekommt das gezeichnete Ortssymbol (drawLocIcon) */
 
 export let A = {};
 // Wettersymbole: eigene Strichzeichnungen, eine Linienstärke
@@ -47,7 +47,7 @@ const SUBTAB = { settlement: 'Lager (B)', business: 'Betriebe', character: 'Wert
 let ICO = null;
 const pico = (k, s = 2) => { try { return ICO?.iconURL?.(k, s) || ''; } catch (e) { return ''; } };
 const icoImg = (k, s = 2, cls = 'ico') => { const u = pico(k, s); return u ? `<img class="${cls}" src="${u}" alt="">` : ''; };
-function loadIcons() { import('./icons.js?v=26').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
+function loadIcons() { import('./icons.js?v=27').then(m => { ICO = m; paintNav(); iconCss(); HUD_LAST.clear(); renderLog(); }).catch(() => {}); }
 function paintNav() {
   for (const b of $('nav')?.children || []) { const G = NAV.find(n => n[0] === b.dataset.g); if (!G) continue; const u = pico('nav_' + G[0], 3);
     b.innerHTML = (u ? `<img class="navico" src="${u}" alt="">` : '') + `<span class="navlbl">${NAV_SHORT[G[0]] || G[1]}</span>` + (G[2] ? `<i>${G[2]}</i>` : '') + '<b class="dot"></b>'; }   /* Entwickler: größere Symbole, Beschriftung darunter */
@@ -334,7 +334,7 @@ function stableUI(body, npc) {
       <b>${H.name}</b><div class="ledger">Tempo ${Math.round(H.tempo * 100)} %${bar(H.tempo - 0.85, 0.4, '#c9a45a')}Ausdauer ${H.staminaMax}${bar(H.staminaMax, 160, '#7fae6e')}Mut ${H.mut}${H.mut >= 70 ? ' (kommt im Kampf)' : ''}${bar(H.mut, 100, '#b86a4a')}</div>
       <div class="ctx-actions"><button data-buy="${H.id}">${cur ? `Eintauschen — ${Math.max(0, H.price - credit)} Gold` : `Kaufen — ${H.price} Gold`}</button></div></div>`).join('')}</div>`;
   // Pferde-Überarbeitung (02.10.2026): echte Fellfarbe (H.coat) statt zufälliger Namenslänge — das Porträt zeigt dasselbe Pferd wie draußen im Spiel.
-  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=26').then(SP => { const f = SP.beastFrame('horse', mountPalOf(H.kind, H.coat), 'W', '', 1);
+  for (const H of offers) { const cv = body.querySelector(`[data-h="${H.id}"]`); if (!cv) continue; import('./sprites.js?v=27').then(SP => { const f = SP.beastFrame('horse', mountPalOf(H.kind, H.coat), 'W', '', 1);
     const c = cv.getContext('2d'); c.imageSmoothingEnabled = false; c.drawImage(f, (150 - f.width * 2.4) / 2, 100 - f.height * 2.4, f.width * 2.4, f.height * 2.4); }); }
   body.querySelectorAll('[data-buy]').forEach(b => b.onclick = () => { if (A.buyHorse(npc, b.dataset.buy)) closeModal(); else stableUI(body, npc); });
 }
@@ -932,6 +932,7 @@ const INV_SORT = [['found', 'Fund'], ['cat', 'Art'], ['rar', 'Seltenheit'], ['va
 const FIG_DIRS = ['S', 'W', 'N', 'E'];
 let invSel = null, invFilter = 'all', figDir = 0, figPrev = null, figT = 0, invTimer = 0, DRAG = null, moreOpen = false;
 const icoTag = (k, s = 1, cls = 'kpi-ico') => icoImg(k, s, cls);
+export const paintItemIcons = root => paintIcons(root);   /* Debug-Gegenstandsbrowser (09.10.) */
 function paintIcons(root) { root?.querySelectorAll?.('canvas[data-ico]').forEach(cv => drawItemIconTo(cv, cv.dataset.ico)); root?.querySelectorAll?.('canvas[data-skbr]').forEach(cv => drawSkillIconTo(cv, cv.dataset.skbr, cv.dataset.sktype)); }
 function chipBar(box, list, cur, on) {
   if (!box) return;

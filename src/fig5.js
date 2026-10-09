@@ -8,8 +8,8 @@
 // Metall getrennt schattiert; Details nur in Clustern (kein Einzelpixel-Rauschen).
 // Arme gehören zum Bild: Waffenhand (und zweite Hand) folgen derselben Schwungkurve wie im Renderer (armPlan), der
 // Renderer setzt nur noch die Waffe an die Hand. Jede Kombination wird einmal gemalt und in sprites.js gecacht.
-import { mix } from './sprites.js?v=26';
-import { atkShape, legacySw, atkBody, atkStance } from './anim.js?v=26';   /* Kampfanimation Scheibe 1; Ganzkörperpose */
+import { mix } from './sprites.js?v=27';
+import { atkShape, legacySw, atkBody, atkStance } from './anim.js?v=27';   /* Kampfanimation Scheibe 1; Ganzkörperpose */
 
 // S14c: Rahmen 40 breit (Nutzer: Schulterplatten und Rüstung brauchen Platz); gemalt wird weiter in 32er-Koordinaten, Px verschiebt um DX
 export const RW = 40, RH = 56, ROX = 20, ROY = 53, RPX = 1.25, DX = 4, DY = 6;   // S15: 6 Zeilen Kopffreiheit (Hörner, Geweih, Dornenkrone, Flammen)

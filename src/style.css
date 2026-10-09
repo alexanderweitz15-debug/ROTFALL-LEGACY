@@ -1189,3 +1189,53 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 #game{grid-template-rows:calc(64px*var(--ts)) 1fr calc(130px*var(--ts))}
 #bottombar{grid-template-columns:1fr calc(430px*var(--ts))}
 #topbar,#leftpanel,#rightpanel,#logwrap,#hotbar,#dialogue,#modal,#toast,#tutor,#prompt,#prologPanel,#nameCard,.creation-grid,#deathscreen,#successor{zoom:var(--ts)}
+
+/* Debug-GUI kompakt (Entwickler 09.10.: „kompakter, kleiner, übersichtlicher“) */
+#debugpanel.dbg-gui{width:min(860px,94vw);height:min(600px,82vh);font-size:11.5px}
+.dbg-head{padding:6px 8px;gap:8px}
+#dbg-search{padding:4px 8px;font-size:12px}
+#dbg-close{width:28px;height:26px}
+#dbg-nav{width:150px;padding:5px;gap:2px}
+#dbg-nav button{padding:4px 6px;font-size:11px;line-height:1.2}
+#dbg-main{padding:6px;gap:6px}
+.dbg-card{padding:5px 7px}
+.dbg-card h4{margin:0 0 4px;font-size:12px;cursor:pointer;user-select:none}
+.dbg-card h4::before{content:"▾ ";opacity:.6}
+.dbg-card h4 small{opacity:.5;font-weight:normal}
+.dbg-card.shut h4::before{content:"▸ "}
+.dbg-card.shut .dbg-grid,.dbg-card.shut .dbg-in{display:none}
+.dbg-card .dbg-in{gap:4px;margin-bottom:5px}
+.dbg-card .dbg-in select,.dbg-card .dbg-in input{padding:2px 4px;font-size:11px;max-width:180px}
+.dbg-grid{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:3px}
+#debugpanel .dbg-btn{padding:3px 6px;font-size:11px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dbg-sub{grid-column:1/-1;font-size:10.5px;color:#a8884e;letter-spacing:.05em;text-transform:uppercase;margin:4px 0 0;border-bottom:1px solid #2a2117}
+.dbg-foot{padding:4px 8px;font-size:11px;gap:4px}
+.dbg-foot + .dbg-foot{border-top:0;padding-top:0}
+#debugpanel .dbg-chip{padding:2px 6px;font-size:10.5px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#debugpanel .dbg-chip.fav{border-color:#8a6a34}
+/* Gegenstands-Browser */
+#dbg-items{flex:1;display:flex;flex-direction:column;min-width:0;min-height:0;padding:6px;gap:6px}
+.dbi-top{display:flex;flex-direction:column;gap:4px}
+.dbi-cats,.dbi-subs,.dbi-rars{display:flex;flex-wrap:wrap;gap:3px}
+.dbi-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.dbi-q{flex:1;min-width:140px;background:#0c0906;border:1px solid #3a3024;color:#e8dcb8;padding:3px 6px;font-size:11.5px}
+.dbi-n select{background:#0c0906;border:1px solid #3a3024;color:#e8dcb8;font-size:11px}
+#debugpanel .dbi-chip{display:inline-block;width:auto;margin:0;padding:3px 8px;font-size:11px;background:#1b150e;border:1px solid #33291e;color:#d8caa6;cursor:pointer}
+#debugpanel .dbi-chip.sm{padding:2px 6px;font-size:10.5px}
+#debugpanel .dbi-chip.on{background:#3a2a16;border-color:#a8843e;color:#f3e2b4}
+.dbi-chip small{opacity:.55}
+.dbi-grid{flex:1;overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:3px;align-content:start}
+.dbi-tile{display:flex;gap:6px;align-items:center;background:#16110b;border:1px solid #2c241a;padding:3px 5px;cursor:pointer;min-width:0}
+.dbi-tile:hover{border-color:#8a6a34;background:#21180f}
+.dbi-tile canvas{width:28px;height:28px;image-rendering:pixelated;flex:none}
+.dbi-txt{display:flex;flex-direction:column;min-width:0;flex:1;line-height:1.15}
+.dbi-txt b{font-size:11.5px;font-weight:normal;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dbi-txt span{font-size:10px;opacity:.7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dbi-txt i{font-size:9.5px;opacity:.4;font-style:normal}
+#debugpanel .dbi-eq{width:auto;margin:0;padding:2px 5px;font-size:10px;background:#2a1f12;border:1px solid #5a4426;color:#f0dfb0;flex:none}
+.dbi-foot{font-size:10.5px;opacity:.55}
+.dbi-tile.r-rare{border-left:2px solid #5f92bd}.dbi-tile.r-epic{border-left:2px solid #a077bb}.dbi-tile.r-legendary{border-left:2px solid var(--gold)}.dbi-tile.r-mythic{border-left:2px solid #9fd3ea}.dbi-tile.r-uncommon{border-left:2px solid #89a05a}
+#debugpanel #dbg-search{flex:1;width:auto;min-width:0;display:block}
+.dbg-foot{flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
+.dbg-foot > span{display:flex;gap:4px;overflow:hidden}
+#debugpanel #dbg-close{width:28px;height:26px;flex:none;margin:0;text-align:center;padding:0}
