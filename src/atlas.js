@@ -1,8 +1,8 @@
 // Weltkarte (Session 12, Nutzer: „Karte wie auf dem Bild, mit Fog of War“): gemalte Landkarte statt Kachelfarben.
 // Grundbild einmal je Welt (1 Pixel je Kachel, Relief, Rauschen, Küsten), darauf Symbole im Anzeigemaßstab (Gipfel, Wälder,
 // Burgen, Dörfer, Ruinen), Herrschaftsgrenzen (Kette bernstein, Menschen gold, Totenland rot) und der Nebel des Unerkundeten.
-import { S } from './state.js?v=25';
-import { MAPS, T, TS, LOCATIONS, regionAt, OX } from './world.js?v=25';
+import { S } from './state.js?v=26';
+import { MAPS, T, TS, LOCATIONS, regionAt, OX } from './world.js?v=26';
 
 // ---------------- Nebel: 8×8-Kachel-Zellen, bitweise, im Spielstand als Base64 (S.fog) ----------------
 const FC = 8;
