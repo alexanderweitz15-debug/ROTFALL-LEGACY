@@ -1,19 +1,19 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, keepRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=27';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=27';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=27';
-import * as R from './render.js?v=27';
-import * as HB from './buildings.js?v=27';
-import * as UI from './ui.js?v=27';
-import * as SIM from './sim.js?v=27';
-import * as B from './body.js?v=27';
-import * as SP from './sprites.js?v=27';
-import * as ECO from './economy.js?v=27';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=27';   /* Roadmap P8 */
-import { drawAtlas, revealAround, explored } from './atlas.js?v=27';
-import { skyVisible, skyHidden } from './sky.js?v=27';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
-import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=27';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=28';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=28';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=28';
+import * as R from './render.js?v=28';
+import * as HB from './buildings.js?v=28';
+import * as UI from './ui.js?v=28';
+import * as SIM from './sim.js?v=28';
+import * as B from './body.js?v=28';
+import * as SP from './sprites.js?v=28';
+import * as ECO from './economy.js?v=28';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=28';   /* Roadmap P8 */
+import { drawAtlas, revealAround, explored } from './atlas.js?v=28';
+import { skyVisible, skyHidden } from './sky.js?v=28';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
+import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=28';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -164,7 +164,7 @@ function speedOf(c) {
   if (stat(c, 'grabbed')) s *= 0.5;                                   // Griff des Wiedergängers
   if (stat(c, 'shackled')) s *= 0.5;                                  // S12 E: Fußkette (Schuldknecht, Steinbruch)
   s *= (1 + tfx(c, 'speed') + afx(c, 'fleet')) * (node(c, 'k_bulwark') ? 0.9 : 1) * (node(c, 'k_wild') ? (outside(c) ? 1.1 : 0.95) : 1);
-  return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c) * limpMul(c) * (c === S.player && S.dbg?.speed ? S.dbg.speed : 1);   // Debug-Tempo
+  return s * speedMul(c.map, c.x, c.y) * B.speedFactor(c) * limpMul(c) * (c.shortLeg > performance.now() ? 0.3 : 1) * (c === S.player && S.dbg?.speed ? S.dbg.speed : 1);   /* T15 Kurzschluss: Bein versagt 1 s */   // Debug-Tempo
 }
 
 // ================= Items =================
@@ -702,7 +702,7 @@ function applyHealItem(c, key, target, part) {
     const amt = ((key === 'bandage' ? 6 + P.max * 0.3 : it.heal) + med * 0.4) * (1 + tfx(target, 'heal')) * (dkNode(target, 'k_bloodlord') || isVamp(target) ? 0.5 : 1);
     const r = B.healPart(target, part, amt);
     if (key === 'bandage') target.status = (target.status || []).filter(s => s.key !== 'bleeding');
-    if (S.prolog && target === S.player) S.prolog.healed = 1;   /* Prolog (Entwickler 09.10.): der Schritt wartet aufs Verbinden */
+    if (S.prolog && target === S.player && PR_STEPS[S.prolog.step]?.k === 'heal') S.prolog.healed = 1;   /* Prolog (Entwickler 09.10.): der Schritt wartet aufs Verbinden — erst im Heilschritt */
     float(target, `+${Math.round(r.gained)} ${B.PART_NAME[part]}`, 'rgba(120,170,90,ALPHA)');
     log(`${c.name} verbindet ${target === c ? 'sich' : target.name}: ${B.PART_NAME[part]}.`, 'party');
     if (r.restored) log(`${B.PART_NAME[part]} von ${target.name} ist wieder zu gebrauchen.`, 'party');
@@ -4126,6 +4126,7 @@ function chargeTick(p, now = performance.now()) {
 function attack(c, forceDir) {
   const chain = c.swing > 0 && atkCancel(c), rem = chain ? (1 - c.swing) * (c.swingDur || 0) : 0;   /* Kampfanimation: der nächste Kombo-Schlag bricht die Erholung ab (rem = abgebrochener Rest in ms) */
   if ((c.swing > 0 && !chain) || (c.atkCd > 0 && !chain) || c.downed || !c.alive) return;
+  if (c.shortArm > performance.now()) { if (c === S.player) float(c, 'Arm gehorcht nicht', 'rgba(240,224,112,ALPHA)'); return; }   /* T15 Kurzschluss (Entwickler 09.10.: Glied versagt 1 s) */
   if (c === S.player && S.map === 'world') keepDraw(c);              /* Umbau S3: Burgfrieden */
   if (dualOn(c)) c.dualTurn = !c.dualTurn; else c.dualTurn = false;   /* Zweiwaffen: abwechselnd rechts und links */
   if (B.armless(c)) { if (c === S.player && !(c.armWarn > performance.now())) { c.armWarn = performance.now() + 2000; UI.toast('Ohne Arme kannst du nicht zuschlagen.'); } return; }   // S14
@@ -4311,7 +4312,7 @@ const c0Casting = t => !!t.casting;
    Nur Held und Gefährten (nur sie nutzen Prothesen ab). Getroffen wird das erste Messingglied mit Zustand (Arme vor Beinen). */
 function shortCircuit(t) {
   if (!t.body || !(t === S.player || S.party.includes(t.id))) return; const k = ['rarm', 'larm', 'rleg', 'lleg'].find(q => t.body[q]?.mech && (t.body[q].mechCond ?? 100) > 0); if (!k) return;
-  B.wearProsthesis(t, k, 1.2 * 2); t.stagger = Math.max(t.stagger || 0, 1000); addStatus(t, { key: 'kurzschluss', name: 'Kurzschluss', left: 1000, desc: 'Ein Schlag ins Messing: eine Sekunde lang gehorcht die Prothese nicht.' });
+  B.wearProsthesis(t, k, 1.2 * 2); t.stagger = Math.max(t.stagger || 0, 1000); t[k.endsWith('arm') ? 'shortArm' : 'shortLeg'] = performance.now() + 1000;   /* Entwickler 09.10.: das Glied versagt 1 s — Arm: kein Hieb/Block, Bein: stark verlangsamt */ addStatus(t, { key: 'kurzschluss', name: 'Kurzschluss', left: 1000, desc: 'Ein Schlag ins Messing: eine Sekunde lang gehorcht die Prothese nicht.' });
   float(t, 'Kurzschluss', 'rgba(240,224,112,ALPHA)');
   if (t === S.player && !S.flags.shortHint) { S.flags.shortHint = 1; log(`Kurzschluss! Blitz und Schock fahren ins Messing: Deine Prothese (${B.PART_NAME[k]}) setzt eine Sekunde aus und nutzt sich doppelt ab. Auch Regen draußen setzt Prothesen zu (×1,3).`, 'party'); }
 }
@@ -8343,7 +8344,7 @@ function rebuildRazed() {                                                       
    geht an manchen Tagen einer in einem Valen-Dorf. Er nimmt bis zu 2 Milizionäre mit, das Dorf kämpft 5 Tage mit ¾ Stärke, dann kommt ein
    Nachfolger. Er führt eine Deserteurbande an, wenn es eine gibt oder entsteht. Wer den Sold auslegt (50 Gold), hält ihn 10 Tage. */
 const VM_TITLES = ['Hauptmann ', 'Waffenmeisterin ', 'Feldwebel '];
-const vmHash = (town, salt) => { let h = 7 + salt * 131; for (const ch of town) h = (h * 31 + ch.charCodeAt(0)) | 0; return Math.abs(h); };
+const vmHash = (town, salt) => { let h = Math.imul((S.seed | 0) ^ Math.imul((salt | 0) + 1, 0x9E3779B1), 0x85EBCA77); for (const ch of town) h = Math.imul(h ^ ch.charCodeAt(0), 0xC2B2AE3D); h ^= h >>> 15; h = Math.imul(h, 0x27D4EB2F); h ^= h >>> 13; return h >>> 0; };   /* gemischt wie resHash (Fehlersucher 09.10.: linear im Tag klumpte) */
 const vmName = town => { const g = S.vmGen?.[town] || 0, h = vmHash(town, g); return VM_TITLES[h % 3] + FIRST_M[(h >> 3) % FIRST_M.length]; };
 const vmAway = town => (S.vmGone?.[town]?.back || 0) > (S.day | 0);
 const VM_GO = { pWin: 0.3, max: 0.5, poor: 0.15, weary: 70, wearyDay: 0.05, days: 5, takeMil: 2, weak: 0.75, paidDays: 10, paidCost: 50, hireCost: 100 };
@@ -10515,7 +10516,7 @@ function prologDrop(at) {
 }
 function prologRescue() {
   const p = S.player, os = prEnt('oswin') || { x: 26 * TS, y: 21 * TS };
-  p.alive = true; p.downed = false; B.fullHeal(p); p.hp = p.maxHp; p.x = os.x - 30; p.y = os.y + 26; p.vx = p.vy = 0;
+  p.alive = true; p.downed = false; B.fullHeal(p); p.hp = p.maxHp; p.x = os.x - 30; p.y = os.y + 26; p.vx = p.vy = 0; p.status = (p.status || []).filter(s => s.good); p.stamina = p.maxStamina;   /* Fehlersucher 09.10.: Blutung/Gift/Brand bleiben nicht über die Rettung */
   for (const e of S.ents.prolog) if (e.prUndead) { e.aggroId = null; e.aiState = 'idle'; e.x = e.anchor.x; e.y = e.anchor.y; }
   log('Oswin schleift dich zurück ans Feuer. „Langsam. Tot nützt du keinem — und hier bleibt keiner lange tot.“ (Im Prolog stirbst du nicht. Draußen schon.)', 'quest');
   UI.toast('Gerettet — draußen in der Welt ist der Tod endgültig.', 3200);
@@ -20022,7 +20023,7 @@ function moveInput() {
 // Flächenangriffe und Geschosse lassen sich blocken, aber nicht parieren.
 const GUARD = { parry: 180, arc: 1.22, shield: 0.15, weapon: 0.45, rearm: 400 };   // rearm: Mechanik-Check S14 — wer die Deckung schneller neu hebt, bekommt keine neue Parade
 function updateGuard(p, want) {
-  const now = performance.now(), can = want && !p.dodge && !p.downed && !(p.swing > 0) && !(p.guardBroken > now) && p.stamina > 1;
+  const now = performance.now(), can = want && !p.dodge && !p.downed && !(p.swing > 0) && !(p.guardBroken > now) && !(p.shortArm > now) && p.stamina > 1;   /* T15 Kurzschluss: der Arm gehorcht nicht */
   if (can && !p.cover) { p.cover = { since: p.coverOff > now - GUARD.rearm ? -1e9 : now }; sfx('metal', 0.15); }
   else if (!can && p.cover) { p.cover = null; p.coverOff = now; }
 }
@@ -20895,7 +20896,7 @@ function debugSections() {
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
       'Welt-Ereignis-Karte: drei nacheinander (E22, nebenbei mit Glocke, eine Kriegskarte hält die Welt an)': () => { worldCard('SEUCHE IN PROBEDORF', 'In Probedorf geht das Fleckfieber um.'); worldCard('SCHLACHT BEI PROBEFURT', 'Das Heer der Toten gegen Valens Aufgebot.', { war: true, snd: 'drum' }); worldCard('TURNIER IN PROBESTADT', 'Ein Herold ruft zum Turnier.'); UI.toast(`Warteschlange: ${EV_CARDS.length} Karten (warten auf Gespräche, Fenster, Kamerafahrten)`, 2600); },
       'Koop: Attrappen-Gast steuert den nächsten Gefährten (Karte + Treffer-Balken prüfen; Ergebnis als Hinweis)': () => { const m = partyMembers().find(x => x !== p && raceOf(x) === 'mensch'); if (!m) return UI.toast('Kein menschlicher Gefährte in der Gruppe.'); if (S.coop && S.coop.role !== 'host') return UI.toast('Nur ohne echten Koop.');
-        import('./coop.js?v=27').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
+        import('./coop.js?v=28').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
           const sent = F.conn.sent.map(s => JSON.parse(s).t); UI.toast(`Koop-Probe: Karte an Gast ${sent.includes('card') ? 'ja' : 'nein'}, letzter Gasttreffer ${m.lastHitId ? 'gemerkt' : '— (kein Feind nah)'}. Attrappe trennen: Eintrag darunter.`, 6000); window.__fakeGuest = F; }); },
       'Ereignis-Reste: Karten Spuk vorbei, Parade, Ratsbeschluss (nacheinander)': () => { worldCard('DER SPUK IST VORBEI', 'Spuk am Brunnen von Probedorf — Probedorf schläft wieder.'); worldCard('PARADE DER SONNENLEGION', 'Mittags vom Westtor zum Palast von Aurelheim.', { snd: 'horn' }); worldCard('BESCHLUSS DES HOHEN RATES', 'Probethema — 5 zu 2', { snd: 'horn' }); },
       'Handelskontakt: Kette abschließen (Kutscher der nächsten Stadt) + Handelsbrief sofort': () => { const L = ECO.TOWN_LOCS.filter(l => S.towns?.[l.key]).sort((a, b) => Math.hypot(a.x - p.x / TS, a.y - p.y / TS) - Math.hypot(b.x - p.x / TS, b.y - p.y / TS))[0]; if (!L) return UI.toast('Keine Stadt.'); tradeContact(L.key, `${FIRST_M[0]} der Kutscher`); tradeContactTick(true); },
@@ -22955,6 +22956,10 @@ export function selftest() {
       return Object.values(res).every(Boolean);
     } finally { S.seaSide = side0; F.freed = fz.fr; F.bought = fz.bo; }
   }));
+  ok('T15 Kurzschluss-Wirkung (Entwickler 09.10.): Schock auf die Arm-Prothese — 1 s kein Hieb und keine Deckung; auf die Bein-Prothese — 1 s Tempo ×0,3', sandbox(() => {
+    const p = stage(); B.attachProsthesis(p, 'rarm', 2); p.shockImm = 0; applySpellStatus(p, { key: 'shocked', chance: 1 }, p); p.atkCd = 0; p.swing = 0; attack(p); const noHit = !(p.swing > 0); updateGuard(p, true); const noBlock = !p.cover;
+    p.shortArm = 0; p.body.rarm.mech = 0; p.body.rarm.lost = false; B.attachProsthesis(p, 'rleg', 2); const s0 = speedOf(p); p.shockImm = 0; applySpellStatus(p, { key: 'shocked', chance: 1 }, p); const slow = Math.abs(speedOf(p) - s0 * 0.3) < 1e-9;
+    if (!(noHit && noBlock && slow)) console.warn('Kurzschluss-Probe', { noHit, noBlock, slow }); return noHit && noBlock && slow; }));
   ok('T15 V10 Messing-Schwächen: Prototyp ohne Energiezelle nach 3 Tagen nur halber Vorteil, Zelle lädt ihn; Schock = Kurzschluss (Status, doppelter Verschleiß); Regen draußen nutzt ×1,3 ab', sandbox(() => {
     const p = stage(), W0 = S.weather; try {
       B.attachProsthesis(p, 'rarm', 4); const full = B.mechBonus(p, 'arm'); p.cellDay = (S.day | 0) - 3; const half = Math.abs(B.mechBonus(p, 'arm') - full / 2) < 1e-9;
@@ -27607,7 +27612,7 @@ function boot() {
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
-    openCoop: () => import('./coop.js?v=27').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
+    openCoop: () => import('./coop.js?v=28').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
@@ -27670,7 +27675,7 @@ function boot() {
       const act = b.dataset.act;
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
-      else if (act === 'coop') { import('./coop.js?v=27').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
+      else if (act === 'coop') { import('./coop.js?v=28').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { $('cr-fac-wrap')?.classList.remove('hidden'); creation.facRow?.(); setSlot(newSlot('single'));   /* Fraktions-Starts: Freischaltungen neu lesen */   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -27681,7 +27686,7 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=27').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=28').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
     travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
