@@ -413,3 +413,5 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
 - **E49 Aurelion nach Wohlstand:** soll **stärker wirken** — auch Wachen, Preise und Automaten-Streifen.
 - **E50 Kurzschluss:** das getroffene Glied versagt 1 s — Arm: kein Hieb/Block, Bein: stark verlangsamt; dazu doppelter Verschleiß.
 - **E51 T21 Zelte:** Leute in Zelten — ja, flüchtig (nachts ein Schläfer je Zelt, bezahlte Bande sitzt friedlich darin). Bandenbeute stehlen — ja, nachts ungesehen (halbe Beute als Ware, Bande wird feindlich, Hinterhalt).
+- **E52 Gegner-Scaling (T24):** Gruppen + Rollenmix — ab Heldenstufe 20/35/50 bekommen Begegnungen +1/+2/+3 Begleiter mit Rollen (Schildträger, Schütze, Heiler/Nekromant); Leben je Stufe über 30 nur noch +2 %; Frühspiel unverändert. Ziel: Smart-Bot verliert im Mittel > 10 %.
+- **E53 Frühspiel-Ausreißer:** Knochenritter, Fleischgolem, Goblinkrieger in frühen Gebieten (Gefahr 1–2) nicht oder nur als Boss/Elite mit Vorwarnung; im Totenland bleiben sie hart.

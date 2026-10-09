@@ -4161,3 +4161,16 @@ Befunde (alle ⚖, Entscheidung beim Entwickler):
 - **Handel:** steigt auf 89–99 (Spec erwartet „Messe als Normalzustand“) → Messe in Eren/Nordfurt an jedem Händler-Agendatag (alle 5 Tage), 12–16 Züge unterwegs (Deckel 16), neue Züge 5–6 am Tag.
 - **Aurelion:** Ein Handelsschiff wird zum Wrack (Werft ohne Barren/Holz), Import 50 % → Nahrung 0,5 Tage ab Tag ~25, Magitech 31 Tage. Stufe „knapp“ dauerhaft: Zoll +0,1 je Agendatag bis zum Deckel 1,3, Frachtauftrag Kupferhafen; der Gesandte kauft nichts, weil Nordfurt selbst bei 0 Korn steht (gewollter Kornmangel).
 - **Kette:** 56 Köpfe (50 Gefangene + 3 Tributdörfer × 2) → Feldzug 25, Stoßtrupp 11, Heerzug 45 (= alte Mitte, Eichung ⚖). Der Spec-Normalwert (12–20 Köpfe) traf nicht zu: 30 versklavte Arbeiter (Bergmann, Feldarbeiter …) zählen mit.
+
+### Messung 09.10. — Gegner-Scaling-Audit (P4.27/T24), 1-gegen-1 Smart-Bot
+`RF.simFight(typ, { level, elvl, seed: 1–2 })`, Gegnerstufe = Gebietsstufe (Gebiet 4: 15–35, Gebiet 5: 25–50), Leben verloren in % (Mittel aus 2), † = Held fiel.
+
+| Held/Gegner-Stufe | bandit | bandit_spear | bandit_archer | goblin_warrior | skeleton | bone_knight | death_knight | ghoul | bear | mutant_brute | flesh_golem | necromancer | wraith |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 8/8 | 1 | 38 | 28 | 71† | 16 | 103† | 32 | 0 | 50 | 27 | 132† | 0 | 20 |
+| 15/15 | 3 | 40 | 73† | 65† | 0 | 26 | 0 | 0 | 67 | 1 | 77† | 0 | 47 |
+| 30/30 | 25 | 30 | 16 | 14 | 0 | 0 | 0 | 0 | 2† | 0 | 0 | 30 | 16 |
+| 45/35 | 10 | 24 | 10 | 11 | 0 | 0 | 0 | 0 | 17 | 3 | 0 | 22 | 10 |
+| 60/50 | 0 | 15 | 29 | 11 | 0 | 0 | 0 | 0 | 15 | 1 | 0 | 11 | 10 |
+
+**Befund:** Ab Stufe 30 sind untote Nahkämpfer (Skelett, Knochenritter, Todesritter, Ghul, Fleischgolem) und Mutanten 1-gegen-1 ohne Risiko (0 %). Was noch beißt: Fernkampf (Schützen, Nekromant, Geist) und Speer (Abstand). Frühspiel streut stark (Knochenritter/Golem töten Stufe 8, Goblinkrieger Stufe 8–15). Die Spec T24 verlangt Druck über Gruppengröße und Rollenmix statt Lebenspunkte — Entscheidung E52 offen.

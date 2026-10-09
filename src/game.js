@@ -1,19 +1,19 @@
 // Rotfall: Legacy — Spielkern. Schleife, Kampf, KI, Quests, Siedlung, Erbe.
 import { S, S_INIT, SAVE_VERSION, log, onLog, chronicle, setSlot, newSlot, deleteSlot, slotIndex, slotKey, slotMetaFrom, ACHIEVE, SLOT, save, saveSync, saveCompressed, readRaw, unpackAll, zipSave, unzipSave, pack, unpack, loadRaw, applySave, hasSave, wipeSave, seedRng, keepRng, rnd, ri, pick, chance,
-         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=30';
-import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=30';
-import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=30';
-import * as R from './render.js?v=30';
-import * as HB from './buildings.js?v=30';
-import * as UI from './ui.js?v=30';
-import * as SIM from './sim.js?v=30';
-import * as B from './body.js?v=30';
-import * as SP from './sprites.js?v=30';
-import * as ECO from './economy.js?v=30';
-import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=30';   /* Roadmap P8 */
-import { drawAtlas, revealAround, explored } from './atlas.js?v=30';
-import { skyVisible, skyHidden } from './sky.js?v=30';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
-import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=30';
+         clamp, dist, uid, byId, partyMembers, timeStr, year, seasonOf, SEASONS, mergeProps, adoptPropKeys, saveData, SAVE_KEY, startUnlocks, unlockStart } from './state.js?v=31';
+import { RACES, FAC_STARTS, BOSS_CARDS, MAGIC_VIEW, STIGMA, BOSS_LOOT, LORE, ITEMS, MONSTERS, NPCS, ORIGINS, CLASSES, ABILITIES, FACTIONS, BUILDINGS, QUESTS, LOOT, MEMORY_TEXT, RARITY, RARITY_ORDER, RARITY_DROP, RARITY_VALUE, RARITY_AFFIXES, ARMOR_SETS, AFFIXES, LEGENDS, SKILL_NAMES, SKILL_DEF, SKILL_MS, TECHS, TITLE_CLASSES, SKILL_TREE, SKILL_BRANCHES, SKIES, CUT_STARS, MAX_TITLES, REP_TIERS, GOODS , ELITES , RECIPES , FAC_RES } from './data.js?v=31';
+import { MAPS, TS, T, SOLID, LOCATIONS, genWorld, genMine, genDeep, genSky, genKerker, genGarmadon, genOmega, genIsle, genDeck, genTower, NACHT, TOWER_LEVELS, DUNGEONS, MAP_KEYS, tileAt, setTile, solidTile, speedMul, locAt, freeSpotNear, openSpot, regionAt, occupied, HOUSES, TOWN_PLAN, findGrowSpot, buildGrown, townAt, worldPt, seaLine, WS, EAST, EAST2, SOUTH, VILLAGES, OX, EM, EISEN_CONVOY, FORT, EISEN_SITES, METRO, MORR , CAPITAL } from './world.js?v=31';
+import * as R from './render.js?v=31';
+import * as HB from './buildings.js?v=31';
+import * as UI from './ui.js?v=31';
+import * as SIM from './sim.js?v=31';
+import * as B from './body.js?v=31';
+import * as SP from './sprites.js?v=31';
+import * as ECO from './economy.js?v=31';
+import { ANIM_DEFS, DEATH_KINDS, animEvents, deathPose, tintCacheInfo, atkPlan, atkFx, atkSpin, atkProfile, atkU, snapU, ATK_U, ATK_PACKS, animClassOf, atkStance, hitKind, HIT_RX } from './anim.js?v=31';   /* Roadmap P8 */
+import { drawAtlas, revealAround, explored } from './atlas.js?v=31';
+import { skyVisible, skyHidden } from './sky.js?v=31';   /* Sternenhimmel gekürzt (08.10.): Sichtbarkeit für Debug und Probe */
+import { sfx, ambience, ambienceTick, duck, musicNow } from './sfx.js?v=31';
 
 const $ = id => document.getElementById(id);
 let last = 0, acc = 0, running = false, hovered = null, selected = null, placing = null;
@@ -2530,7 +2530,7 @@ function spawnEnemy(mtype, map, tx, ty, opts = {}) {
     faction: m.faction, boss: !!m.boss, ...opts,
   };
   if (!e.boss && (opts.level == null || opts.zone) && !map.startsWith('__')) e.level = zoneLevel(map, tx, ty, m);   // Phase 1: Gebietsspanne
-  e.maxHp = e.hp = Math.round(m.hp * (1 + e.level * 0.04) * BAL.hp * (bossScaled(e) ? BOSS.hp : 1)); if (bossScaled(e)) e.bossV = 1;   // bossV: schon nach BOSS bemessen (Ladeprüfung)
+  e.maxHp = e.hp = Math.round(m.hp * (1 + Math.min(e.level, 30) * 0.04 + Math.max(0, e.level - 30) * 0.02) * BAL.hp * (bossScaled(e) ? BOSS.hp : 1));   /* E52: über Stufe 30 nur noch +2 % Leben je Stufe */ if (bossScaled(e)) e.bossV = 1;   // bossV: schon nach BOSS bemessen (Ladeprüfung)
   if (!e.boss && !opts.noVariant && !m.prey && !e.servant && !map.startsWith('__') && !S._quiet && Math.random() < 0.18) applyVariant(e, m);   // S13: Gegnervarianten (eigener Zufall: die Weltfolge bleibt stabil)
   if (HUMANOID.has(mtype)) { const b0 = pick(Object.keys(B.BUILDS)); e.build = m.build || b0; B.initBody(e, e.maxHp); }   // Menschenähnliche haben Trefferzonen   /* P3.20: Rolle legt den Körperbau fest (Zufall wird trotzdem gezogen — Folge bleibt) */
   if (m.leader && !e.variant) e.variant = 'leader';
@@ -2670,11 +2670,26 @@ function zoneLevel(map, tx, ty, m) {
   const [lo, hi] = ZONE[clamp(zoneTier(map, tx, ty), 0, 5)], pl = S.player?.level || 1;
   return clamp(pl + ri(-2, 2) + Math.max(0, (m.threat || 1) - 2), lo, hi);
 }
+/* E52 (Entwickler 09.10., T24): Spätspiel-Druck über Gruppen und Rollen statt Lebenspunkte — ab Heldenstufe 20/35/50 bringt eine Begegnung in
+   Gebieten ab Gefahr 3 einen, zwei oder drei Begleiter mit Rolle (Schildträger, Schütze, Heiler) aus der eigenen Fraktion mit.
+   E53: frühe Gebiete (Gefahr 1–2) bekommen statt Knochenritter, Fleischgolem und Goblinkrieger deren leichtere Verwandte. */
+const SCALE_STEPS = [[50, 3], [35, 2], [20, 1]], SCALE_ORDER = ['shield', 'ranged', 'heal'];
+const SCALE_ROLES = { undead: { shield: 'bone_knight', ranged: 'bone_archer', heal: 'necromancer' }, bandit: { shield: 'bandit_merc', ranged: 'bandit_archer', heal: 'bandit_medic' },
+  goblin: { shield: 'goblin_warrior', ranged: 'goblin_archer', heal: 'goblin_shaman' }, chain: { shield: 'chain_brute', ranged: 'kettenschuetze' }, pirate: { shield: 'sea_raider', ranged: 'sea_harpooner' },
+  blut: { shield: 'chalice_guard', ranged: 'blood_mage', heal: 'blood_mage' } };
+const EARLY_SWAP = { bone_knight: 'skeleton', flesh_golem: 'zombie', goblin_warrior: 'goblin' };
+const scaleExtra = () => (SCALE_STEPS.find(([l]) => (S.player?.level || 1) >= l) || [0, 0])[1];
 function regionSpawn(mtype, map, tx, ty, opts = {}) {
   const tier = map === 'world' ? (locAt(tx, ty)?.threat || 1) : 3;
+  if (tier < 3 && EARLY_SWAP[mtype] && !opts.boss && !opts.elite && MONSTERS[EARLY_SWAP[mtype]]) mtype = EARLY_SWAP[mtype];   /* E53 */
   if (tier < 3 || MONSTERS[mtype]?.prey) return spawnEnemy(mtype, map, tx, ty, opts);
   const e = spawnEnemy(mtype, map, tx, ty, { ...opts, zone: true, level: (opts.level || 0) + (tier - 2) * 2 + Math.max(1, ri(1, 3) + (MONSTERS[mtype].threat || 1) * 2) });
   if (chance(tier >= 4 ? 0.5 : 0.25)) { e.elite = true; e.maxHp = e.hp = Math.round(e.hp * 1.3); if (e.body) { for (const k of B.PARTS) { e.body[k].max = Math.round(e.body[k].max * 1.3); e.body[k].hp = e.body[k].max; } B.syncHp(e); } }
+  const n = scaleExtra(), R = SCALE_ROLES[MONSTERS[mtype]?.faction];   /* E52 */
+  if (n && R && !opts.noScale && !MONSTERS[mtype].boss && map === 'world') {
+    for (const role of SCALE_ORDER.slice(0, n)) { const t2 = R[role]; if (!t2 || !MONSTERS[t2]) continue; const f = spawnEnemy(t2, map, tx + ri(-2, 2), ty + ri(-2, 2), { ...opts, zone: true, scaleRole: role }); if (f) f.anchor = { ...e.anchor }; }
+    if (!S.flags.scaleHint && !S._quiet) { S.flags.scaleHint = 1; log('Man kennt deinen Namen: Deine Gegner kommen jetzt in Gruppen — mit Schildträgern, Schützen und Heilern. Erst die Heiler, dann die Schützen.', 'combat'); }
+  }
   return e;
 }
 const capOf = a => REGION_BOSSES.some(b => S.flags[b.flag] && b.area(a)) ? Math.ceil(a.cap * 0.7) : a.cap;
@@ -9029,7 +9044,7 @@ function addRep(f, n, lo = -100, hi = 100) {
   for (const h of REP_HOOKS) h(f, v0, v);
   return v;
 }
-function setLord(town, fac, why = '') { if (S._quiet && !S._probeLord) return;   /* Proben rufen liberate()/morrFall() außerhalb der Sandbox — die Ortsherren der echten Welt bleiben unberührt */
+function setLord(town, fac, why = '') { if (S._quiet && !S._probeLord && !S._bench) return;   /* Proben rufen liberate()/morrFall() außerhalb der Sandbox — die Ortsherren der echten Welt bleiben unberührt */
   (S.townLord ||= {})[town] = fac; if (why) log(`${LOCATIONS.find(l => l.key === town)?.name || town}: ${why} — Aufträge und Ruf dort gehen jetzt an ${FACTIONS[fac]?.name || fac}.`, 'faction'); }
 const townFac = town => S.townLord?.[town] || (S.schutz?.[town]?.taker?.by === 'chain' ? 'chain' : TOWN_PLAN[town]?.tribute ? 'frei' : TOWN_PLAN[town]?.lord || GUARD_POSTS[town]?.faction || (town !== 'grubenhort' && ['chain', 'goblin', 'wuest', 'zwerge'].includes(LOCATIONS.find(l => l.key === town)?.faction) ? LOCATIONS.find(l => l.key === town).faction : null) || (town === 'grubenhort' && S.after?.revolt ? 'frei' : 'valen'));   /* Folgen §5c: Aufträge der Freien */
 /* Entscheidung 03.10.2026: Karak-Atar und Dünenwacht (Wüstenbund) sowie die Zwerge der Tiefhall haben eigene Bretter — Arten passend zum Ort (vorläufig) */
@@ -14145,7 +14160,7 @@ function hourTick(h) {
   fortressHour();                                                            // S12: Tore der Eisenfeste
   travelHour();                                                              // S13: Reisende
   if (h % 6 === 0 && !S._frozenWar) SIM.warTick();                          // Heere ziehen, Schlachten, Eroberungen
-  if (chance(0.10) && !S._quiet) worldEvent();   /* BUG-123: Proben lösen keine Weltereignisse aus (sie verändern sonst Märkte) */
+  if (chance(0.10) && (!S._quiet || S._bench)) worldEvent();   /* Welt-Benchmark: zählt Weltereignisse mit */   /* BUG-123: Proben lösen keine Weltereignisse aus (sie verändern sonst Märkte) */
   checkRankUp();
   // Siedlung produziert
   if (S.settlement) {
@@ -14592,7 +14607,7 @@ function worldEvent() { pick(EVENTS)(); }
 const AFTER_DAYS = 21;
 const afterHeals = () => !finalRuin();
 let afterProbe = false, omegaBeat = 0, avengers = [];                   // afterProbe: Selbsttest löst Folgen auch unter S._quiet aus; avengers: laufende Rachetrupps (flüchtig)
-const afterLive = () => !S._quiet || afterProbe;
+const afterLive = () => !S._quiet || afterProbe || !!S._bench;   /* Welt-Benchmark: Folgen laufen wie im Spiel */
 const AF = () => { const A = (S.after ||= {}); A.ruins ||= {}; A.rev ||= []; A.pmul ||= {}; A.tmul ||= {}; A.quar ||= {}; return A; };
 const afterUntil = () => afterHeals() ? (S.day | 0) + AFTER_DAYS : null;   // Frist der Erholung; null = bleibt
 const facAdd = (f, n) => { if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + n, -100, 100); };
@@ -18357,7 +18372,8 @@ function brassTick(p) {
   const n = B.brassOf(p); if (!n || p.map !== S.map) return; const day = S.day | 0;
   const near = (S.ents[p.map] || []).filter(e => e.kind === 'npc' && e.alive && !e.downed && Math.abs(e.x - p.x) <= 160 && Math.abs(e.y - p.y) <= 160 && stigmaOf(e, 'brass'));   /* ponytail: ganze Karte alle 2 s — Raster erst, wenn es misst */
   if (near.length && !S.flags.brassHint) { S.flags.brassHint = 1; log('Man sieht dein Messing. Der Orden verlangt mehr und notiert es, Valens Kanzler wittert Spione, Aurelion gibt Nachlass. Ein Umhang verbirgt Prothesen, das Roboterauge sieht jeder.', 'faction'); }
-  if (n >= (STIGMA.brass.order.min || 2) && S.flags.brassOrderDay !== day && near.some(e => stigmaOf(e, 'brass')?.report === 'inq')) {
+  const zeal = S.after?.zeal || 0, min = zeal >= FAC_RES.order.ge ? 1 : (STIGMA.brass.order.min || 2);   /* T23 S3 + E44: ab Eifer 4 prüfen Inquisitoren schon ein einzelnes Messingteil (⚖) */
+  if (n >= min && S.flags.brassOrderDay !== day && near.some(e => stigmaOf(e, 'brass')?.report === 'inq')) {
     S.flags.brassOrderDay = day; addRep('order', -1); log('Ein Ordensbruder notiert dein Messing. (Orden −1)', 'faction'); }
 }
 function vampTick(c, dt) {
@@ -20666,6 +20682,7 @@ function debugSections() {
       'E4: Vermisstenwelle im nächsten Dorf (sofort ein Opfer)': () => { const ks = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].village).sort((a, b) => Math.hypot(TOWN_PLAN[a].square[0] - p.x / TS, TOWN_PLAN[a].square[1] - p.y / TS) - Math.hypot(TOWN_PLAN[b].square[0] - p.x / TS, TOWN_PLAN[b].square[1] - p.y / TS));
         if (S.vanish?.state === 'on') return UI.toast('Eine Welle läuft schon.'); const k = ks.find(x => vanishStart(x)); if (!k) return UI.toast('Kein Dorf mit Unterschlupf in Reichweite.'); vanishTake(); UI.toast(`${townName(k)}: ${VANISH[S.vanish.cause].name} · ${S.vanish.loc}`, 3000); },
       'E4: Vermisstenwelle 3 Tage vorspulen (Opfer altern)': () => { for (const t of S.vanish?.taken || []) t.day -= 3; if (S.vanish) { S.vanish.day0 -= 3; S.vanish.last -= 3; } UI.toast('Opfer 3 Tage älter'); },
+      'E52 Scaling: Gegnergruppe hier (nach Heldenstufe)': () => { const p0 = P(); const e = regionSpawn(pick(['skeleton', 'bandit', 'goblin']), S.map, (p0.x / TS | 0) + 8, p0.y / TS | 0); UI.toast(`Stufe ${p0.level}: ${scaleExtra()} Begleiter mit Rolle${e ? ' bei ' + MONSTERS[e.mtype].name : ''}`, 2600); },
       'N4: Hauptmann des nächsten Dorfs desertiert': () => { const V = VILLAGES.slice().sort((a, c) => Math.hypot(a.x - P().x / TS, a.y - P().y / TS) - Math.hypot(c.x - P().x / TS, c.y - P().y / TS)).find(v => S.ents.world.some(e => e.vm === v.key && e.alive)); const n = V && vmDesert(V.key, 'raid'); UI.toast(n ? `${n} hat ${townName(V.key)} verlassen` : 'Kein Dorf mit Hauptmann (oder schon fort).', 3000); },
       'N4: Abwesende Hauptleute ins Log': () => log(`Ohne Hauptmann: ${Object.entries(S.vmGone || {}).filter(([k]) => vmAway(k)).map(([k, g]) => `${townName(k)} (${g.name}, bis Tag ${g.back})`).join(', ') || 'keiner'}.`, 'faction'),
       'N3: Kriegsmüdigkeit Valen +20': () => { wearyOf('valen').v = Math.min(100, wearyOf('valen').v + 20); UI.toast(`Valen müde: ${wearyOf('valen').v} (Stufe ${wearyStage('valen')}) — wirkt beim nächsten Tag`); },
@@ -20754,6 +20771,8 @@ function debugSections() {
     ['Krieg und Gruppe (Audit T02, T05)', '', {
       'Krieg 10 Tage vorspulen (ohne Feldschlachten)': () => { const m0 = P().map; P().map = 'deep'; try { for (let d = 0; d < 10; d++) { for (let i = 0; i < 4; i++) SIM.warTick(); SIM.warDay(); } } finally { P().map = m0; }
         const o = {}; for (const n of Object.values(S.war.nodes)) o[n.owner || 'frei'] = (o[n.owner || 'frei'] || 0) + 1; UI.toast('Knoten: ' + Object.entries(o).map(([k, n]) => `${FACTIONS[k]?.name || k} ${n}`).join(', '), 5000); },
+      'Welt-Benchmark (6 Welten × Schwer/Sehr schwer, 250 Tage ohne Spieler; ersetzt die Welt im Speicher, danach neu laden)': () => { const B = worldBench();
+        UI.toast('Welt-Benchmark läuft — Stand in window.__bench (Konsole). Speichern ist bis zum Neuladen gesperrt.', 6000); log(`Welt-Benchmark: ${B.status}. Ergebnis in window.__bench.summary.`, 'world'); },
       'Führung +10': () => leadGrow(10),
     }],
     ['Klang & Effekte (Audit C3–C5)', sel('dbAmb', ['greenmark', 'forest', 'marsh', 'desert', 'blight', 'deadland', 'aurel', 'eisen', 'frozen', 'coast', 'under'].map(k => [k, k])), {
@@ -21106,7 +21125,7 @@ function debugSections() {
       'Namenskarte': () => nameCard('NAMENSKARTE', 'Untertitel in Spectral', 3000),
       'Welt-Ereignis-Karte: drei nacheinander (E22, nebenbei mit Glocke, eine Kriegskarte hält die Welt an)': () => { worldCard('SEUCHE IN PROBEDORF', 'In Probedorf geht das Fleckfieber um.'); worldCard('SCHLACHT BEI PROBEFURT', 'Das Heer der Toten gegen Valens Aufgebot.', { war: true, snd: 'drum' }); worldCard('TURNIER IN PROBESTADT', 'Ein Herold ruft zum Turnier.'); UI.toast(`Warteschlange: ${EV_CARDS.length} Karten (warten auf Gespräche, Fenster, Kamerafahrten)`, 2600); },
       'Koop: Attrappen-Gast steuert den nächsten Gefährten (Karte + Treffer-Balken prüfen; Ergebnis als Hinweis)': () => { const m = partyMembers().find(x => x !== p && raceOf(x) === 'mensch'); if (!m) return UI.toast('Kein menschlicher Gefährte in der Gruppe.'); if (S.coop && S.coop.role !== 'host') return UI.toast('Nur ohne echten Koop.');
-        import('./coop.js?v=30').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
+        import('./coop.js?v=31').then(M => { const F = M.fakeGuest(coopAPI(), m.id), q = S._quiet; S._quiet = false; worldCard('KOOP-PROBE', 'Diese Karte geht auch an den Gast.'); S._quiet = q; const f = actorsOf(p.map).list.find(e => e.kind === 'enemy' && e.alive && dist(e, m) < 400); if (f) hurt(f, 1, m);
           const sent = F.conn.sent.map(s => JSON.parse(s).t); UI.toast(`Koop-Probe: Karte an Gast ${sent.includes('card') ? 'ja' : 'nein'}, letzter Gasttreffer ${m.lastHitId ? 'gemerkt' : '— (kein Feind nah)'}. Attrappe trennen: Eintrag darunter.`, 6000); window.__fakeGuest = F; }); },
       'Ereignis-Reste: Karten Spuk vorbei, Parade, Ratsbeschluss (nacheinander)': () => { worldCard('DER SPUK IST VORBEI', 'Spuk am Brunnen von Probedorf — Probedorf schläft wieder.'); worldCard('PARADE DER SONNENLEGION', 'Mittags vom Westtor zum Palast von Aurelheim.', { snd: 'horn' }); worldCard('BESCHLUSS DES HOHEN RATES', 'Probethema — 5 zu 2', { snd: 'horn' }); },
       'Handelskontakt: Kette abschließen (Kutscher der nächsten Stadt) + Handelsbrief sofort': () => { const L = ECO.TOWN_LOCS.filter(l => S.towns?.[l.key]).sort((a, b) => Math.hypot(a.x - p.x / TS, a.y - p.y / TS) - Math.hypot(b.x - p.x / TS, b.y - p.y / TS))[0]; if (!L) return UI.toast('Keine Stadt.'); tradeContact(L.key, `${FIRST_M[0]} der Kutscher`); tradeContactTick(true); },
@@ -21635,8 +21654,118 @@ export function simFight(mtype, o = {}) {
     delete MAPS.__d; delete S.ents.__d; delete solidIndex.__d;
   }
 }
+/* ===== Welt-Benchmark (Entwickler 09.10., nur ?dev): Wie verläuft die Welt ohne den Spieler? =====
+   RF.worldBench({ seeds, diffs, days }) legt je Weltsamen × Schwierigkeit ein NEUES Spiel an (newGame ohne Prolog), parkt den Helden weit weg
+   in der Tiefe (p.map 'deep': nichts materialisiert vor Ort, kein Feldzug zählt ihn als Mitstreiter) und spult Tag um Tag vor wie update():
+   jede Spielminute die Sekunden-Haken von Feldzug und Überfall, alle 10 Minuten Tribut, Großereignis, Folgen und Aurelion, jede Stunde hourTick
+   (Kriegszug alle 6 Std., Weltereignis 10 %), jeden Tag dayTick (warDay mit capThreatDay, bigDay, keepSiegeDay …). S._quiet bleibt an (kein
+   Speichern, keine Karten); S._bench schaltet Weltereignisse, Folgen (afterLive) und Ortsherren trotzdem ein; S._sink zählt Protokoll und
+   Chronik mit. Der Stand im Speicher ist danach eine Testwelt: bis zum Neuladen sperrt die Bank das Schreiben aller rotfall.*-Schlüssel.
+   Ergebnis und Zwischenstand in window.__bench (runs, summary). benchDays(n, R, light) ist der Kern; light = nur Kriegszüge, Tageswechsel,
+   keepSiegeDay und warDay (für die Probe, die den echten Stand nicht anfassen darf). Grenzen: Tributzüge, Karawanen und Figuren bewegen sich
+   nur mit update() — sie stehen still; Feldschlachten werden immer gewürfelt (battleAbstract), nie vor Ort ausgetragen. */
+const BENCH_UND = ['graveyard', 'blackkeep', 'necropolis', 'altvharn'], BENCH_VAL = ['eren', 'road', 'northcity', 'saltport', 'varonheim'];
+let benchSetItem = null;
+function benchLock() {   /* bis zum Neuladen wird kein rotfall.*-Schlüssel geschrieben (die Testwelt darf nie über den echten Stand) */
+  if (benchSetItem) return; benchSetItem = Storage.prototype.setItem;
+  Storage.prototype.setItem = function (k, v) { if (/^rotfall\./.test(String(k))) return; return benchSetItem.call(this, k, v); };
+}
+function benchRec(seed, diff) {
+  const R = { seed, diff, day0: S.day | 0, days: 0, keys: Object.keys(S.war.nodes), first: {}, maxLiving: 0, maxUnd: 0, nodeDays: {}, chron: {}, kinds: {}, logs: {}, nLogs: 0, tl: [],
+    n: { capFall: 0, capFreed: 0, siege: 0, siegeLift: 0, host: 0, toUndead: 0, toLiving: 0, big: {}, camp: {} }, _p: null };
+  S._sink = (t, text, k) => { const key = String(text).replace(/\d+/g, '#').slice(0, 90);
+    if (t === 'chron') { R.chron[key] = (R.chron[key] || 0) + 1; R.kinds[k] = (R.kinds[k] || 0) + 1; }
+    else if (R.logs[key] != null || R.nLogs < 800) { if (R.logs[key] == null) R.nLogs++; R.logs[key] = (R.logs[key] || 0) + 1; } };
+  return R;
+}
+function benchRecord(R) {
+  const W = S.war, N = W.nodes, d = S.day | 0, own = k => N[k]?.owner || null, P = R._p || {}, cap = N.varonheim || {};
+  const living = BENCH_UND.filter(k => own(k) && own(k) !== 'undead').length, undV = BENCH_VAL.filter(k => own(k) === 'undead').length;
+  const host = W.armies.find(a => a.host), C = S.campaign, Bg = S.big;
+  const first = (k, cond) => { if (cond && R.first[k] == null) R.first[k] = d; };
+  first('valen70', living / BENCH_UND.length >= 0.7); first('und70', undV / BENCH_VAL.length >= 0.7); first('keepLost', own('blackkeep') !== 'undead');
+  first('capFall', cap.owner === 'undead'); first('siege', !!cap.siege); first('host', !!host); first('stage1', (W.capStage || 0) >= 1); first('stage2', (W.capStage || 0) >= 2);
+  first('keepSiege', !!S.flags.keepSiege); first('garmadonSlain', !!S.flags.garmadonSlain); first('chainsBroken', !!S.flags.chainsBroken); first('varonDead', !!S.flags.varonDead);
+  R.maxLiving = Math.max(R.maxLiving, living); R.maxUnd = Math.max(R.maxUnd, undV);
+  if (P.cap === 'valen' && cap.owner === 'undead') R.n.capFall++; if (P.cap === 'undead' && cap.owner !== 'undead') R.n.capFreed++;
+  if (!P.siege && cap.siege) R.n.siege++; if (P.siege && !cap.siege && cap.owner !== 'undead') R.n.siegeLift++;
+  if (host && host.id !== P.host) R.n.host++;
+  for (const k of R.keys) { const o = own(k) || 'frei', o0 = P.own?.[k]; if (o0 && o0 !== o) R.n[o === 'undead' ? 'toUndead' : 'toLiving']++; const D = (R.nodeDays[k] ||= {}); D[o] = (D[o] || 0) + 1; }
+  if (Bg && Bg.id !== P.big) R.n.big[Bg.kind] = (R.n.big[Bg.kind] || 0) + 1;
+  if (C && C.id !== P.camp) R.n.camp[C.type] = (R.n.camp[C.type] || 0) + 1;
+  R._p = { cap: cap.owner, siege: !!cap.siege, host: host?.id, big: Bg?.id, camp: C?.id, own: Object.fromEntries(R.keys.map(k => [k, own(k) || 'frei'])) };
+  R.days++;
+  if (R.days % 10 === 0 || R.days === 1) R.tl.push({ d, own: R.keys.map(k => ({ valen: 'V', undead: 'U', order: 'O', merch: 'M', aurel: 'A' })[own(k)] || '-').join(''),
+    arm: W.armies.map(a => `${a.faction[0]}${Math.round(a.strength)}${a.host ? 'H' : ''}@${a.at}`).join(' '), thr: Math.round((W.capThreat || 0) * 10) / 10, st: W.capStage || 0,
+    walls: Math.round(cap.walls ?? 100), gar: Math.round(cap.garrison || 0), res: Object.fromEntries(SIM.facResView().map(x => [x.f, Math.round(x.v)])),
+    weary: Object.fromEntries(Object.entries(S.weary || {}).map(([f, w]) => [f, Math.round(w?.v || 0)])), bands: bandsOf().length, men: bandsOf().reduce((a, b) => a + (b.men || 0), 0), razed: Object.keys(S.razed || {}).length });
+}
+export function benchDays(n, R, light = false) {
+  for (let i = 0; i < n; i++) {
+    if (light) { for (let k = 0; k < 4; k++) SIM.warTick(); S.day++; keepSiegeDay(); SIM.warDay(); }
+    else for (let m = 0; m < 1440; m++) {   /* wie update(): Minute, Stunde, Tag */
+      S.minute += 1; if (S.minute >= 1440) { S.minute -= 1440; S.day++; }
+      const C = S.campaign; if (C && C.phase !== 'done' && C.phase !== 'rat') campTick(); if (S.deadRaid) raidTick();
+      if (m % 10 === 0) { tribTick(); chainTick(); bigSecond(); afterSecond(); aurelTick(); }
+      const h = Math.floor(S.minute / 60); if (h !== lastHour) { lastHour = h; hourTick(h); }
+      if (S.day !== lastDay) { lastDay = S.day; dayTick(); }
+    }
+    if (R) benchRecord(R);
+  }
+  return R;
+}
+function benchWorld(seed, diff) {
+  newGame({ name: 'Bank', house: 'Bank', origin: 'wanderer', seed, difficulty: diff, prolog: false });
+  S._quiet = true; S._bench = true; S.paused = true;   /* newGame leert S: sofort wieder stumm (das verzögerte save() aus startGame greift dann nicht), Schleife steht */
+  const p = S.player; S.ents[p.map] = S.ents[p.map].filter(e => e !== p); p.map = S.map = 'deep'; p.x = p.y = 1e6; S.ents.deep.push(p);
+  lastHour = Math.floor(S.minute / 60); lastDay = S.day;
+  return benchRec(seed, diff);
+}
+function benchFinish(R) {
+  const N = S.war.nodes, own = k => N[k]?.owner || null, living = BENCH_UND.filter(k => own(k) && own(k) !== 'undead').length;
+  R.end = { day: S.day | 0, cap: own('varonheim'), und: R.keys.filter(k => own(k) === 'undead').length, living, undV: BENCH_VAL.filter(k => own(k) === 'undead').length,
+    own: R.tl.at(-1)?.own, after: Object.keys(S.after || {}).filter(k => { const v = S.after[k]; return v && (typeof v !== 'object' || Object.keys(v).length); }),
+    razed: Object.keys(S.razed || {}), garmadon: (S.ents.garmadon || []).some(e => e.mtype === 'garmadon' && e.alive), cult: S.cult?.end || S.cult?.stage || 0, chainHeads: Math.round(SIM.facRes('chain')) };
+  R.winner = R.end.cap === 'undead' ? 'Tote' : living >= 3 ? 'Valen' : 'offen';
+  const top = (o, n) => Object.fromEntries(Object.entries(o).sort((a, b) => b[1] - a[1]).slice(0, n));
+  R.logs = top(R.logs, 120); delete R._p; S._sink = null;
+}
+function benchSummary(runs) {
+  const out = {};
+  for (const diff of [...new Set(runs.map(r => r.diff))]) {
+    const rs = runs.filter(r => r.diff === diff), days = rs.reduce((a, r) => a + r.days, 0), fall = rs.filter(r => r.first.capFall != null).map(r => r.first.capFall);
+    const per100 = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, Math.round(v / days * 1000) / 10]).sort((a, b) => b[1] - a[1]));
+    const sum = f => rs.reduce((o, r) => { for (const [k, v] of Object.entries(f(r))) o[k] = (o[k] || 0) + v; return o; }, {});
+    out[diff] = { runs: rs.length, days, capFallRate: `${fall.length}/${rs.length}`, fallDays: fall, fallMean: fall.length ? Math.round(fall.reduce((a, b) => a + b, 0) / fall.length) : null,
+      winners: rs.reduce((o, r) => (o[r.winner] = (o[r.winner] || 0) + 1, o), {}), valen70: rs.map(r => r.first.valen70 ?? null), und70: rs.map(r => r.first.und70 ?? null),
+      keepLost: rs.map(r => r.first.keepLost ?? null), host: rs.map(r => r.first.host ?? null), siege: rs.map(r => r.first.siege ?? null),
+      counts: per100(sum(r => ({ capFall: r.n.capFall, capFreed: r.n.capFreed, siege: r.n.siege, siegeLift: r.n.siegeLift, host: r.n.host, toUndead: r.n.toUndead, toLiving: r.n.toLiving }))),
+      big: per100(sum(r => r.n.big)), camp: per100(sum(r => r.n.camp)), kinds: per100(sum(r => r.kinds)), chron: Object.fromEntries(Object.entries(per100(sum(r => r.chron))).slice(0, 60)),
+      nodeShare: Object.fromEntries((rs[0]?.keys || []).map(k => [k, per100(sum(r => r.nodeDays[k] || {}))])) };
+  }
+  return out;
+}
+export function worldBench(o = {}) {
+  const { seeds = [11, 23, 37, 41, 59, 73], diffs = ['schwer', 'sehr_schwer'], days = 250, slice = 350 } = o;
+  if (window.__bench && !window.__bench.done) return window.__bench;   /* läuft schon */
+  benchLock();
+  const B = window.__bench = { opts: { seeds, diffs, days }, todo: diffs.flatMap(diff => seeds.map(seed => ({ seed, diff }))), runs: [], cur: null, done: false, t0: Date.now(), status: 'startet' };
+  const step = () => {
+    try {
+      if (!B.cur) { const j = B.todo.shift(); if (!j) { B.summary = benchSummary(B.runs); B.done = true; B.status = `fertig: ${B.runs.length} Welten in ${Math.round((Date.now() - B.t0) / 1000)} s — neu laden, bevor du weiterspielst`;
+        console.log('%cWelt-Benchmark', 'color:#bd9433', B.summary); UI.toast('Welt-Benchmark fertig (window.__bench) — Seite neu laden', 6000); return; }
+        B.cur = benchWorld(j.seed, j.diff); }
+      const R = B.cur, t = performance.now();
+      while (R.days < days && performance.now() - t < slice) benchDays(1, R);
+      B.status = `Welt ${B.runs.length + 1}/${B.runs.length + 1 + B.todo.length} (Samen ${R.seed}, ${R.diff}): Tag ${R.days}/${days}`;
+      if (R.days >= days) { benchFinish(R); B.runs.push(R); B.cur = null; }
+    } catch (err) { console.error(err); B.errors = [...(B.errors || []), String(err?.stack || err)]; if (B.cur) { B.cur.error = String(err); benchFinish(B.cur); B.runs.push(B.cur); B.cur = null; } }
+    setTimeout(step, 0);
+  };
+  setTimeout(step, 0); return B;
+}
 export function selftest() {
-  const fame0 = structuredClone(S.fame || null), anom0 = S.anomaly || null, after0 = structuredClone({ a: S.after ?? null, r: S.resettle ?? null });   /* Folgen §5c: S.after bleibt vom Test unberührt */   // S15: Ruhm und Anomalie bleiben vom Test unberührt
+  const fame0 =structuredClone(S.fame || null), anom0 = S.anomaly || null, after0 = structuredClone({ a: S.after ?? null, r: S.resettle ?? null });   /* Folgen §5c: S.after bleibt vom Test unberührt */   // S15: Ruhm und Anomalie bleiben vom Test unberührt
   const quests0 = structuredClone(S.quests || {});   /* 09.10.: Probe-Aufträge (E2, Auftraggeberin) blieben sonst als aktive Einträge in S.quests stehen */
   const out = [], quiet0 = S._quiet;   // AUDIT P-05: Proben setzen S._quiet zurück — am Ende gilt wieder der Wert von vorher
   S._quiet = true;                     // S13: der ganze Test ist still (keine Kamerafahrten, Chronik, Speicherstände aus Proben)
@@ -23344,6 +23473,19 @@ export function selftest() {
     const res = { none, eye, two, cloak, inq }; if (!Object.values(res).every(Boolean)) console.warn('E44-Probe', JSON.stringify(res));
     return Object.values(res).every(Boolean);
   }));
+  ok('E52/E53 Gegner-Scaling: ab Heldenstufe 20/35/50 bringt eine Begegnung (Gefahr ≥ 3) 1/2/3 Begleiter mit Rolle; unter 20 keine; Leben über Stufe 30 nur +2 % je Stufe; frühe Gebiete tauschen Knochenritter gegen Skelett', (() => {
+    const W0 = S.ents.world, p = S.player, lv = p.level, fl = S.flags.scaleHint; S.ents.world = W0.slice();
+    try {
+      const deep = LOCATIONS.find(l => (l.threat || 0) >= 4 && l.kind !== 'city' && l.kind !== 'village'), early = LOCATIONS.find(l => (l.threat || 1) <= 1 && l.kind !== 'city' && l.kind !== 'village');
+      if (!deep || !early) return true; const cnt = () => S.ents.world.length;
+      p.level = 10; let c0 = cnt(); regionSpawn('skeleton', 'world', deep.x, deep.y); const none = cnt() - c0 === 1;
+      p.level = 40; c0 = cnt(); regionSpawn('skeleton', 'world', deep.x, deep.y); const add = S.ents.world.slice(c0), two = add.length === 3 && add.some(e => e.scaleRole === 'shield' && e.mtype === 'bone_knight') && add.some(e => e.scaleRole === 'ranged' && e.mtype === 'bone_archer');
+      p.level = 1; c0 = cnt(); const sw = regionSpawn('bone_knight', 'world', early.x, early.y); const swap = sw?.mtype === 'skeleton';
+      const e30 = spawnEnemy('wolf', 'world', deep.x, deep.y, { level: 30, noVariant: true }), e60 = spawnEnemy('wolf', 'world', deep.x, deep.y, { level: 60, noVariant: true }), hp = Math.abs(e60.maxHp / e30.maxHp - 2.8 / 2.2) < 0.02;
+      const res = { none, two, swap, hp }; if (!Object.values(res).every(Boolean)) console.warn('E52-Probe', JSON.stringify(res));
+      return Object.values(res).every(Boolean);
+    } finally { S.ents.world = W0; p.level = lv; S.flags.scaleHint = fl; }
+  })());
   ok('E41 Nachwachsen (09.10.): Stumpf wird nach 10 Tagen wieder ein fester Baum, vorher nicht, nie im Bild oder unter dem Helden', sandbox(() => {
     const p = stage(), d = S.day | 0, mk = (x, y, age) => { const s = { id: uid(), kind: 'prop', type: 'stump', map: '__a', x, y, r: 8, solid: false, stumpDay: d - age }; S.ents.__a.push(s); return s; };
     S.map = '__a'; const young = mk(p.x + 3000, p.y, 9), old = mk(p.x + 3000, p.y + 200, 10), under = mk(p.x, p.y, 12);
@@ -25425,6 +25567,18 @@ export function selftest() {
       for (let d = 0; d < 60; d++) { for (let i = 0; i < 4; i++) SIM.warTick(); SIM.warDay(); S.day++; }
       return S.war.nodes.varonheim.owner === 'valen';
     } finally { S.war = keep.w; S.towns = keep.t; if (keep.e) S.eco = keep.e; S.priceSeen = keep.ps; S.ents.world = W0; S.player.map = m0; SIM.H.raidDamage = rd; if (A0 === undefined) delete S.after; else S.after = A0; }
+  }));
+  ok('Welt-Benchmark (09.10.): 5 Tage benchDays (leicht: Kriegszüge, keepSiegeDay, warDay) auf dieser Welt — Aufzeichnung vollständig und ohne NaN; Welt im Speicher und echter Spielstand danach unverändert', sandbox(() => {
+    const skip = new Set(['ents', 'player', 'map', 'party', 'projectiles', 'rising', 'fx', 'floats', 'settings', 'dbg', '_quiet', 'paused', 'uiDirty', 'dying', 'cine', 'coop']), snap = {};
+    for (const k of Object.keys(S)) if (!skip.has(k)) { try { snap[k] = [JSON.stringify(S[k]), structuredClone(S[k])]; } catch (err) { /* nicht klonbar: bleibt */ } }
+    const keys0 = new Set(Object.keys(S)), W0 = S.ents.world.slice(), m0 = S.player.map, rd = SIM.H.raidDamage, raw0 = localStorage.getItem(SAVE_KEY), war0 = snap.war?.[0]; let R = null;
+    try { SIM.H.raidDamage = null; S.player.map = 'deep'; S.war.battles = []; R = benchDays(5, benchRec(1, S.difficulty || 'schwer'), true); }
+    finally { S._sink = null; S.ents.world = W0; S.player.map = m0; SIM.H.raidDamage = rd;
+      for (const [k, [j, v]] of Object.entries(snap)) { let same = false; try { same = JSON.stringify(S[k]) === j; } catch (err) { /* nicht serialisierbar */ } if (!same) S[k] = v; }
+      for (const k of Object.keys(S)) if (!skip.has(k) && !keys0.has(k)) delete S[k]; }
+    const nums = R.tl.flatMap(t => [t.thr, t.walls, t.gar, ...Object.values(t.res), ...Object.values(t.weary)]);
+    return R.days === 5 && R.tl.length === 1 && R.keys.length === Object.keys(S.war.nodes).length && Object.values(R.nodeDays).every(D => Object.values(D).reduce((a, b) => a + b, 0) === 5)
+      && nums.every(Number.isFinite) && JSON.stringify(S.war) === war0 && localStorage.getItem(SAVE_KEY) === raw0 && !S._sink && !S._bench;
   }));
   ok('Control 2: Schlächter (Klinge ≤ −60) — niemand ergibt sich (RB-027); Verkauf füllt das Lager und zahlt höchstens ×1,3 (RB-029); Hedda hat genau 3 Phiolen am Tag (RB-019); Lichtschacht brennt den Vampir-Spieler bei Tag (RB-030)', sandbox(() => {
     const T0 = structuredClone(S.towns), m0 = S.minute;
@@ -27965,7 +28119,7 @@ function boot() {
   UI.bind({
     select: e => { selected = e; UI.renderContext(e); },
     talk, recruit, dismiss, giveGear, partyCommand, repairAll, wxText: () => WX[wxKey()]?.txt || '',
-    openCoop: () => import('./coop.js?v=30').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
+    openCoop: () => import('./coop.js?v=31').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)),   /* Koop K2: auch im Spiel über die Einstellungen */
     useOrEquip: i => coopHooks.cmd?.({ kind: 'equip', idx: i }) ?? equip(S.player, i),   /* Koop: beim Gast führt der Host es aus */
     unequip: k => coopHooks.cmd?.({ kind: 'unequip', slot: k }) ?? unequip(S.player, k),
     dropItem: i => { if (S.player.inv[i]?.lock) return UI.toast('Gesperrt. Erst entsperren, dann ablegen.'); if (coopHooks.cmd?.({ kind: 'drop', idx: i })) return; const s = S.player.inv[i]; if (!s) return; dropItemAt(S.map, S.player.x + 16, S.player.y + 8, s); S.player.inv.splice(i, 1); },
@@ -28028,7 +28182,7 @@ function boot() {
       const act = b.dataset.act;
       if (act === 'continue') { const last = localStorage.getItem('rotfall.slot.lastSingle'); if (SLOT.startsWith('c') && last && slotIndex()[last]) setSlot(last); bindInput(); continueGame(); }   /* Fortsetzen = letzter Einzelspieler-Stand */
       else if (act === 'slots') { slotPanel('single'); }
-      else if (act === 'coop') { import('./coop.js?v=30').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
+      else if (act === 'coop') { import('./coop.js?v=31').then(m => m.openPanel(coopAPI())).catch(err => UI.toast('Koop nicht ladbar: ' + err.message, 4000)); }   /* Koop K2, nur auf Knopfdruck geladen */
       else if (act === 'new') { $('cr-fac-wrap')?.classList.remove('hidden'); creation.facRow?.(); setSlot(newSlot('single'));   /* Fraktions-Starts: Freischaltungen neu lesen */   /* Nutzer: neue Geschichte bekommt einen eigenen Platz, nichts wird überschrieben (vorher BUG-086-Rückfrage) */
         $('titlescreen').classList.add('hidden'); $('creation').classList.remove('hidden'); }
       else if (act === 'chronicle') { UI.openModal('chronicle'); }
@@ -28039,8 +28193,8 @@ function boot() {
   requestAnimationFrame(titleLoop);
   if (location.search.includes('test')) setTimeout(() => selftest(), 400);
   // Entwicklerzugang (nur mit ?dev): Zustand und Kernfunktionen für Browser-Tests; tick() simuliert auch bei verstecktem Tab.
-  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=30').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
-    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
+  if (location.search.includes('dev')) window.RF = { S, R, MAPS, TS, update, die, capital2Migrate, useConsumable, foeFacs, lureWhistle, craftItem, craftMenu, coopHooks, coopAPI, coop: { fakeGuest: entId => import('./coop.js?v=31').then(m => m.fakeGuest(coopAPI(), entId)) }, loadProbe, gesture, deathKind, seaVoyage, airVoyage, ensureAirport, harborTalk, voyageFix, airRepair, airUpgrade, tributeDay, tribState, startBrawl, spawnTribute, fortressHour, campaignDay, campTick, planCampaign, festTick, controlPlayer, updateFx, updateProjectiles, actorsOf, think, questPoint, talk, introFlight, prof: on => { PF = on ? { _t: 0 } : null; return PF; }, profGet: () => PF, prologStart, prologAdvance, prologEnd, prologChoiceMenu, goToJail, jailTick, townContracts, acceptContract, conTick, makeContract, findPath, startHunt, huntTick, courtTrial, travel, skyGate, enslave, bondTick, freeBond, aurelWatch, hasPermit, inAurel, mechMenu, raidDay, raidTick, raze, defPower, startRunaway, chainTick, unlockClass, separate, combatN: () => combat.length, factoryWork, holyCourt, aurelParade, mechSwapOptions, councilVote, applyLaw, councilSession, corvanTalk, refugeeWave, TOPICS, cinematic, vargCinematic, undeadFallCinematic, vharnholmFate, cineEnd, healTick, omegaStance, faithDay, ketzerjagd, wallfahrt, kreuzzug, opferfest, growTown, growthDay, investMenu, omegaFrag, omegaPerform, omegaEnd, ensureOmegaBoss, garmadonHost, garmadonParley, garmadonSlain, spawnEnemy, magitechAccident, isHostile, furnAct, useFurniture, sleepIn, rummage, tradeAt, makeChar, HOUSES, B, styleArea, dayTarget, placeAway, VILLAGERS, tick: (ms, step = 16) => { for (let t = 0; t < ms; t += step) update(step, performance.now()); },
+    travel, spawnEnemy, hurt, die, downed, provoke, attack, resolveSwing, teamOf, isHostile, byId, save, selftest, solidPropAt, solidIndex, spawnChoiceEncounter, encTalk, ambientTick, runScene, ensureCoaches, tripOf, journey, applyVariant, rallyCall, enterVault, buildVault, twinFallCheck, legionArrives, duel, simFight, worldBench, benchDays, mkItem, equip, ECO, ecoMenu, dayTick, spawnTraveler, travelerStep, roadTick, migrationDay, emigrate, settleIn, eatMeal, marketBuy, dayTargetRaw, TRAV_KINDS, wanderBotize, hit, giverMark,
     figSheet: (name, list, o) => figSheet(name, list.map(([l, k, w]) => [l, typeof k === 'string' ? sheetSpec(k) : k, w]).filter(r => r[1]), o),
     classRite, trialOffer, startClsTrial, classPassed, talentTopUp, talentTotal, teach, learnNode, nodeState,   /* Klassen und Talente */
     castSpell, learnSpell, spellMenu, startTrial, acadSpot, spellHit, spellPower, stableOffers, buyHorse, dkSteed, conMix, worldCard,                                         // S15 P4: Zauber im Dev-Modus prüfen

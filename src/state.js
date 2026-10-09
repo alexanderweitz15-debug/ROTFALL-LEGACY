@@ -117,6 +117,7 @@ export const SEASON_FARM = [0.9, 1.1, 1.4, 0.4];                                
 const logListeners = [];
 export function onLog(fn) { logListeners.push(fn); }
 export function log(text, cat = 'world') {
+  if (S._sink) S._sink('log', text, cat);       /* Welt-Benchmark (09.10.): zählt mit, auch wenn alles stumm ist */
   if (S._quiet) return;                           // Selbsttest-Sandbox: keine Einträge im echten Protokoll
   const e = { t: timeStr(), text, cat };
   S.log.push(e);
@@ -125,6 +126,7 @@ export function log(text, cat = 'world') {
 }
 
 export function chronicle(text, kind = 'event', detail = '') {
+  if (S._sink) S._sink('chron', text, kind);   /* Welt-Benchmark */
   if (S._quiet) return;
   S.chronicle.push({ year: year(), day: S.day, text, kind, detail });
   if (kind === 'death') log(text, 'death'); 
@@ -171,7 +173,7 @@ export function byId(id) {
 export function partyMembers() { return S.party.map(byId).filter(x => x && x.alive); }
 
 // ---- Speichern ----
-const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg', 'cine', 'coop', 'dying', '_hostHero']);   /* T10: der Heldentod-Moment wird nie gespeichert */   /* Koop K2: Verbindungszustand wird nie gespeichert */
+const SKIP = new Set(['fx', 'floats', 'projectiles', 'paused', 'uiDirty', '_quiet', '_frozenWar', 'dbg', 'cine', 'coop', 'dying', '_hostHero', '_sink', '_bench']);   /* T10: der Heldentod-Moment wird nie gespeichert */   /* Koop K2: Verbindungszustand wird nie gespeichert */
 // Props, die die Generierung aus dem Seed ohnehin wieder erzeugt, werden nicht gespeichert (BUG-057): gespeichert werden nur
 // Props mit Abweichung vom Grundzustand (geöffnete Truhe, verschobene Kiste) und die Schlüssel entfernter Props (propsGone).
 // Grundzustand = Signatur jedes erzeugten Props direkt nach genWorld/genMine, ohne id (ids vergibt jede Generierung neu).
