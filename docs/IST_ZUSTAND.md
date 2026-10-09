@@ -3788,6 +3788,7 @@ Bereich D des detaillierten Ist-Zustands. Grundlage: Code-Stand vom 03.10.2026 (
 - Ganz kleine Fenster (406×310, eingeklapptes Panel): Nur die Einstellungen liefen waagerecht über.
 
 ### Debug-Menü (Strg+Umschalt+D, `debugSections`)
+- **Fenster (Runde 2, 09.10.):** Statuszeile, Schnellleiste (`DBG_QUICK`), 11 Bereiche mit Symbol (`DBG_GROUPS`, kein „Sonstiges“), Werkzeuge Gegenstände (`dbgItemBrowser`), Gegner & Tiere (`dbgFoeBrowser`) und Teleport (`dbgTpBrowser`), Suche mit Treffern in den Browsern, Tastatur ↑↓/Enter/Esc, verschiebbar und vergrößerbar (`rotfall.dbg.win`). Regeln: MECHANIKEN „Debug-Menü (09.10., Runde 2)“.
 - **Was es ist:** Gruppen mit Karten, wie im alten Ist-Zustand §2.29 beschrieben. Neu für Bereich D sind:
   - Gegenstände & Handel: „Items: …“ (Beute regnen lassen, Gepäck füllen, Marken löschen), „Handel: nächsten Händler öffnen (Dock)“, Händlerspruch, +500 Gold.
   - UI: Schmiede-Dock, Kutsche-Dock, Betriebe-Reiter, Fund-Karte Legendär/Mythisch, Pergament.

@@ -3070,7 +3070,7 @@ export function continueGame(given = null, retried = false) {                   
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.goodsOnly && e.kind === 'npc') { delete e.goodsOnly; delete e._kontor; } }   /* P7-Fehler: Kontor setzte goodsOnly dauerhaft — alte Stände bereinigen */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
   S.flags.introDone ??= 1;   /* Einflug nur für neue Helden */
-  migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); ensureTents(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
+  migrateKingsIron(); aurelMetroMigrate(); sideCityMigrate(); SIM.clampArmies(); ensureEisenmark(); ensureRelics(); ensureAurelion(); ensureNobles(); ensureMachines(); ensureBondProps(); ensureDefenseMasters(); evacLoad(); ensureScytheMilitia(); ensureKarak(); ensureBlackKeep(); ensureGobCity(); ensureDwarfGate(); ensureVaronGate(); ensureBloodCult(); ensureCatacombGate(); vanishProps(); ensureSecrets(); ensureCityCharacter(); ensureAirport(); ensureTents(); registerContracts(); nameFix(); fortressHour();   /* Roadmap P6: Mast, Hafenmeisterin, S.air */
   if (!given && S.player && !S.player.alive && !S.dying) S.dying = { t0: performance.now() - 3000, killer: null, rec: S.legacy?.ancestors?.at(-1) || {} };   /* HB-01: ein gespeicherter Tod führt nach dem Laden sofort zum Todesbildschirm und zur Erbenwahl */
   voyageFix();                                                        /* Roadmap P7: an Deck nur mit laufender Reise */
   if (S.map === 'prolog') { if (S.prolog) { buildProlog(); prologEnsure(); } else { const p = S.player; S.ents.prolog = []; S.map = p.map = 'world'; const q = freeSpotNear('world', ...worldPt(66, 70), 3); p.x = q.x; p.y = q.y; S.ents.world.push(p); } }   /* Prolog: Karte neu bauen, Schritt bleibt */
@@ -6291,6 +6291,7 @@ const foesNow = () => { if (FOES_OF !== combat) { FOES_OF = combat; FOES = comba
 function updateNpc(e, dt) {
   if (!e.alive) return;
   if (S.party.includes(e.id)) return partyAI(e, dt);
+  if (e.evacEsc && evacFollow(e, dt)) return;   /* S3c: der Zug des Königs folgt dem Helden */
   if (e.brawl && !e.downed && brawlAI(e, dt)) return;   // S12: Aufstand
   if (e.panicT && panicStep(e, dt)) return;                            /* Folgen §5c: Panik nach Omegas Ende */
   const p = S.player;
@@ -11892,6 +11893,7 @@ function burgDay() {
   if (B2?.lost && cityOk) { B2.lost = Math.max(0, B2.lost - 2); B2.byP = Math.min(B2.byP, B2.lost); if (afterLive()) ensureVaronCourt(); log(`Zwei neue Burgwachen ziehen in die Varonsburg ein.${B2.lost ? '' : ' Die Burgwache ist wieder vollzählig.'}`, 'world'); }
   if (!F.varonFled) return;
   if (SIM.capitalFallen()) return;
+  if (F.varonFled.why === 'evac') { evacHomeDay(); return; }   /* S3c: Heimkehr nach der Belagerung statt Wachen-Zählung */
   F.varonFled.ok = cityOk && !(B2?.lost) ? (F.varonFled.ok || 0) + 1 : 0;
   if (F.varonFled.ok >= 3) { F.varonEvac = F.varonFled.evac0; delete F.varonFled; ensureVaronExile(); ensureVaronCourt(); log('Der König kehrt nach Varonheim zurück.', 'world'); chronicle('Varon kehrt heim', 'news', 'Die Wache steht wieder. Der König sitzt wieder auf seinem Thron.'); }
 }
@@ -12205,6 +12207,7 @@ function servantSmuggle(npc, choices) {                            /* Diener hol
 let keepWas = false, keepWarnAt = 0;
 function keepTick() {
   const p = S.player; if (!CAPITAL || !p.alive) return;
+  evacTick();   /* S3c */
   if (S.keepDepot?.[p.id] && SIM.capitalFallen()) { const b = keepReturn(p); if (b.length) log(`Hagen hat die Waffenkammer der Burg ins Exil gerettet; ein Bote bringt dir deine Sachen: ${b.map(keepItName).join(', ')}.`, 'world'); }
   if (p.map !== 'world' || SIM.capitalFallen() || p.cineGhost) { keepWas = false; return; }
   if (keepSiegeTick()) { keepWas = inKeep(p); return; }   /* S3b: Burgfrieden aufgehoben */
@@ -12289,6 +12292,89 @@ function sallyTick() {                                               /* entschie
   if (!left.length) { if (n?.siege) n.siege.noHit = true; log('Der Ausfall gelingt. Die Toten verlieren Männer, und im nächsten Zug ruhen ihre Rammen. (Heer −15)', 'combat'); UI.toast('AUSFALL GELUNGEN', 2000); return; }
   S.ents.world = S.ents.world.filter(e => !X.ids.includes(e.id) || !e.alive); if (n) n.garrison = Math.max(0, n.garrison - SALLY_LOSS);
   log('Der Ausfall ist gescheitert. Die Besatzung verliert fünf Mann.', 'combat');
+}
+/* ===== Belagerung S3c: den König fortbringen (proposals/varonheim_belagerung_s3.md §2, Entscheidung E18 09.10.) =====
+   Während der Belagerung, sobald die Mauern auf 60 % gefallen sind, bieten Gero (Südtor) und Brandt (Thronsaal) an, den König fortzubringen —
+   nur mit Rang bei Valen, als Ritter Varons oder mit gewährter Audienz. Varon geht als Ritter sicher mit, sonst lehnt er je Tag mit 15 % ab.
+   Weg A (immer): Burgtor, Westtor, 20 Felder Königsstraße zum Sammelplatz — dort lauert eine Streife der Toten. Weg B (nur mit Kultschlüssel):
+   durch den Kanzleikeller, ungesehen bis zur Friedhofsgruft (unzerschlagener Kult: Katakombenwachen am Ausgang). Am Sammelplatz zieht der Hof
+   ins Exil: Besatzung −10, Valen −3, der Hof bleibt ganz (fällt die Stadt, zerstreut sich niemand). Endet die Belagerung gehalten, kehrt er
+   am nächsten Tag heim. Der Zug ist flüchtig: Laden, zu weit weg (40 Felder) oder zu lange (3 Stunden) — der König kehrt in die Burg zurück. */
+const EVAC = { walls: 60, refuse: 0.15, patrol: [3, 4], plvl: 8, mark: 20, far: 40, mins: 180, garLoss: 10, rep: -3, cult: 2, clvl: 13 };
+function evacPts() {
+  const P = TOWN_PLAN.varonheim; if (!P?.area) return null; const [x0] = P.area, gy = P.square[1] - 11;
+  return { gate: [x0, gy], mark: [x0 - EVAC.mark, gy] };
+}
+const evacEsc = () => S.ents.world.filter(e => e.evacEsc && e.alive);
+const evacMayAsk = () => (S.ranks?.valen ?? -1) >= 1 || keepKnight() || !!S.flags.varonAudience;
+function evacChoices(npc, choices) {
+  if (!((npc.varonMarshal && !npc.exileCourt) || npc.siegeMarshal)) return; const n = capNode(), day = S.day | 0;
+  if (!n?.siege || n.owner !== 'valen' || S.flags.varonFled || S.evac?.state || (S.flags.varonDead && S.cult?.end === 'ruling')) return;
+  const say = t => UI.dialogue(npc, t, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]), dead = !!S.flags.varonDead, what = dead ? 'Den Hof fortbringen' : 'Den König fortbringen';
+  choices.unshift({ text: `${what} …`, fn: () => {
+    if ((n.walls ?? 100) > EVAC.walls) return say('„Noch halten die Mauern. Frag mich, wenn sie wanken.“');
+    if (!evacMayAsk()) return say('„Den König vertraue ich keinem Fremden an.“ (Rang bei Valen, Ritter Varons oder eine Audienz nötig)');
+    if (!dead && S.evac?.refused === day) return say('„Der König hat heute schon Nein gesagt. Morgen vielleicht.“');
+    if (!dead && (S.flags.varonQ || 0) < 3 && vmHash('evac', day) % 100 < EVAC.refuse * 100) { (S.evac ||= {}).refused = day; S.evac.state = null; return say('Varon, aus dem Thronsaal: „Ich fliehe nicht vor Knochen.“ (Er lehnt heute ab — als Ritter Varons würde er dir folgen.)'); }
+    const keyB = !!S.cult?.keyB, cult = keyB && !['destroyed', 'player'].includes(S.cult?.end);
+    UI.dialogue(npc, `„Zwei Wege. Durch Burgtor und Westtor zum Sammelplatz an der Königsstraße — dort lauern die Streifen der Toten.${keyB ? ` Oder durch den Kanzleikeller, ungesehen bis zur Friedhofsgruft${cult ? ' — aber unter der Kanzlei wohnt nicht nur Staub' : ''}.` : ''}“ Ankunft am Sammelplatz kostet die Stadt Männer (Besatzung −10) und dem König Ansehen (Valen −3) — aber der Hof bleibt ganz.`, [
+      { text: 'Burgtor und Westtor (Streife der Toten)', fn: () => { UI.closeDialogue(); evacStart('tor'); } },
+      ...(keyB ? [{ text: `Kanzleikeller (ungesehen${cult ? ', Katakombenwachen' : ''})`, fn: () => { UI.closeDialogue(); evacStart('keller'); } }] : []),
+      { text: 'Noch nicht.', fn: () => UI.closeDialogue() }]);
+  } });
+}
+function evacStart(route) {
+  const C = courtEnts(), king = C.find(e => e.varonKing && e.alive), brandt = C.find(e => e.varonMarshal && e.alive), G = C.filter(e => e.guard && e.courtFolk && e.alive).slice(0, 2), Pt = evacPts();
+  if (!Pt || (!king && !brandt)) return UI.toast('Niemand vom Hof ist da.');
+  const esc = [king, brandt, ...G].filter(Boolean), p = S.player;
+  for (const e of esc) Object.assign(e, { evacEsc: true, brave: true, anchor: null });
+  courtDrop(e => e.varonNoble != null || e.varonSpy || (e.smith && e.name === 'Hagen'));   /* die Adligen, Ysmay und Hagen gehen mit dem Hofwagen ab */
+  S.evac = { state: 'run', day: S.day | 0, route, start: S.day * 1440 + S.minute, patrol: false };
+  log(`${king ? 'Varon' : 'Brandt'} folgt dir${route === 'keller' ? ' hinab in den Kanzleikeller' : ''}. Die Adligen fahren mit dem Hofwagen voraus. Ziel: der Sammelplatz des Hofes an der Königsstraße westlich der Stadt.`, 'quest');
+  if (king) bubble(king, '„Ich habe diese Stadt nie zu Fuß verlassen.“', 3600);
+  if (route === 'keller') {                                           /* Weg B: ungesehen bis zur Friedhofsgruft (Abkürzung statt begehbarer Katakomben) */
+    const [x0, y0] = TOWN_PLAN.varonheim.area, at = freeSpotNear('world', x0 + 6, y0 + 11, 3) || { x: p.x, y: p.y }; p.x = at.x; p.y = at.y;
+    esc.forEach((e, i) => { const q = freeSpotNear('world', (at.x / TS | 0) + (i % 2 ? 1 : -1) * (1 + (i >> 1)), (at.y / TS | 0) + 1, 2); if (q) { e.x = q.x; e.y = q.y; } });
+    UI.toast('DURCH DEN KANZLEIKELLER', 2200); log('Ihr steigt durch die Treppe im Kanzleikeller hinab und kommt an der Friedhofsgruft wieder ans Licht.', 'quest');
+    if (!['destroyed', 'player'].includes(S.cult?.end)) for (let i = 0; i < EVAC.cult; i++) { const e = spawnEnemy('blood_cultist', 'world', (at.x / TS | 0) + 4 + i, (at.y / TS | 0) - 2, { level: EVAC.clvl }); if (e) Object.assign(e, { transient: true, aggroId: (king || brandt).id }); }
+  }
+}
+function evacFollow(e, dt) {                                         /* Begleiter: dicht beim Helden, im Kampf normale KI */
+  const p = S.player; if (e.threatId || e.angry || e.downed) return false; const d = dist(e, p);
+  if (d > 70) { seek(e, Math.atan2(p.y - e.y, p.x - e.x), (d > 220 ? 1.7 : 1.35) * dt / 16, dt, p); return true; }
+  e.vx = e.vy = 0; return true;
+}
+function evacTick() {
+  const E = S.evac; if (!E || E.state !== 'run') return; const Pt = evacPts(), p = S.player, esc = evacEsc(), lead = esc.find(e => e.varonKing) || esc.find(e => e.varonMarshal);
+  if (!Pt || !lead) return evacAbort('Vom Zug des Königs ist niemand mehr übrig.');
+  if (SIM.capitalFallen()) return evacArrive(lead);                   /* fällt die Stadt während des Zugs: wer draußen ist, ist entkommen */
+  const n = capNode(), [gx, gy] = Pt.gate, [mx, my] = Pt.mark, lx = lead.x / TS, ly = lead.y / TS;
+  if (Math.hypot(lx - mx, ly - my) < 5) return evacArrive(lead);
+  if (Math.hypot(p.x / TS - lx, p.y / TS - ly) > EVAC.far || S.day * 1440 + S.minute - E.start > EVAC.mins || p.map !== 'world') return evacAbort('Der König traut dir nicht mehr. Der Zug kehrt in die Burg zurück.');
+  if (E.route === 'tor' && !E.patrol && lx < gx + 2) {                /* Weg A: die Streife der Toten zwischen Westtor und Sammelplatz (Pflicht, nicht zufällig) */
+    E.patrol = true; const by = n?.siege?.by, k = EVAC.patrol[vmHash('patrol', S.day | 0) % 2];
+    for (let i = 0; i < k; i++) { const e = spawnEnemy(['skeleton', 'zombie', 'bone_archer', 'ghoul'][i % 4], 'world', ((gx + mx) >> 1) + i - 1, gy + (i % 2 ? 2 : -2), { level: EVAC.plvl }); if (e) Object.assign(e, { transient: true, armyId: by, worth: 2, aggroId: lead.id }); }
+    log('Eine Streife der Toten fängt den Zug an der Königsstraße ab!', 'combat'); UI.toast('STREIFE DER TOTEN', 2200);
+  }
+}
+function evacArrive(lead) {
+  const F = S.flags, n = capNode(), to = SIM.exileOf(), king = lead.varonKing;
+  S.ents.world = S.ents.world.filter(e => !e.evacEsc);
+  if (!to) { S.evac = null; return log('Es gibt keine Stadt mehr, die den Hof aufnimmt.', 'quest'); }
+  F.varonFled = { day: S.day | 0, to, evac0: F.varonEvac || 0, ok: 0, why: 'evac' }; F.varonEvac = 1; S.evac.state = 'away'; (S.after ||= {});
+  if (n && n.owner === 'valen') n.garrison = Math.max(0, n.garrison - EVAC.garLoss); addRep('valen', EVAC.rep);
+  ensureVaronCourt(); ensureVaronExile();
+  const t = `${king ? 'König Varon' : 'Marschall Brandt'} erreicht den Sammelplatz. Der Hof zieht nach ${townName(to)} — ganz und unversehrt. Die Stadt verliert zehn Mann, und man sagt: Der König flieht vor dem Feind. (Valen ${EVAC.rep})`;
+  log(t, 'quest'); chronicle('Der Hof verlässt Varonheim', 'news', t); UI.toast('DER HOF IST IN SICHERHEIT', 2600);
+}
+function evacAbort(why) {
+  S.ents.world = S.ents.world.filter(e => !e.evacEsc); S.evac = null; ensureVaronCourt(); log(why, 'quest');
+}
+function evacLoad() { if (S.evac?.state === 'run') { S.evac = null; ensureVaronCourt(); log('Der Zug des Königs kehrte in die Burg zurück.', 'quest'); } }   /* der Zug ist flüchtig */
+function evacHomeDay() {                                             /* Belagerung gehalten: am nächsten Tag kehrt der Hof heim */
+  const F = S.flags; if (F.varonFled?.why !== 'evac' || SIM.capitalFallen() || capNode()?.siege) return false;
+  F.varonEvac = F.varonFled.evac0; delete F.varonFled; S.evac = null; ensureVaronExile(); ensureVaronCourt();
+  log('Die Belagerung ist vorbei: Der König kehrt nach Varonheim heim.', 'world'); chronicle('Der König kehrt heim', 'news', 'Nach der Belagerung zieht der Hof wieder in die Varonsburg ein.'); return true;
 }
 function keepDraw(c) {                                               /* drinnen zugeschlagen: Warnung, dann Alarm */
   if (c !== S.player || !inKeep(c) || SIM.capitalFallen() || keepStorm()) return;   /* S3b: im Sturm zieht jeder blank */
@@ -15707,8 +15793,11 @@ function tentKind(e) {
 }
 function tentLoc(e) { const tx = e.x / TS, ty = e.y / TS; let best = null, bd = 1e9; for (const l of LOCATIONS) { const d = Math.hypot(l.x - tx, l.y - ty); if (d < bd && d <= (l.r || 8) + 10) { bd = d; best = l; } } return best; }
 function tentBand(e) { if (e.bandId) return (S.bands || []).find(b => b.id === e.bandId && !b.gone) || null; const tx = e.x / TS, ty = e.y / TS; return bandsOf().find(b => Math.hypot(b.tx - tx, b.ty - ty) <= 8) || null; }
-function tentIndex() { const idx = new Map(); for (const o of S.ents.world) if (o.kind === 'prop') { const k = SK(o.x / TS | 0, o.y / TS | 0); (idx.get(k) || idx.set(k, []).get(k)).push(o); } return idx; }
-function tentFits(x, y, w, h, self, idx) {
+function tentIndex() { const idx = new Map(); for (const o of S.ents.world) if (o.kind === 'prop') { const k = SK(o.x / TS | 0, o.y / TS | 0); (idx.get(k) || idx.set(k, []).get(k)).push(o); }
+  idx.route = new Set(); const RT = SIM.ROUTE || []; for (let i = 1; i < RT.length; i++) { const [a, b] = RT[i - 1], [x, y] = RT[i], n = Math.max(Math.abs(x - a), Math.abs(y - b), 1);
+    for (let k = 0; k <= n; k++) idx.route.add(SK(Math.floor(a + (x - a) * k / n), Math.floor(b + (y - b) * k / n))); }
+  return idx; }
+function tentFits(x, y, w, h, self, idx, town = false) {               /* town: in Orten 2 Felder Abstand zu Häusern (Gassen bleiben frei, Plätze gehen) */
   for (let j = y - 1; j <= y + h; j++) for (let i = x - 1; i <= x + w; i++) {
     const t = tileAt('world', i, j), inner = i >= x && i < x + w && j >= y && j < y + h;
     if (inner ? !TENT_GROUND.has(t) : (t === T.WALL || t === T.DWALL)) return false;
@@ -15716,19 +15805,25 @@ function tentFits(x, y, w, h, self, idx) {
   }
   const dx = x + (w >> 1), fy = y + h, ft = tileAt('world', dx, fy);
   if (SOLID.has(ft) || ft === T.WATER || (idx.get(SK(dx, fy)) || []).some(o => o.solid && !o._tent)) return false;
-  return !HOUSES.some(b => b.map === 'world' && x - 1 < b.x + b.w && x + w + 1 > b.x && y - 1 < b.y + b.h && y + h + 1 > b.y);
+  if (idx.route) for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) if (idx.route.has(SK(i, j))) return false;   /* Karawanenroute bleibt frei */
+  const M = town ? 2 : 1; return !HOUSES.some(b => b.map === 'world' && x - M < b.x + b.w && x + w + M > b.x && y - M < b.y + b.h && y + h + M > b.y);
 }
-function tentSpot(e, idx) {                                          /* das Prop liegt in der Zeltwand (zuerst Mitte der Rückwand), nie in der Tür */
-  const px = e.x / TS | 0, py = e.y / TS | 0;
+function tentSpot(e, idx, far = 5) {                                          /* das Prop liegt in der Zeltwand (zuerst Mitte der Rückwand), nie in der Tür */
+  const px = e.x / TS | 0, py = e.y / TS | 0, town = !!townAt(px, py, 2);
   for (const [w, h] of TENT_SIZES) {
     const ring = []; for (let oy = 0; oy < h; oy++) for (let ox = 0; ox < w; ox++) { if ((oy > 0 && oy < h - 1 && ox > 0 && ox < w - 1) || (oy === h - 1 && ox === (w >> 1))) continue; ring.push([ox, oy, oy * 10 + Math.abs(ox - (w >> 1))]); }
     ring.sort((a, b) => a[2] - b[2]);
-    for (const [ox, oy] of ring) if (tentFits(px - ox, py - oy, w, h, e, idx)) return [px - ox, py - oy, w, h];
+    for (const [ox, oy] of ring) if (tentFits(px - ox, py - oy, w, h, e, idx, town)) return [px - ox, py - oy, w, h];
+  }
+  for (const [w, h] of TENT_SIZES) for (let r = 1; r <= far; r++) for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) {   /* kein Platz am Prop: bis 5 Felder daneben (Pilger im Ort 14 ⚖, bis auf den Platz), das Prop rückt in die Rückwand */
+    if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue; const x = px + dx - (w >> 1), y = py + dy;
+    if (tentFits(x, y, w, h, e, idx, town)) return [x, y, w, h, true];
   }
   return null;
 }
 function raiseTent(e, kind, spot) {
-  const [x, y, w, h] = spot, id = 'tent_' + (e.gk ?? e.id), before = [];
+  const [x, y, w, h, moved] = spot, id = 'tent_' + (e.gk ?? e.id), before = [];
+  if (moved) { if (e.solid && solidIndex.world) removeSolid(e); e.x = (x + (w >> 1)) * TS + TS / 2; e.y = y * TS + TS / 2; if (e.solid && solidIndex.world) addSolid(e); }
   for (let j = y; j < y + h; j++) for (let i = x; i < x + w; i++) { before.push(tileAt('world', i, j)); setTile('world', i, j, j === y || j === y + h - 1 || i === x || i === x + w - 1 ? T.WALL : T.DIRT); }
   const dt = [x + (w >> 1), y + h - 1]; setTile('world', dt[0], dt[1], T.DIRT);
   const L = tentLoc(e), look = TENT_LOOK[kind], fac = kind === 'garrison' ? (L?.faction || (e.gateCamp && townFac(e.gateCamp)) || 'valen') : null;
@@ -15736,6 +15831,7 @@ function raiseTent(e, kind, spot) {
     cloth: look.cloth, stripe: look.stripe || (fac && FACTIONS[fac]?.colors?.[0]) || null, emblem: look.emblem || null, label: e.label || TENT_NAME[kind], where: L?.name || null };
   HOUSES.push(b); const T0 = { b, prop: e, before, furn: [], key: null }; TENTS.set(id, T0);
   Object.defineProperty(e, '_tent', { value: id, writable: true, configurable: true, enumerable: false });
+  if (e.solid) { if (solidIndex.world) removeSolid(e); e.solid = false; e.tentSolid = 1; }   /* das Prop steckt in der Zeltwand: dort fest zu sein wäre doppelt (Probe Weltmaßstab) */
   tentFurnish(T0);
   for (const o of S.ents.world) if (o.kind !== 'prop' && (o.map || 'world') === 'world' && tileAt('world', o.x / TS | 0, o.y / TS | 0) === T.WALL && o.x / TS >= x && o.x / TS < x + w && o.y / TS >= y && o.y / TS < y + h) { const s = freeSpotNear('world', dt[0], dt[1] + 1, 3); o.x = s.x; o.y = s.y; }   /* wer jetzt in der Zeltwand stünde, tritt vor die Tür */
   return b;
@@ -15745,8 +15841,9 @@ function lowerTent(T0) {                                             /* Prop for
   for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) setTile('world', i, j, T0.before[k++]);
   const hi = HOUSES.indexOf(b); if (hi >= 0) HOUSES.splice(hi, 1);
   const gone = new Set(T0.furn); for (const o of T0.furn) if (o.solid && solidIndex.world) removeSolid(o); S.ents.world = S.ents.world.filter(o => !gone.has(o));
-  if (T0.prop) T0.prop._tent = 0; TENTS.delete(b.id);
+  if (T0.prop) { T0.prop._tent = 0; tentUnsolid(T0.prop); } TENTS.delete(b.id);
 }
+function tentUnsolid(e) { if (!e.tentSolid) return; e.solid = true; delete e.tentSolid; if (solidIndex.world && (e.map || 'world') === 'world') addSolid(e); }   /* Zelt steht nicht (mehr): das Prop wird wieder fest */
 function tentItems(T0) {                                             /* Bandenzelt: im Zelt nahe der Lagermitte liegt die Beute (b.loot, T12) */
   const { b } = T0; if (b.tentKind !== 'band') return [TENT_FURN[b.tentKind], b.tentKind];
   const B0 = tentBand(T0.prop); if (!B0) return [[['debris', 'Ausgeräumt — hier haust gerade keine Bande'], ['sack', 'Strohlager']], 'leer'];
@@ -15772,7 +15869,7 @@ function ensureTents() {                                             /* idempote
   if (TENTS.size) { const live = new Set(S.ents.world); for (const T0 of [...TENTS.values()]) if (!live.has(T0.prop)) lowerTent(T0); }
   const todo = S.ents.world.filter(e => e.type === 'tent_prop' && !e._tent && !e._tentNo && tentKind(e)); let n = 0;
   if (todo.length) { const idx = tentIndex();
-    for (const e of todo) { const sp = tentSpot(e, idx); if (sp) { raiseTent(e, tentKind(e), sp); n++; } else Object.defineProperty(e, '_tentNo', { value: true, configurable: true, enumerable: false }); } }
+    for (const e of todo) { const sp = tentSpot(e, idx, tentKind(e) === 'pilger' ? 14 : 5); if (sp) { raiseTent(e, tentKind(e), sp); n++; } else { tentUnsolid(e); Object.defineProperty(e, '_tentNo', { value: true, configurable: true, enumerable: false }); } } }
   for (const T0 of TENTS.values()) if (T0.b.tentKind === 'band') tentFurnish(T0);
   return n;
 }
@@ -16187,7 +16284,7 @@ function talk(npc) {
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith && !(npc.dwarf && !S.flags.dwarfFriend)) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });   /* Zwergenschmiede erst als Freund der Halle */
   if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost(npc)} Gold)${zealHealMul(npc) > 1 ? ' — der Orden verlangt mehr, solange sein Eifer brennt' : ''}`, fn: () => healerTreat(npc) });   // AUDIT H-03
-  choices.push(...bionicChoices(npc)); leaveChoices(npc, choices);   /* NPC-Ziele N2 */ if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); envoyChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); geroChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
+  choices.push(...bionicChoices(npc)); leaveChoices(npc, choices);   /* NPC-Ziele N2 */ if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); envoyChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); geroChoices(npc, choices); evacChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
   if ((npc.recruit || npc.retainer) && !S.party.includes(npc.id)) choices.push({ text: npc.retainer ? 'Komm wieder mit.' : 'Komm mit mir.', fn: () => recruit(npc) });
@@ -20411,6 +20508,10 @@ function debugSections() {
       'S3b: Sturm vor Ort jetzt (Phase 1, Heer 60 — zum Südtor)': () => { const G = capGates(); if (!G) return; tp(G.southIn[0], G.southIn[1] - 3); const n = S.war.nodes.varonheim; let u = S.war.armies.find(a => a.faction === 'undead' && a.at === 'varonheim');
         if (!u) { u = { id: uid(), faction: 'undead', at: 'varonheim', prev: 'ashford', strength: 60, name: 'Morvaths Heerzug', host: true }; S.war.armies.push(u); } n.siege ||= { day: S.day | 0, by: u.id }; n.walls = 0; SIM.capitalStormForTest(u, { id: 'g:varonheim', garrison: 'varonheim', faction: 'valen', strength: n.garrison, name: 'Besatzung von Varonheim' }, 1); },
       'S3b: Phase 2 jetzt (Burgtor)': () => { const G = capGates(), n = S.war.nodes.varonheim, u = S.war.armies.find(a => a.faction === 'undead' && a.at === 'varonheim'); if (!G || !u || !n.siege) return UI.toast('Erst Belagerung/Sturm starten.'); tp(G.keep[0], G.keep[1] + 4); S.war.battles = S.war.battles.filter(b => !b.storm); SIM.capitalStormForTest(u, { id: 'g:varonheim', garrison: 'varonheim', faction: 'valen', strength: n.garrison, name: 'Besatzung von Varonheim' }, 2); },
+      'S3c: König fortbringen jetzt (Weg Tor, Rang gesetzt)': () => { const n = S.war.nodes.varonheim; let u = S.war.armies.find(a => a.faction === 'undead' && a.at === 'varonheim'); if (!u) { u = { id: uid(), faction: 'undead', at: 'varonheim', prev: 'ashford', strength: 60, name: 'Morvaths Heerzug', host: true }; S.war.armies.push(u); }
+        n.siege ||= { day: S.day | 0, by: u.id }; n.walls = Math.min(n.walls ?? 100, 50); S.ranks.valen = Math.max(1, S.ranks.valen ?? -1); ensureVaronCourt(); const k = courtEnts().find(e => e.varonKing); if (k) tp(k.x / TS | 0, (k.y / TS | 0) + 2); evacStart('tor'); },
+      'S3c: Zug sofort am Sammelplatz': () => { const L = evacEsc().find(e => e.varonKing) || evacEsc()[0], Pt = evacPts(); if (!L || !Pt) return UI.toast('Kein Zug unterwegs.'); L.x = Pt.mark[0] * TS; L.y = Pt.mark[1] * TS; evacTick(); },
+      'S3c: Evakuierung zurücksetzen': () => { if (S.flags.varonFled?.why === 'evac') { S.flags.varonEvac = S.flags.varonFled.evac0; delete S.flags.varonFled; } S.ents.world = S.ents.world.filter(e => !e.evacEsc); S.evac = null; ensureVaronExile(); ensureVaronCourt(); UI.toast('Evakuierung zurückgesetzt'); },
       'S3b: Burgfrieden-Status': () => UI.toast(keepStorm() ? 'Burgfrieden AUFGEHOBEN (Mauern 0, Belagerung)' : S.flags.keepSiegeOpen ? 'Belagerung vorbei — Burgfrieden gilt beim nächsten Tick wieder' : 'Burgfrieden gilt', 3000),
       'S3b: zu Gero ans Südtor': () => { const G = capGates(); if (G) tp(G.southIn[0], G.southIn[1] - 2); if (!capNode()?.siege) UI.toast('Gero steht nur während einer Belagerung am Tor.'); },
       'Varonheim fällt': () => { SIM.captureNode('varonheim', 'undead'); if (AF().capital) S.after.capital.why = 'Debug'; },
@@ -20640,6 +20741,12 @@ function debugSections() {
       'Module abnehmen': () => { for (const k of ['larm', 'rarm', 'lleg', 'rleg']) delete p.body[k].mod; recalc(p); UI.toast('Keine Module'); },
       'Bande hier gründen (neben dir)': () => { const p = P(), T0 = Object.keys(TOWN_PLAN).find(k => TOWN_PLAN[k].square); const b = bandFound(T0, [(p.x / TS | 0) + 18, p.y / TS | 0]); if (b) UI.toast(b.name); },   /* Nutzer §5d.7 */
       'Banden: einen Tag vergehen lassen': () => bandDay(),
+      'Zelte (T21): zum nächsten begehbaren Zelt (vor die Tür)': () => { const p = P(), t = [...TENTS.values()].map(T0 => T0.b).sort((a, c) => Math.hypot(a.doorTile[0] * TS - p.x, a.doorTile[1] * TS - p.y) - Math.hypot(c.doorTile[0] * TS - p.x, c.doorTile[1] * TS - p.y))[0];
+        if (!t) return UI.toast('Kein begehbares Zelt'); if (S.map !== 'world') travel('world'); p.x = t.doorTile[0] * TS + TS / 2; p.y = (t.doorTile[1] + 1) * TS + TS / 2; UI.toast(`${t.label}${t.where ? ' · ' + t.where : ''} (${t.tentKind}) — nach oben gehen`, 3000); },
+      'Zelte (T21): nächstes Räuberzelt mit Bande und Beute 25': () => { const p = P(), t = [...TENTS.values()].filter(T0 => T0.b.tentKind === 'band' && !T0.prop.bandId).map(T0 => T0.b).sort((a, c) => Math.hypot(a.x * TS - p.x, a.y * TS - p.y) - Math.hypot(c.x * TS - p.x, c.y * TS - p.y))[0];
+        if (!t) return UI.toast('Kein Räuberzelt'); let b = tentBand(TENTS.get(t.id).prop); if (!b) { const T0 = Object.keys(TOWN_PLAN).filter(k => TOWN_PLAN[k].square).sort((a, c) => Math.hypot(TOWN_PLAN[a].square[0] - t.x, TOWN_PLAN[a].square[1] - t.y) - Math.hypot(TOWN_PLAN[c].square[0] - t.x, TOWN_PLAN[c].square[1] - t.y))[0]; b = bandFound(T0, [t.x + 2, t.y + t.h + 2]); }
+        if (!b) return UI.toast('Keine Bande'); b.loot = 25; b.good = 'grain'; ensureTents(); if (S.map !== 'world') travel('world'); p.x = t.doorTile[0] * TS + TS / 2; p.y = (t.doorTile[1] + 1) * TS + TS / 2; UI.toast(`${b.name}: Beute 25 — im Zelt liegt der Haufen`, 3000); },
+      'Zelte (T21): Zahl und Arten ins Log': () => { const k = {}; for (const T0 of TENTS.values()) k[T0.b.tentKind] = (k[T0.b.tentKind] || 0) + 1; log(`Begehbare Zelte: ${TENTS.size} (${Object.entries(k).map(([a, n]) => `${a} ${n}`).join(', ')}); ohne Platz: ${S.ents.world.filter(e => e._tentNo).length}`, 'world'); },
       'Straßen (T12): Bande an die Alte Straße setzen (Eren–Nordfurt)': () => { const LA = LOCATIONS.find(l => l.key === 'eren'), LB = LOCATIONS.find(l => l.key === 'northcity'), b = bandFound('eren', [Math.round((LA.x + LB.x) / 2), Math.round((LA.y + LB.y) / 2) + 8]); if (b) { b.men = 7; UI.toast(`${b.name} bei ${b.where} — Kontor in Eren oder Nordfurt zeigt die Gefahr`, 3500); } },
       'Straßen (N1): Eren–Nordfurt einmal überfallen (2× = Umweg, 3× = gemieden)': () => { ECO.noteRaid('eren', 'northcity'); const r = ECO.routeOf('eren', 'northcity'); UI.toast(`Überfälle: ${r.hits.length} · Umweg bis Tag ${r.detourTill || '—'} · gemieden bis Tag ${r.shunTill || '—'}`, 3000); },
       'Straßen (N1): Gedächtnis der Händler ins Log': () => log(`Strecken: ${Object.entries(S.eco.routes || {}).map(([k, r]) => `${k} ${r.hits.length}× (Umweg ${r.detourTill}, gemieden ${r.shunTill})`).join(' · ') || 'nichts gemerkt'}.`, 'economy'),
@@ -21068,7 +21175,7 @@ function dbgFoeBrowser(host) {
   host.innerHTML = `<div class="dbi-top"><div class="dbi-cats"></div><div class="dbi-row"><input class="dbi-q" placeholder="Name oder Schlüssel (sucht in allen Kategorien) …" autocomplete="off">
     <label>Stufe <select class="dbf-lv">${opt(DBG_LV.map(l => [l, l || 'Gebiet']), dbgF.lv)}</select></label><label>Anzahl <select class="dbf-n">${opt([1, 3, 5, 10].map(n => [n, n]), dbgF.n)}</select></label>
     <label>Variante <select class="dbf-va">${opt([['', 'wie im Spiel'], ['plain', 'keine'], ...Object.entries(ENEMY_VARIANTS).map(([k, V]) => [k, V.name.replace(':', '')])], dbgF.va)}</select></label>
-    <button class="dbi-act" title="Entfernt alle Gegner im Umkreis von 25 Feldern auf dieser Karte (ohne Bosse, Haus- und Nutztiere)">✕ Umkreis leeren</button></div></div>
+    <button class="dbi-act" title="Entfernt alle feindlichen Gegner im Umkreis von 25 Feldern auf dieser Karte (ohne Bosse, Wachen, Haus- und Nutztiere)">✕ Umkreis leeren</button></div></div>
     <div class="dbi-grid"></div><div class="dbi-foot">Klick = erscheint neben dir · Stufe „Gebiet“ = wie die Gegend · Kopfgeld-Elite = benannter Anführer aus den Steckbriefen (Stufe/Variante gelten dort nicht)</div>`;
   const $q = host.querySelector('.dbi-q'), grid = host.querySelector('.dbi-grid');
   const draw = () => {
@@ -21084,7 +21191,7 @@ function dbgFoeBrowser(host) {
   host.onclick = e => {
     const b = e.target.closest('button'), t = e.target.closest('.dbi-tile'), p = S.player;
     if (b?.dataset.cat) { dbgF.cat = b.dataset.cat; dbgF.q = $q.value = ''; return draw(); }
-    if (b?.classList.contains('dbi-act')) { let n = 0; S.ents[S.map] = (S.ents[S.map] || []).filter(x => { const r = x.kind === 'enemy' && !x.boss && !MONSTERS[x.mtype]?.prey && !x.owner && !x.pet && dist(x, p) < 25 * TS; if (r) n++; return !r; }); return UI.toast(`${n} Gegner entfernt.`, 1400); }
+    if (b?.classList.contains('dbi-act')) { let n = 0; S.ents[S.map] = (S.ents[S.map] || []).filter(x => { const r = x.kind === 'enemy' && !x.boss && !MONSTERS[x.mtype]?.prey && !x.owner && !x.pet && dist(x, p) < 25 * TS && isHostile(x, p); if (r) n++; return !r; }); return UI.toast(`${n} Gegner entfernt.`, 1400); }
     if (!t) return; const n = dbgF.n;
     if (t.dataset.el) { for (let i = 0; i < n; i++) spawnEliteHere(t.dataset.el); return UI.toast(`${n > 1 ? n + '× ' : ''}${ELITES[t.dataset.el].name} erscheint.`, 1400); }
     const k = t.dataset.k; for (let i = 0; i < n; i++) dbgSpawn(k, i); UI.toast(`${n > 1 ? n + '× ' : ''}${MONSTERS[k].name}${dbgF.lv ? ` (Stufe ${dbgF.lv})` : ''} erscheint.`, 1400);
@@ -21101,7 +21208,7 @@ const DBG_TQUICK = [['Auftragsziel', 'Bewegung', 'Teleport: Auftragsziel'], ['Sc
 function dbgTpList() {
   const out = [];
   for (const k of Object.keys(TOWN_PLAN)) { const [x, y] = TOWN_PLAN[k].square; out.push({ cat: 'Städte', name: townName(k), sub: '', key: k, x, y: y + 2 }); }
-  for (const l of LOCATIONS) if (l.kind !== 'road') out.push({ cat: 'Orte', name: l.name, sub: (DBG_LKIND[l.kind] || l.kind) + (l.poi ? ' (Fundort)' : ''), key: l.key, x: l.x, y: l.y });
+  for (const l of LOCATIONS) if (l.kind !== 'road') out.push({ cat: 'Orte', name: l.name, sub: l.poi ? 'Fundort' : DBG_LKIND[l.kind] || l.kind, key: l.key, x: l.x, y: l.y });
   for (const k of MAP_KEYS) out.push({ cat: 'Karten', name: DUNGEONS[k]?.name || 'Oberwelt', sub: '', key: k, map: k });
   for (const e of S.ents.world || []) if (e.kind === 'npc' && e.alive && e.name && (e.vm || e.houseKey || e.passamt || (e.key && !e.villager && !e.guard))) out.push({ cat: 'Personen', name: e.name, sub: e.prof || '', key: e.id, id: e.id, x: e.x / TS | 0, y: e.y / TS | 0 });
   return out;
@@ -21110,7 +21217,7 @@ function dbgTpBrowser(host) {
   host.innerHTML = `<div class="dbi-top"><div class="dbi-cats"></div><div class="dbi-subs"></div><div class="dbi-row"><input class="dbi-q" placeholder="Stadt, Ort, Person, Karte … (sucht überall)" autocomplete="off">
     <button class="dbi-chip dbt-near" title="Nächste zuerst sortieren">↕ Nähe</button><input class="dbi-xy" placeholder="x,y" size="8" title="Kachel-Koordinaten (stehen oben in der Statuszeile)"><button class="dbi-act dbt-go">Hin</button></div>
     <div class="dbi-subs dbt-quick">${DBG_TQUICK.map((q, i) => `<button class="dbi-chip sm" data-qs="${i}" title="${dbgEsc(q[1] + ' › ' + q[2])}">➹ ${q[0]}</button>`).join('')}</div></div>
-    <div class="dbi-grid"></div><div class="dbi-foot">Klick = hinreisen (freier Platz neben dem Ziel) · Karten: Eingang des Dungeons · Personen und Orte liegen auf der Oberwelt</div>`;
+    <div class="dbi-grid"></div><div class="dbi-foot">Klick = hinreisen (freier Platz neben dem Ziel) · Karten: direkt hinein · Personen und Orte liegen auf der Oberwelt</div>`;
   const $q = host.querySelector('.dbi-q'), grid = host.querySelector('.dbi-grid');
   const draw = () => {
     const all = dbgTpList(), q = dbgT.q.trim().toLowerCase(), p = S.player, w = S.map === 'world', ptx = p.x / TS, pty = p.y / TS;
@@ -22724,7 +22831,30 @@ export function selftest() {
       return Object.values(res).every(Boolean);
     } finally { const i = S.ents.world.indexOf(fake); if (i >= 0) S.ents.world.splice(i, 1); S.bands = B0; S.ranks.bandit = rk0; Object.assign(S.factions, fa0); S.gold = g0; S.flags = fl; }
   })());
-  /* T23 Fraktionsressourcen: jede Probe sichert S.facRes, S.towns, S.war, S.eco, S.after, S.tribute, S.gobCity, S.tollMul, Feldzug, Glaubenstakt,
+  ok('T21 Begehbare Zelte: Lager-, Räuber-, Pilger- und Garnisonszelte stehen als Bauten (Stoffwand, Tür, Einrichtung; Prop in der Wand, nicht fest, Einrichtung nicht gespeichert), Hütten bleiben Props; ein neues Zelt steht mit seinem Prop auf und fällt mit ihm (Kacheln zurück); im Räuberzelt liegt die Beute der Bande in Stufen', (() => {
+    const B0 = S.bands, W0 = S.ents.world.slice(), fl = { ...S.flags }, test = [];
+    try {
+      const all = [...TENTS.values()], kinds = new Set(all.map(T0 => T0.b.tentKind));
+      const built = all.length > 30 && ['band', 'camp', 'garrison', 'pilger'].every(k => kinds.has(k)) && all.every(({ b, prop }) => HOUSES.includes(b) && prop._tent === b.id && !prop.solid
+        && tileAt('world', b.x, b.y) === T.WALL && tileAt('world', b.x + b.w - 1, b.y + b.h - 1) === T.WALL && !SOLID.has(tileAt('world', ...b.doorTile)) && !SOLID.has(tileAt('world', b.doorTile[0], b.doorTile[1] - 1)) && SOLID.has(tileAt('world', prop.x / TS | 0, prop.y / TS | 0)));
+      const huts = S.ents.world.filter(x => x.type === 'tent_prop' && /Hütte/.test(x.label || '')).every(x => !x._tent);
+      const sw = JSON.parse(saveData()).ents.world, noSave = !sw.some(x => x.tentOf) && !sw.some(x => '_tent' in x);
+      const L = LOCATIONS.find(l => l.key === 'redwaste'), idx = tentIndex(), mk = (id, o) => ({ id, kind: 'prop', type: 'tent_prop', map: 'world', r: 14, solid: true, transient: true, ...o });
+      let e = null; for (let r = 0; r < 40 && !e; r += 3) { const c = mk('tp21', { x: (L.x + r) * TS + 16, y: L.y * TS + 16, label: 'Probezelt' }); if (tentSpot(c, idx) && tentSpot(mk('x', { x: c.x + 9 * TS, y: c.y }), idx)) e = c; }
+      if (!e) return false; const e2 = mk('tp21b', { x: e.x + 9 * TS, y: e.y, label: 'Räuberzelt', bandId: 'tb21' }); test.push(e, e2);
+      const tb = { id: 'tb21', name: 'Probe-Bande', lead: 'X', where: 'x', town: 'eren', tx: (e2.x / TS | 0), ty: (e2.y / TS | 0) + 4, born: S.day | 0, men: 5, paid: -1, amb: -999, loot: 5, good: 'grain', starve: 0 };
+      S.bands = [tb]; S.ents.world.push(e, e2); const n = ensureTents(), b = HOUSES.find(h => h.id === 'tent_tp21'), bb = HOUSES.find(h => h.id === 'tent_tp21b'), before = TENTS.get('tent_tp21')?.before.slice();
+      const furn = id => S.ents.world.filter(o => o.tentOf === id), lab = () => furn('tent_tp21b').map(o => o.label || '').join('|');
+      const up = n >= 2 && !!b && !!bb && b.tentKind === 'camp' && bb.tentKind === 'band' && e._tent === b.id && !e.solid && e.tentSolid === 1 && R.playerInside(b, { map: 'world', x: (b.x + 1) * TS + 16, y: (b.y + 1) * TS + 16 })
+        && furn(b.id).length >= 2 && furn(b.id).filter(o => o.solid).length <= Math.max(1, Math.floor((b.w - 2) * (b.h - 2) / 2) - 1) && !furn(b.id).some(o => o.x / TS === b.doorTile[0] + 0.5 && o.y / TS === b.doorTile[1] - 0.5);
+      const l5 = lab().includes('Beute von Probe-Bande: 5'); tb.loot = 25; ensureTents(); const l25 = lab().includes('Beute von Probe-Bande: 25') && lab().includes('Beutefass') && lab().includes('Beutesack'); tb.loot = 0; ensureTents(); const l0 = lab().includes('die Bande hungert');
+      S.ents.world = S.ents.world.filter(o => o !== e); ensureTents(); let k = 0, same = true; for (let j = b.y; j < b.y + b.h; j++) for (let i = b.x; i < b.x + b.w; i++) if (tileAt('world', i, j) !== before[k++]) same = false;
+      const down = same && !HOUSES.includes(b) && !furn(b.id).length && !TENTS.has('tent_tp21') && e.solid === true;
+      const res = { built, huts, noSave, up, l5, l25, l0, down }; if (!Object.values(res).every(Boolean)) console.warn('T21-Probe', res);
+      return Object.values(res).every(Boolean);
+    } finally { for (const e of test) { const T0 = TENTS.get(e._tent); if (T0) lowerTent(T0); if (e.solid && solidIndex.world) removeSolid(e); } S.ents.world = W0; S.bands = B0; S.flags = fl; }
+  })());
+  /* T23 Fraktionsressourcen:jede Probe sichert S.facRes, S.towns, S.war, S.eco, S.after, S.tribute, S.gobCity, S.tollMul, Feldzug, Glaubenstakt,
      Verträge, Weltliste, Hooks und den Zufallsstand (keepRng) selbst und setzt sie zurück */
   const t23 = fn => keepRng(() => sandbox(() => {
     const K = structuredClone({ r: S.facRes ?? null, t: S.towns, w: S.war, e: S.eco ?? null, a: S.after ?? null, tr: S.tribute ?? null, g: S.gobCity ?? null, toll: S.tollMul ?? null, cn: S.campNext ?? null,
@@ -24869,6 +24999,25 @@ export function selftest() {
       return Object.values(res).every(Boolean);
     } finally { S.war = W0; S.towns = T0; if (A0 === undefined) delete S.after; else S.after = A0; S.ents.world = W1; gate.forEach((g, i) => { if (g.solid && !gs[i][0]) removeSolid(g); [g.solid, g.label] = gs[i]; }); geroRef = null;
       Object.assign(p, pk); S.map = m0; S.keepDepot = D0; S.keepPass = P0; S.flags = fl; p.inv = inv0; p.equip = eq0; recalc(p); }
+  }));
+  ok('Belagerung S3c (E18): König fortbringen — Angebot erst ab Mauern 60 und nur mit Rang; Zug folgt; am Sammelplatz Exil ohne Fall (Besatzung −10, Valen −3, Hof ganz); Belagerung gehalten = Heimkehr; Laden setzt den Zug zurück', sandbox(() => {
+    const W0 = structuredClone(S.war), A0 = S.after ? structuredClone(S.after) : undefined, E1 = S.ents.world, fl = structuredClone(S.flags), rk = S.ranks.valen, fa = { ...S.factions }, ev0 = S.evac, p = S.player, pk = { map: p.map, x: p.x, y: p.y };
+    S.ents.world = E1.slice();
+    try {
+      if (SIM.capitalFallen() || !evacPts()) return true; const n = S.war.nodes.varonheim; delete S.flags.varonDead; delete S.flags.varonFled; S.evac = null; S.cult && (S.cult.end ??= null);
+      const u = { id: 'pe3c', faction: 'undead', at: 'varonheim', prev: 'ashford', strength: 60, name: 'Probe' }; S.war.armies = [u]; n.owner = 'valen'; n.siege = { day: S.day | 0, by: u.id }; n.walls = 80; n.garrison = 40;
+      ensureVaronCourt(); const br = courtEnts().find(e => e.varonMarshal); S.ranks.valen = -1; delete S.flags.varonAudience;
+      const talk = () => { const ch = []; evacChoices(br, ch); const c = ch.find(x => /fortbringen/.test(x.text)); c?.fn(); const t = document.querySelector('#dialogue .dlg-text')?.textContent || ''; UI.closeDialogue(); return t; };
+      const early = /Noch halten die Mauern/.test(talk()); n.walls = 50; const stranger = /keinem Fremden/.test(talk()); S.ranks.valen = 1; S.flags.varonQ = 3;
+      p.map = 'world'; const king = courtEnts().find(e => e.varonKing); p.x = king.x; p.y = king.y + 40; evacStart('tor');
+      const run = S.evac?.state === 'run' && evacEsc().some(e => e.varonKing) && !courtEnts().some(e => e.varonNoble != null);
+      const Pt = evacPts(), g0 = n.garrison, v0 = S.factions.valen || 0; king.x = Pt.mark[0] * TS; king.y = Pt.mark[1] * TS; p.x = king.x + 30; p.y = king.y; evacTick();
+      const away = S.evac?.state === 'away' && S.flags.varonFled?.why === 'evac' && n.garrison === g0 - 10 && (S.factions.valen || 0) === Math.max(-100, v0 - 3) && S.ents.world.some(e => e.exileCourt && e.varonKing) && !courtEnts().some(e => e.varonKing) && n.owner === 'valen';
+      n.siege = null; burgDay(); const home = !S.flags.varonFled && !S.evac && courtEnts().some(e => e.varonKing) && !S.ents.world.some(e => e.exileCourt);
+      S.evac = { state: 'run' }; evacLoad(); const load = S.evac === null;
+      const res = { early, stranger, run, away, home, load }; if (!Object.values(res).every(Boolean)) console.warn('S3c-Probe', JSON.stringify(res));
+      return Object.values(res).every(Boolean);
+    } finally { S.war = W0; if (A0 === undefined) delete S.after; else S.after = A0; S.ents.world = E1; S.flags = fl; S.ranks.valen = rk; Object.assign(S.factions, fa); S.evac = ev0; if (S.evac === undefined) delete S.evac; Object.assign(p, pk); UI.closeDialogue(); ensureVaronExile(); ensureVaronCourt(); }
   }));
   ok('Belagerung S3d: Welle 4 der Rückeroberung sammelt sich im Burghof und ankert am Thron, die Knochenwachen am Burgtor zählen zu ihr; am Tag der Befreiung hält die Torwache niemanden an (Gnadentag)', sandbox(() => {
     const W0 = structuredClone(S.war), W1 = S.ents.world, fl = structuredClone(S.flags), P0 = structuredClone(S.keepPass || {}), p = S.player;

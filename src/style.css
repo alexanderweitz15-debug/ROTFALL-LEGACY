@@ -1206,17 +1206,18 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 #debugpanel #dbg-close{flex:none;width:2.3em;height:2.3em;margin:0;padding:0;text-align:center;font-size:1em;background:#2a1a12;border:1px solid #6b3a28;color:#e8c9a0}
 #debugpanel #dbg-close:hover{background:#4a2018;color:#fff}
 .dbg-status{display:flex;flex-wrap:wrap;gap:2px 16px;padding:5px 12px;font-size:.93em;color:#b9ab8c;background:#100d09;border-bottom:1px solid #2a2117}
+.dbg-status > span{white-space:nowrap}
 .dbg-status b{color:#f0dfb0;font-weight:600}
 .dbg-status i{font-style:normal;opacity:.6}
 .dbg-status .hp{color:#e08a74}
 .dbg-status .bl{color:#d05a50}
 .dbg-quick{display:flex;flex-wrap:wrap;gap:4px;padding:6px 10px;background:#15100b;border-bottom:1px solid #3a3024}
-#debugpanel .dbg-q{display:inline-flex;align-items:center;gap:6px;width:auto;min-height:2.15em;margin:0;padding:0 .75em;font-size:.93em;background:linear-gradient(180deg,#2a1f14,#1b150d);border:1px solid #4a3a26;border-radius:2px;color:#e6d6ae}
+#debugpanel .dbg-q{display:inline-flex;align-items:center;white-space:nowrap;gap:6px;width:auto;min-height:2.15em;margin:0;padding:0 .75em;font-size:.93em;background:linear-gradient(180deg,#2a1f14,#1b150d);border:1px solid #4a3a26;border-radius:2px;color:#e6d6ae}
 #debugpanel .dbg-q i{font-style:normal;color:var(--dg);font-size:1.1em;font-family:"Segoe UI Symbol","Noto Sans Symbols 2",serif}
 #debugpanel .dbg-q:hover{border-color:#a8843e;color:#fff4d6;background:linear-gradient(180deg,#3a2a18,#21180f)}
 #debugpanel .dbg-q.on{background:linear-gradient(180deg,#5a3e18,#33230f);border-color:#d0a548;color:#ffe9b0;box-shadow:inset 0 0 8px rgba(208,165,72,.35)}
 #debugpanel .dbg-body{flex:1;display:flex;min-height:0}
-#debugpanel #dbg-nav{width:13.5em;flex:none;overflow:auto;padding:6px;gap:2px;display:flex;flex-direction:column;background:linear-gradient(90deg,#0d0a07,#120e0a);border-right:1px solid #3a3024}
+#debugpanel #dbg-nav{width:15.5em;flex:none;overflow:auto;padding:6px;gap:2px;display:flex;flex-direction:column;background:linear-gradient(90deg,#0d0a07,#120e0a);border-right:1px solid #3a3024}
 .dbg-navh{font:700 .8em Cinzel,serif;letter-spacing:.2em;color:#8a7650;text-transform:uppercase;padding:8px 6px 3px}
 #debugpanel #dbg-nav button{display:flex;align-items:center;gap:8px;width:100%;min-height:2.2em;margin:0;padding:0 8px;font-size:1em;text-align:left;background:transparent;border:1px solid transparent;border-left:3px solid transparent;color:#d2c4a0;line-height:1.2}
 #debugpanel #dbg-nav button:hover{background:#1e170f;border-color:#2f271d;color:#f4e6c0}
@@ -1257,7 +1258,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges}
 .dbi-row label{display:inline-flex;gap:5px;align-items:center;font-size:.93em;color:#b3a585}
 #debugpanel .dbi-q{flex:1;min-width:12em;height:2.15em;padding:0 .6em;font:inherit;background:#0c0906;border:1px solid #3a3024;color:#efe3c2}
 #debugpanel .dbi-row select,#debugpanel .dbi-xy{height:2.15em;padding:0 4px;font:inherit;font-size:.93em;background:#0c0906;border:1px solid #3a3024;color:#e8dcb8}
-#debugpanel .dbi-chip{display:inline-flex;align-items:center;gap:4px;width:auto;min-height:2em;margin:0;padding:0 .75em;font-size:.93em;background:linear-gradient(180deg,#1f180f,#18120c);border:1px solid #33291e;border-radius:2px;color:#dccdaa}
+#debugpanel .dbi-chip{display:inline-flex;align-items:center;white-space:nowrap;gap:4px;width:auto;min-height:2em;margin:0;padding:0 .75em;font-size:.93em;background:linear-gradient(180deg,#1f180f,#18120c);border:1px solid #33291e;border-radius:2px;color:#dccdaa}
 #debugpanel .dbi-chip.sm{padding:0 .6em;font-size:.86em}
 #debugpanel .dbi-chip:hover{border-color:#a8843e;color:#fff2cf}
 #debugpanel .dbi-chip.on{background:linear-gradient(180deg,#4a3418,#2e2010);border-color:#d0a548;color:#ffe9b0}
