@@ -54,6 +54,7 @@ export function launchHost() {                                     // Morvaths H
   const base = nearestHeld(CAPK, 'undead'); if (!base) return null;
   const a = { id: uid(), faction: 'undead', at: base, prev: base, strength: Math.min(CAP_SIEGE.host[dk()], ARMY_CAP()), name: 'Morvaths Heerzug', order: CAPK, host: true };
   W.armies.push(a); W.capThreat = 5; W.capStage = 0; W.hostCd = (S.day | 0) + CAP_SIEGE.cd;
+  resAdd('undead', -FAC_RES.undead.host);   /* T23 S3 F2 (Entwickler 01.10.): der Heerzug kostet 40 Seelen, ist aber an keine Bedingung geknüpft */
   chronicle('Die Toten marschieren auf Varonheim', 'legend', `${a.name} (Stärke ${a.strength}) bricht von ${LOC[base].name} auf. Ziel: die Hauptstadt.`);
   log(`Morvaths Heerzug bricht von ${LOC[base].name} auf — Ziel ist Varonheim. Wer die Front hält, gewinnt Zeit.`, 'faction');
   H.toast('DIE TOTEN MARSCHIEREN AUF VARONHEIM'); H.scene?.('host', a);   /* T17: Szene */
@@ -341,7 +342,7 @@ function arrive(c, player) {
   H.hireEscorts?.(c);                                            // MP2 §106: gefallene Wachen werden in der Stadt ersetzt
   for (const [g, n] of Object.entries(c.cargo)) t.stock[g] += n;
   const sum = Object.values(c.cargo).reduce((a, b) => a + b, 0);
-  if (sum) { log(`Karawane erreicht ${t.name} (${sum} Ladungen).`, 'economy'); chronicle(`Die Karawane ist heil in ${t.name} angekommen`, 'news'); }
+  if (sum) { log(`Karawane erreicht ${t.name} (${sum} Ladungen).`, 'economy'); chronicle(`Die Karawane ist heil in ${t.name} angekommen`, 'news'); ECO.merchAdd(FAC_RES.merch.big); }   /* T23 S4: Große Karawane +8 */
   if (c.attacked && Math.hypot(player.x - c.x, player.y - c.y) < 400) {
     S.gold += 30; H.addRep ? H.addRep('merch', 4) : (S.factions.merch += 4);
     log('Die Händler danken für den Geleitschutz: 30 Gold.', 'economy');
@@ -355,7 +356,7 @@ function arrive(c, player) {
 export function caravanDied(c) {
   log('Die Karawane ist verloren. Ihre Ladung liegt auf der Straße.', 'economy'); chronicle('Die Karawane nach Nordfurt ist nie angekommen', 'news');
   H.addRep ? H.addRep('merch', -2) : (S.factions.merch -= 2);
-  S.caravanBack = S.day + 2;
+  S.caravanBack = S.day + 2; ECO.merchAdd(-FAC_RES.merch.died);   /* T23 S4: verlorene Große Karawane −10 */
 }
 
 // ---------------- Krieg ----------------
@@ -430,7 +431,7 @@ function battleAbstract(node, a, d, dMul) {
   const ra = a.strength * (0.75 + rnd() * 0.5), rd = d.strength * (0.85 + rnd() * 0.5) * wall;
   const win = ra >= rd ? a : d, lose = win === a ? d : a;
   setStrength(win, win.strength - lose.strength * (0.2 + rnd() * 0.15));
-  setStrength(lose, lose.strength * (0.35 + rnd() * 0.2));
+  const l0 = lose.strength, lk = l0 * (0.35 + rnd() * 0.2); setStrength(lose, lk); soulHarvest(l0 - lk);   /* T23 S3: die Toten ernten jedes Schlachtfeld */
   const txt = `Schlacht bei ${LOC[node].name}: ${win.name} siegt über ${lose.name}.`;
   log(txt, 'faction');
   if (a.strength + d.strength > 40) chronicle(`Schlacht bei ${LOC[node].name}`, 'battle', txt);
@@ -512,11 +513,16 @@ export function warDay() {
   for (const a of W.armies) a.strength += a.faction === 'undead' ? (dead ? 0 : Math.min(4, 1 + 0.25 * undNodes)) : Math.max(0, (valenGrain > 10 ? 3 : 1) + Math.min(3, 0.3 * undNodes) - (H.cultDrain?.() || 0));   /* §5g.2: der Blutkult zehrt an Valen */
   clampArmies();
   // Besatzungen füllen sich täglich wieder auf (+2): Valen in Städten bis 20, sonst bis 10; höhere Startbesatzungen bleiben.
-  for (const [k, n] of Object.entries(W.nodes)) if (n.owner) { if (k === CAPK) { capDay(n); continue; } const cap = n.owner === 'valen' && S.towns[k] ? 20 : 10; if (n.garrison < cap) n.garrison = Math.min(cap, n.garrison + 2); }
+  // T23 S3: Besatzungen der Toten füllen sich nur aus Seelen (1 je Ort und Tag, nicht bei schweigenden Gräbern); Sonnwacht füllt bei Eifer ≥ 3 +3 statt +2.
+  const SR = FAC_RES.undead;
+  for (const [k, n] of Object.entries(W.nodes)) if (n.owner) { if (k === CAPK) { capDay(n); continue; } const cap = n.owner === 'valen' && S.towns[k] ? 20 : 10; if (n.garrison >= cap) continue;
+    if (n.owner === 'undead') { if (resStageOf('undead') === 0 || facRes('undead') < SR.fill) continue; resAdd('undead', -SR.fill); }
+    n.garrison = Math.min(cap, n.garrison + (k === 'sonnwacht' && n.owner !== 'undead' && (S.after?.zeal || 0) >= 3 ? 3 : 2)); }
   // Der Krieg endet nicht: zerschlagene Heere werden neu aufgestellt (die Toten nur, solange Garmadon lebt)
-  if (!dead && !W.armies.some(a => a.faction === 'undead') && chance(0.35)) {
-    const base = Object.keys(W.nodes).find(k => W.nodes[k].owner === 'undead') || 'graveyard';
-    W.armies.push(newArmy('undead', base, 30));   /* Audit V17c: der Friedhof wird nicht mehr stillschweigend umgefärbt — hält Valen ihn, muss das Heer ihn erst nehmen */ log('Aus der Gruft erhebt sich ein neues Heer.', 'faction');
+  if (!dead && !W.armies.some(a => a.faction === 'undead') && chance(0.35) && facRes('undead') >= SR.newArmy) {   /* T23 S3: ein neues Heer kostet 30 Seelen, Stärke 20 + Seelen/5 (höchstens 50) */
+    const base = Object.keys(W.nodes).find(k => W.nodes[k].owner === 'undead') || 'graveyard', str = Math.min(SR.armyMax, Math.round(SR.armyBase + facRes('undead') / SR.armyDiv));
+    resAdd('undead', -SR.newArmy);
+    W.armies.push(newArmy('undead', base, str));   /* Audit V17c: der Friedhof wird nicht mehr stillschweigend umgefärbt — hält Valen ihn, muss das Heer ihn erst nehmen */ log(`Aus der Gruft erhebt sich ein neues Heer (Stärke ${str}) — die Toten zahlen dafür ${SR.newArmy} Seelen.`, 'faction');
   }
   capThreatDay();
   const muster = W.nodes.northcity?.owner === 'valen' ? 'northcity' : Object.keys(W.nodes).find(k => k !== CAPK && W.nodes[k].owner === 'valen' && S.towns[k]);   /* Audit V1: nur in einer eigenen Stadt; die Hauptstadt mustert nicht */
@@ -554,6 +560,8 @@ export function resStage(f, v, old = 1) {
   if (old === 2 && v >= C.ge * 0.9) return 2;
   return 1;
 }
+/* T23 S3: Seelen aus Verlusten einer Schlacht im Kriegsgraphen (abstrakt oder vor Ort) — 30 % der Stärke, die der Verlierer verlor, gleich welche Seite */
+export function soulHarvest(loss) { const n = Math.round(Math.max(0, loss) * FAC_RES.undead.battle); if (n > 0) resAdd('undead', n); return n; }
 export const resStageOf = f => S.facRes?.[f]?.stage ?? resStage(f, facRes(f));
 export const resHash = (salt, n) => Math.abs(((S.seed | 0) * 7 + (S.day | 0) * 13 + salt * 31) | 0) % n;   /* Tageshash statt rnd() */
 export const undNodeCount = () => Object.values(S.war?.nodes || {}).filter(n => n.owner === 'undead').length;
@@ -578,7 +586,9 @@ export function facResDay() {
   set('order', resNum(src.zeal) ? src.zeal : facRes('order'));
   if (!resNum(R.undead.v)) set('undead', Math.min(FAC_RES.undead.max, FAC_RES.undead.start[0] + FAC_RES.undead.start[1] * undNodeCount()));
   if (!resNum(R.merch.v)) set('merch', FAC_RES.merch.def);
-  H.resDaily?.(R, first);                                            /* Tagesquellen und -senken der Scheiben S3–S5 (game.js) */
+  if (!first) resAdd('merch', -FAC_RES.merch.decay);   /* S4: der Handelswert klingt ab, wenn keine Züge ankommen */
+  if (!(S.flags?.garmadonSlain && S.flags?.deadSucc?.winner !== 'morvath')) resAdd('undead', FAC_RES.undead.node * undNodeCount());   /* S3: die Gräber geben — 1 Seele je Ort der Toten */
+  H.resDaily?.(R, first);                                           /* Tagesquellen und -senken der Scheiben S3–S5 (game.js) */
   set('chain', resNum(src.labor) ? src.labor : FAC_RES.chain.def);
   set('aurel', aurelIndex().v);
   set('sea', seaSalt());
@@ -596,17 +606,18 @@ export const facResView = () => RES_KEYS.map(f => ({ f, v: facRes(f), prev: S.fa
 // ---- Schlacht vor Ort (Stufe A): Heere werden zu Einheiten ----
 function materialize(node, att, def) {
   const L = LOC[node];
-  const b = { node, sides: [att.id, def.id], started: S.day * 1440 + S.minute };
+  const b = { node, sides: [att.id, def.id], started: S.day * 1440 + S.minute, s0: [att.strength, def.strength] };   /* T23 S3: Stärke zu Beginn — Seelenernte nach der Schlacht */
+  const sated = resStageOf('undead') === 2;   /* T23 S3: satte Gruft (120+) schickt gemischte Heere statt nur Skelette */
   // §74 Anmarsch statt Spawn im Ort: Angreifer erscheinen ~20 Kacheln vor dem Ort, auf der Seite, von der sie kommen,
   // und ziehen zum Ort (Anker = Ort); Verteidiger stehen im Ort.
   const from = LOC[att.prev] && att.prev !== node ? LOC[att.prev] : { x: L.x - 1, y: L.y }, fd = Math.hypot(from.x - L.x, from.y - L.y) || 1;
   const sx = L.x + (from.x - L.x) / fd * Math.min(20, fd), sy = L.y + (from.y - L.y) / fd * Math.min(20, fd), home = { x: (L.x + 0.5) * TS, y: (L.y + 0.5) * TS };
   for (const side of [att, def]) {
-    const n = clamp(Math.round(side.strength / 8), 2, 7), at = side === att;
+    const n = clamp(Math.round(side.strength / 8), 2, 7), at = side === att, mix = sated && side.faction === 'undead' ? undeadMix(n, 'military') : null;
     for (let i = 0; i < n; i++) {
       let [qx, qy] = [Math.round((at ? sx : L.x) + ri(-3, 3)), Math.round((at ? sy : L.y) + ri(-3, 3))];
       if (H.inView?.('world', qx * TS, qy * TS)) { if (at) [qx, qy] = H.pushOut('world', qx, qy); else { const hs = HOUSES.filter(h => h.town === node && h.map === 'world'); const h = hs[(i * 7) % Math.max(1, hs.length)]; if (h) [qx, qy] = h.doorTile; } }   // AUDIT: Angreifer von außerhalb, Verteidiger aus den Häusern
-      H.spawnEnemy(side.faction === 'undead' ? 'skeleton' : !at && i === 0 && L.faction === 'aurel' && MONSTERS.dampframme ? 'dampframme' : 'valen_soldier', 'world', qx, qy,   /* Entwickler 03.10.: Städte Aurelions verteidigt eine Dampframme mit */
+      H.spawnEnemy(side.faction === 'undead' ? (mix ? mix[i].type : 'skeleton') : !at && i === 0 && L.faction === 'aurel' && MONSTERS.dampframme ? 'dampframme' : 'valen_soldier', 'world', qx, qy,   /* Entwickler 03.10.: Städte Aurelions verteidigt eine Dampframme mit */
         { armyId: side.id, worth: side.strength / n, level: 4, anchor: { ...home }, marching: at || undefined });
     }
   }
@@ -651,6 +662,7 @@ function spawnWave(node, n, id) {
   H.toast(last ? 'DER HAUPTMANN DER TOTEN' : `WELLE ${n.wave}/${n.waves}`);
 }
 export const materializeForTest = (node, att, def) => materialize(node, att, def);
+export const battleForTest = (node, att, def) => battleAbstract(node, att, def);   /* T23 S3: Seelenernte (Selbsttest) */
 export const spawnWaveForTest = (node, id) => spawnWave(node, S.war.nodes[node], id);   /* S3d-Probe */   // Selbsttest
 export function unitDied(e) {
   const a = findArmy(e.armyId); if (a) setStrength(a, a.strength - (e.worth || 5));
@@ -671,6 +683,7 @@ export function battleCheck() {                              // alle paar Sekund
       if (!a || !d) continue;
       const win = timeout ? (a.strength >= d.strength ? a : d) : (na > 0 ? a : d);
       const lose = win === a ? d : a;
+      if (b.s0) soulHarvest(Math.max(0, b.s0[lose === a ? 0 : 1] - lose.strength));   /* T23 S3: Seelenernte auch nach der Schlacht vor Ort */
       if (b.storm === 1 && win === a && a.faction === 'undead' && nearPlayer(CAPK)) {   /* S3b: Bresche verloren, Spieler nah — die Burg hält noch */
         a.strength *= CAP_STORM.rest; for (let i = S.ents.world.length - 1; i >= 0; i--) { const e = S.ents.world[i]; if (e.kind === 'enemy' && e.armyId === a.id) S.ents.world.splice(i, 1); }
         capitalStorm(a, d, 2); continue; }

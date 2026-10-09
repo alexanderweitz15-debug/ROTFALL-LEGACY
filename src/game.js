@@ -3063,6 +3063,7 @@ export function continueGame(given = null, retried = false) {                   
   S.factions.chain ??= -20; S.factions.goblin ??= -50; S.factions.sea ??= 0;   // Session 11 / S14: neue Fraktionen in alten Ständen
   ensureRegionBosses();                                   // §73: alte Stände bekommen den Leitwolf nachgerüstet
   delete S.prices;   /* T09: der Weltpreis ist weg, Preise kommen aus den Städten */
+  if (S.towns) for (const k of Object.keys(S.tribute || {})) tribState(k);   /* T23 S2 F3: alter Tributvorrat einmalig ×0,5 ins Stadtlager-Korn */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.goodsOnly && e.kind === 'npc') { delete e.goodsOnly; delete e._kontor; } }   /* P7-Fehler: Kontor setzte goodsOnly dauerhaft — alte Stände bereinigen */
   for (const m of Object.keys(S.ents)) for (const e of S.ents[m]) { if (e.sick === false) delete e.sick; if (e.prisoner && e.prisoner.by !== S.player?.id) e.prisoner = null; }   /* T08: Gefangene ohne Herrn */   /* Audit D6: das Seuchenende gab früher jedem Baum „sick: false“ — so galten 14 000 Props als verändert und wurden voll gespeichert */
   S.flags.introDone ??= 1;   /* Einflug nur für neue Helden */
@@ -7439,6 +7440,8 @@ function freeCaptive(c, how) {
   if (to) { c.anchor = { x: to.x * TS + ri(-60, 60), y: to.y * TS + ri(-50, 50) }; c.schedulePos = c.anchor; }
   const F = fortState(); if (how === 'bought') F.bought = (F.bought || 0) + 1; else F.freed = (F.freed || 0) + 1;
   if (gob) addRep('goblin', 3);
+  if (gob && S.flags.goblinsFreed) { const D = (S.flags.gobFreedDay ||= { day: -1, n: 0 }); if (D.day !== (S.day | 0)) { D.day = S.day | 0; D.n = 0; }   /* T23 S5: wer den Hort erreicht, baut mit (+1, höchstens 4 am Tag) */
+    if (D.n < FAC_RES.goblin.freedDay) { D.n++; gobGrow(FAC_RES.goblin.freed, 'Ein befreiter Goblin erreicht den Hort.'); } }
 }
 // ---- Gespräche: Sklavenmarkt, Register, Auspeitschung, Übernahme ----
 function fortChoices(npc, choices) {
@@ -7449,10 +7452,15 @@ function fortChoices(npc, choices) {
     if (auctionNow() && lot) choices.unshift({ text: `Mitbieten: ${lot.name} (90 Gold) und freilassen`, fn: () => buyFree(npc, lot, 90, 'Zugeschlagen. Neunzig. Was du mit deiner Ware machst, geht mich nichts an.') });
     else if (pen.length) choices.unshift({ text: 'Einen aus dem Pferch freikaufen. (140 Gold)', fn: () => buyFree(npc, pen.filter(e => e.key !== 'fl_bruni')[0] || pen[0], 140, 'Hundertvierzig. Freikauf ist teurer als Versteigerung — du zahlst für meine Geduld.') });
     if (keyNeeded && F.veskWary !== (S.day | 0)) choices.push({ text: 'Den Schlüssel von seinem Gürtel nehmen. (Geschick)', fn: () => stealPenKey(npc) });
+    { const caps = S.ents.world.filter(e => e.prisoner?.by === S.player.id && e.alive && dist(e, npc) < 260), D = (F.sold ||= { day: -1, n: 0 }); if (D.day !== (S.day | 0)) { D.day = S.day | 0; D.n = 0; }   /* T23 S2: Gefangene liefern (T08-Anschluss) */
+      if (caps.length && D.n < FAC_RES.chain.sold) choices.unshift({ text: `Einen Gefangenen an die Kette verkaufen. (${FAC_RES.chain.soldGold} Gold — er geht in den Pferch)`, fn: () => {
+        const e = caps[0]; D.n++; S.ents.world = S.ents.world.filter(x => x !== e); flPenCaptive(penList().length % 8, { goblin: false }); S.gold += FAC_RES.chain.soldGold; addRep('chain', 2); styleAct(-3, 'Gefangene verkauft', e);
+        log(`Vesk nimmt ${e.title || e.name || MONSTERS[e.mtype]?.name || 'den Gefangenen'} in den Pferch (${FAC_RES.chain.soldGold} Gold, Kette +2). Die Kette hat eine Hand mehr — ihr nächster Feldzug wird größer.`, 'faction');
+        UI.dialogue(npc, '„Ein Paar Arme mehr für die Grube. Das Halsband passt jedem.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]); save(); } }); }
     choices.push({ text: 'Wie läuft der Handel?', fn: () => UI.dialogue(npc, `„${pen.length} im Pferch. Versteigerung jeden dritten Tag um zehn — ${auctionNow() ? 'also jetzt' : (S.day | 0) % 3 === 0 ? 'heute war schon' : `in ${3 - (S.day | 0) % 3} Tagen`}. Goblins gehen an die Minen, Menschen an die Felder. Und du?“`, [{ text: 'Weiter', fn: () => talk(npc) }]) });
   }
   if (npc.key === 'fl_edda') {
-    choices.push({ text: 'Zeig mir das Register der Feste.', fn: () => UI.dialogue(npc, `„${S.ents.world.filter(e => e.fl === 'soldier' && e.alive).length} Soldaten, ${penList().length} im Pferch, ${S.ents.world.filter(e => e.goblin && e.captive).length} Goblins in Ketten. Freigekauft: ${F.bought || 0}. Entkommen: ${F.freed || 0}. Und ich schreibe alles auf.“`, [{ text: 'Weiter', fn: () => talk(npc) }]) });
+    choices.push({ text: 'Zeig mir das Register der Feste.', fn: () => UI.dialogue(npc, `„${S.ents.world.filter(e => e.fl === 'soldier' && e.alive).length} Soldaten, ${penList().length} im Pferch, ${S.ents.world.filter(e => e.goblin && e.captive).length} Goblins in Ketten. Freigekauft: ${F.bought || 0}. Entkommen: ${F.freed || 0}. Alles in allem ${Math.round(SIM.facRes('chain'))} Köpfe, die für die Kette arbeiten — danach rüstet Varg seine Feldzüge. Und ich schreibe alles auf.“`, [{ text: 'Weiter', fn: () => talk(npc) }]) });
     if (keyNeeded) choices.push({ text: 'Könnte der Pferchschlüssel … verloren gehen? (80 Gold)', fn: () => {
       if (S.gold < 80) return UI.dialogue(npc, '„Für so wenig verliere ich nicht einmal eine Feder.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
       S.gold -= 80; addItem(S.player, 'pferchschluessel'); log('Edda lässt den Pferchschlüssel „fallen“. Du hebst ihn auf.', 'quest');
@@ -8104,7 +8112,7 @@ function defPower(k) { const D = defOf(k); return villagersOf(k).length * 0.3 + 
 function raidDay() {
   if (S.deadRaid) return;
   const V = VILLAGES.filter(V => TOWN_PLAN[V.key] && !S.razed?.[V.key] && !heldBy(V.key) && V.key !== S.myRaid?.v); if (!V.length) return;   // S15: nicht die eigenen Orte, nicht dein Ziel
-  if (!chance(S.flags.chainsBroken ? 0.35 : 0.06)) return;
+  if (!chance((S.flags.chainsBroken ? 0.35 : 0.06) * (SIM.resStageOf('undead') === 0 ? FAC_RES.undead.raidHalf : 1))) return;   /* T23 S3: schweigende Gräber — halb so viele Überfälle */
   let w = V.reduce((a, v) => a + v.x + 200, 0) * rnd(), v = V[0];                    // der Osten liegt näher am Totenland
   for (const c of V) { w -= c.x + 200; if (w <= 0) { v = c; break; } }
   const n = S.flags.garmadonSlain ? ri(2, 4) : Math.min(14, ri(4, 7) + (S.day / 15 | 0));   /* Entwickler: nach Garmadon nur kleine Trupps */
@@ -8157,7 +8165,7 @@ function raidEnd(R, won) {
     log(`${V.name} dankt dir: ${R.pk} Tote hast du zurückgeschlagen. ${FACTIONS[f]?.name || f} +${g}.`, 'faction'); UI.toast(`${V.name.toUpperCase()} DANKT DIR (+${g})`, 2800);
     chronicle(`${S.player.name} verteidigt ${V.name} gegen die Toten`, 'battle'); return; }
   if (won) { log(`${V.name} hält stand. Die Toten ziehen ab.`, 'world'); chronicle(`${V.name} wehrt die Toten ab`, 'battle'); return; }
-  raidDamage(R.v);
+  raidDamage(R.v); SIM.resAdd('undead', R.n || 0);   /* T23 S3: ein gefallenes Dorf füttert die Gruft (+n Seelen) */
   const vs = villagersOf(R.v); for (let i = 0; i < Math.min(vs.length, ri(1, 3)); i++) { const c = vs[i]; c.alive = false; S.ents.world.splice(S.ents.world.indexOf(c), 1); }
   if (!S.flags.garmadonSlain && chance(S.flags.chainsBroken ? 0.45 : 0.15)) return raze(R.v);   /* nach Garmadon löschen die Toten keine Dörfer mehr aus */
   log(`${V.name} fällt beinahe. Häuser brennen, Tote liegen auf der Straße.`, 'world'); chronicle(`Blut in ${V.name}`, 'battle');
@@ -8221,6 +8229,7 @@ function takeVillage(R) {
   S.ents.world = S.ents.world.filter(e => e.holdOf !== R.v && e.raidDef !== R.v); S.myRaid = null; S.raidReady = (S.day | 0) + 1;
   const st = S.quests.q_undraid; if (st) { st.state = 'done'; st.progress = [1]; st.outcome = 'Das Dorf gehört den Toten.'; }
   S.gold += 80; log('Die Horde plündert: 80 Gold für dich.', 'economy'); holdTown(R.v);
+  (S.flags.deadTrial ||= {}).raids = (S.flags.deadTrial.raids || 0) + 1;   /* E40 S4: Rangprüfung Todesritter */
 }
 function holdTown(k) {
   const W = S.war; W.nodes[k] ||= { owner: null, garrison: 0 }; W.nodes[k].owner = 'undead'; W.nodes[k].garrison = Math.max(W.nodes[k].garrison || 0, 12);
@@ -8247,7 +8256,7 @@ function applyFate(k, how) {
   S.fatePending = (S.fatePending || []).filter(x => x !== k); (S.heldFate ||= {})[k] = how;
   if (how === 'raise') { for (const c of vs) c.alive = false; S.ents.world = S.ents.world.filter(c => !vs.includes(c));
     for (let i = 0; i < Math.min(n, 8); i++) { const e = regionSpawn(pick(['skeleton', 'ghoul', 'skeleton']), 'world', sx + ri(-6, 6), sy + ri(-5, 5)); e.anchor = { x: e.x, y: e.y }; e.heldGuard = k; }
-    S.war.nodes[k].garrison += n; addRep('undead', 5);
+    S.war.nodes[k].garrison += n; addRep('undead', 5); SIM.resAdd('undead', n);   /* T23 S3: Erheben gibt der Gruft n Seelen */
     chronicle(`${name}: Die Lebenden stehen als Tote wieder auf`, 'death', `${n} Seelen. Die Besatzung ist stärker, das Dorf still.`);
     return `${n} Lebende sterben auf dem Platz von ${name} und stehen als Tote wieder auf. Die Besatzung ist stärker. (Die Toten +5)`; }
   if (how === 'thrall') { for (const c of vs) Object.assign(c, { thrall: true, prof: 'Knecht der Toten' });
@@ -8971,6 +8980,7 @@ function makeContract(town, kind, giver) {
     if (w) { Object.assign(C, { target: T, who: w.id, whoSig: w.transient ? `${w.name}|${w.prof}` : null, name: w.name, need: 2, x: w.x / TS | 0, y: w.y / TS | 0, tx: w.x / TS | 0, ty: w.y / TS | 0 }); if (kind === 'debt') C.sum = 30 + tier * 20 + ri(0, 4) * 10; else C.reward.gold += 30; }   /* ⚖ Schuldsumme */
     else C.kind = kind = 'deliver';   /* niemand Passendes im Ort: ein gewöhnliches Paket */
   }
+  if (kind === 'escort' && SIM.facRes('merch') < FAC_RES.merch.lt) C.reward.gold = Math.round(C.reward.gold * (1.5 - SIM.facRes('merch') / 100));   /* T23 S4: die Gilde verliert Züge und zahlt Söldner besser */
   if (kind === 'escort' || kind === 'deliver') { C.target = far; C.reward.gold += 30; C.name = pick(FIRST_M); const T2 = TOWN_PLAN[far]; if (T2) { C.tx = T2.square[0]; C.ty = T2.square[1]; } }
   if (kind === 'missing') C.name = pick(FIRST_M);
   if (kind === 'supply') { C.need = ri(5, 10); C.reward.gold = C.need * 6; }
@@ -9169,6 +9179,7 @@ function claimContract(C, npc) {
   if (pay < 1) { C.reward = { ...C.reward, gold: Math.round(C.reward.gold * pay), xp: Math.round(C.reward.xp * pay), rep: share < 0.1 ? 0 : Math.round(C.reward.rep * pay) };
     log(share < 0.1 ? `${C.title}: Das haben die Wachen erledigt, nicht du. Nur ein Handgeld: ${C.reward.gold} Gold.` : `${C.title}: Andere haben einen Großteil erledigt (dein Anteil ${Math.round(share * 100)} %). Lohn gekürzt.`, 'quest'); }
   if (C.kind === 'escort' && townFac(C.town) === 'wuest' && (S.ranks.wuest ?? -1) >= 1 && !C.wuestBonus) { C.wuestBonus = true; C.reward = { ...C.reward, gold: Math.round(C.reward.gold * WUEST_ESCORT) }; log(`Der Wüstenbund zahlt seinen Karawanenwächtern mehr: +${Math.round((WUEST_ESCORT - 1) * 100)} %.`, 'quest'); }   /* Fragemenü 03.10.: Rangvorteil */
+  if (conFac(C) === 'undead') (S.flags.deadTrial ||= {}).jobs = (S.flags.deadTrial.jobs || 0) + 1;   /* E40 S4: Rangprüfung der Stillen zählt Aufträge der Toten */
   C.state = 'claimed'; if (C.kind === 'bounty') questEvent('contract', null, 1, S.player); S.gold += questGold(C.reward.gold); if (['defense', 'patrol', 'bounty'].includes(C.kind) && conFac(C) === 'valen') (S.stats ||= {}).valenDefense = (S.stats.valenDefense || 0) + 1; gainXp(S.player, C.reward.xp); const f = conFac(C); if (S.factions[f] != null) S.factions[f] = clamp(S.factions[f] + C.reward.rep, -100, 100);   /* A-06 */
   const st = S.quests['c_' + C.id]; if (st) { st.state = 'done'; st.progress = CON[C.kind]?.steps ? conProg(C) : [C.need]; st.outcome = `${C.reward.gold} Gold erhalten.`; }
   if (npc?.key) addRel(npc.key, 5);
@@ -9831,7 +9842,7 @@ function ownSeaEvent(V, p) {                                          /* Freie S
 function ownArrive(V) {                                               /* Freie Seefahrt: Beute nach geglückter Prise, Schiff liegt im Zielhafen */
   S.ship.at = V.to;
   if (V.pirated) { const g = ri(100, 200); S.gold += g; let room = S.ship.cap - cargoUsed(); for (const k of Object.keys(CARGO)) { const n = Math.min(room, ri(1, 4)); if (n > 0) { S.ship.cargo[k] = (S.ship.cargo[k] || 0) + n; room -= n; } }
-    addRep('sea', -12); S.flags.piracy = (S.flags.piracy || 0) + 1; if (S.flags.piracy === 1) chronicle(`${S.player.name} wird Pirat`, 'event', 'Die erste Prise. Der Salzbund schreibt den Namen auf.');
+    addRep('sea', -12); S.flags.piracy = (S.flags.piracy || 0) + 1; (SIM.facResState().sea.prizes ||= []).push(S.day | 0);   /* T23 S5: eigene Prise zählt */ if (S.flags.piracy === 1) chronicle(`${S.player.name} wird Pirat`, 'event', 'Die erste Prise. Der Salzbund schreibt den Namen auf.');
     log(`Prise gemacht: ${g} Gold und Ladung im Laderaum. Das Seevolk vergisst es nicht (−12).`, 'faction'); }
 }
 function startVoyage(V, text) {
@@ -10094,7 +10105,8 @@ function soulJarChoice() {
   UI.dialogue({ name: 'Seelenkammer' }, 'Dutzende Gläser. In jedem kreist ein grünes Licht und drückt gegen das Glas, wenn du näher kommst.', [
     { text: 'Die Gläser zerschlagen. Die Seelen befreien.', fn: () => { S.flags.soulsFreed = true; addRep('order', 10); addRep('undead', -10);
       (S.ilvar ||= { trust: 0, asked: {}, vials: 0 }).trust = Math.max(0, S.ilvar.trust - 30); for (const e of S.ents.tower) if (e.soulJar) e.label = 'Zerbrochene Gläser. Das Licht ist fort.';
-      fx(S.player.x, S.player.y - 20, 'heal', 30); log('Die Seelen steigen auf und verlöschen (Orden +10, Untote −10, Ilvars Vertrauen −30).', 'quest'); chronicle(`${S.player.name} befreit die Seelen im Turm des Nachtglases`, 'news'); UI.closeDialogue(); } },
+      SIM.resAdd('undead', -FAC_RES.undead.kammer); witchZeal(FAC_RES.order.kammer);   /* T23 S3: der Gruft fehlen 30 Seelen, der Orden lobt es (Eifer +1) */
+      fx(S.player.x, S.player.y - 20, 'heal', 30); log(`Die Seelen steigen auf und verlöschen (Orden +10, Untote −10, Ilvars Vertrauen −30). Der Gruft fehlen ${FAC_RES.undead.kammer} Seelen, der Eifer des Ordens steigt.`, 'quest'); chronicle(`${S.player.name} befreit die Seelen im Turm des Nachtglases`, 'news'); UI.closeDialogue(); } },
     { text: 'Nichts anrühren.', fn: () => UI.closeDialogue() }]);
 }
 function ilvarSlain(source) {
@@ -10663,7 +10675,7 @@ function seaPeace(w) {                                              // der fried
   log('Der Salzfrieden gilt. Bring Ysolde die Nachricht.', 'quest');
 }
 function whitebeardSlain(w) {
-  S.flags.whitebeardSlain = true; const st = S.quests.q_salz3; if (st?.state === 'active') st.progress = [1];
+  S.flags.whitebeardSlain = true; S.flags.blackDays = (S.day | 0) + FAC_RES.sea.blackDays; const st = S.quests.q_salz3;   /* T23 S5: zehn Tage Schwarzsegel */ if (st?.state === 'active') st.progress = [1];
   chronicle('Weißbart ist tot', 'battle', 'Der König der Sturmklinge fiel in seiner eigenen Halle.'); grantLegend('sea', 'Ankerbrecher', 'Du hast Weißbart im Rumpf der Salzwitwe erschlagen.');
   S.factions.sea = clamp((S.factions.sea || 0) + (S.seaSide === 'raider' ? -60 : 10), -100, 100);
   // Machtvakuum (§73): Hella schwört Rache und geht mit den Treuesten zu den Schwarzsegeln; der Salzbund übernimmt Tangkron
@@ -11088,6 +11100,7 @@ function ensureDeadEast() {
 function deadEastTick() {   /* Hinweise beim ersten Blick (aus deadLifeTick) */
   const p = S.player, H = (S.flags.deadHint ||= {}), B = beinAt(), K = S.ents.world.find(e => e.sealMaster === 'knochenpass');
   if (B && !H.bein && Math.hypot(p.x / TS - B.x, p.y / TS - B.y) < 30) { H.bein = 1; log('Beinhausen, ein Dorf der Stillen: Vogt, Knochenschmiedin, Seelenwirtin, ein Beinhaus und eine Knochentafel mit Aufträgen der Toten (nur für die Schar: Rang oder Pakt). Die Stillen lassen Gäste in Ruhe, solange sie Ruhe halten.', 'world'); }
+  const G = !H.gruft && S.ents.world.find(e => e.vaultSite === 'schaedelstollen'); if (G && dist(G, p) < 20 * TS) { H.gruft = 1; log('Der Schädelstollen ist der erste Gang des Gruftnetzes unter dem Osten: Wer seinen Hort hebt, findet die Karte zur nächsten Gruft — vier Grüfte, jede schwerer.', 'quest'); }   /* E40 S6 */
   if (K && !H.border && dist(K, p) < 20 * TS) { H.border = 1; log('Grenzposten der Stillen am Knochentor: Hier gibt es das Totensiegel, das Lebende für Vharnholm brauchen — gegen ein Grabsiegel, eine Seele oder Grabgut, nicht gegen Gold.', 'world'); }
 }
 /* ================= E40 S3: Nachfolge nach Garmadon (Entscheidung 09.10.: Thronfolgekampf ODER Zerfall in Fürstentümer, nach Weltlage) =================
@@ -11181,6 +11194,21 @@ function succChoices(npc, choices) {
     log(`Du schwörst ${npc.name} Treue${old ? ` und sagst dich von ${PRINCES.find(P => P.key === old)?.name} los` : ''}. Bei den Stillen giltst du jetzt als einer der Ihren: Handel, Knochentafeln, kein Siegel nötig. Ruf bei den Toten mindestens ${SUCC.oathRep}.`, 'faction');
     chronicle(`${S.player.name} schwört ${npc.name} Treue`, 'news', `Ein Lebender im Gefolge eines Fürsten der Stillen.`); } });
 }
+/* ================= E40 S4: Rangprüfungen der Stillen =================
+   Vorher hob jedes Knien vor Garmadon den Rang um eins (viermal knien = Todesritter). Jetzt verlangt jeder Rang eine Prüfung, wie die Rangwege der
+   anderen Fraktionen (RANK_LINES), aber aus vorhandenen Taten: Diener — knien oder beitreten (wie bisher); Adept — drei Aufträge der Toten (Knochentafeln
+   in Vharnholm/Beinhausen); Grabgebundener — sechs Aufträge der Toten und drei Seelen für Garmadon; Todesritter — ein gelungener Überfall mit Sael und drei
+   Seelen; Kommandant — die Eisenfeste (wie bisher). Gezählt ab jetzt (S.flags.deadTrial: jobs, raids), alte Stände behalten ihren Rang. Zahlen ⚖. */
+const DEAD_TRIAL = { jobs: [0, 3, 6, 6], raids: [0, 0, 0, 1], souls: 3,
+  say: [null, 'Du kniest gern. Knien kann jeder. Diene erst — drei Aufträge von unseren Knochentafeln.', 'Ein Grabgebundener bringt mir mehr als Worte. Arbeit für die Schar — und Seelen.', 'Todesritter führen. Führ eine Horde gegen die Lebenden, dann reden wir. Und bring Seelen.'] };
+function deadTrialMiss(n) {   /* was für Rang n noch fehlt (Text) — oder null */
+  if (n < 1 || n > 3) return null; const T = S.flags.deadTrial || {}, miss = [];
+  if ((T.jobs || 0) < DEAD_TRIAL.jobs[n]) miss.push(`Aufträge der Toten ${T.jobs || 0}/${DEAD_TRIAL.jobs[n]} (Knochentafel in Vharnholm oder Beinhausen)`);
+  if ((T.raids || 0) < DEAD_TRIAL.raids[n]) miss.push(`gelungener Überfall mit Sael ${T.raids || 0}/${DEAD_TRIAL.raids[n]}`);
+  if (n >= 2 && !hasItem(S.player, 'soul_vial', DEAD_TRIAL.souls)) miss.push(`${DEAD_TRIAL.souls} Seelenphiolen bei dir`);
+  return miss.length ? miss.join(', ') : null;
+}
+const deadTrialText = i => i === 1 ? `Rangprüfung: ${DEAD_TRIAL.jobs[1]} Aufträge der Toten, dann vor Garmadon knien` : i === 2 ? `Rangprüfung: ${DEAD_TRIAL.jobs[2]} Aufträge der Toten und ${DEAD_TRIAL.souls} Seelenphiolen, dann vor Garmadon knien` : i === 3 ? `Rangprüfung: ein gelungener Überfall mit Sael und ${DEAD_TRIAL.souls} Seelenphiolen, dann vor Garmadon knien` : 'Die Eisenfeste brechen';
 /* P5 A — BUG-143 „Totenland bei der Schwarzen Feste leer“: vier Gebäude im Mauerring (Kaserne NW, Seelenkapelle NO, Knochenschmiede SW, Beinhaus SO),
    gebaut beim Laden in game.js (Kacheln, HOUSES-Eintrag, Möbel nach buildings.js FURNISH) — world.js und die Weltfolge bleiben unberührt. Lage relativ zum
    Thron (Ort blackkeep): Mauer x −17…+18, y −18…+17, Tor im Süden, Thronfläche x −6…+6, y −7…+5; der Weg Tor → Thron bleibt frei. Idempotent. */
@@ -11235,6 +11263,7 @@ function keepChoices(npc, choices) {
   if (npc.keepPriest) choices.unshift({ text: 'Eine Seele opfern (Seelenphiole)', fn: () => {
     if (!hasItem(S.player, 'soul_vial')) return UI.dialogue(npc, '„Ohne Seele kein Segen. Die Seelenhändlerin hat welche, oder hol sie dir aus Leben, die niemand vermisst.“', [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]);
     removeItem(S.player, 'soul_vial', 1); addStatus(S.player, { key: 'blessing', name: 'Totensegen', good: true, left: 900000, desc: 'Die Toten sehen dich als einen der Ihren: +5 Rüstung.' }); if (S.factions.undead != null) S.factions.undead = clamp(S.factions.undead + 3, -100, 100);
+    if (S.flags.vialSoul !== (S.day | 0)) { S.flags.vialSoul = S.day | 0; SIM.resAdd('undead', FAC_RES.undead.vial); log(`Die Phiole fließt in die Gruft: Die Toten haben ${FAC_RES.undead.vial} Seelen mehr (höchstens einmal am Tag).`, 'faction'); }   /* T23 S3 */
     UI.closeDialogue(); log('Die Phiole zerspringt auf dem Altar. Kälte kriecht in deine Knochen — und bleibt als Schutz. Ruf bei den Toten +3.', 'faction'); } });
   if (npc.keepMarshalV) choices.unshift({ text: 'Wie steht die Belagerung?', fn: () => UI.dialogue(npc, `„Noch ${S.war?.nodes?.blackkeep?.garrison ?? '?'} Tote in der Feste. Jeden Tag weniger. Komm mit ans Tor, dann brechen wir sie in Wellen.“`, [{ text: '[Gehen]', fn: () => UI.closeDialogue() }]) });
 }
@@ -11534,7 +11563,7 @@ function gobDay() {
   if (G.lvl >= 2 && chance(0.2)) { const r = pick(['valen', 'order', 'aurel']);
     if (r === 'valen') { gobGrow(1); log('Händler aus Valens Landen ziehen nach Grubenhort. Goblineisen verkauft sich gut.', 'world'); }
     else if (r === 'aurel') { gobGrow(1); log('Gelehrte aus Aurelion vermessen die Tunnel von Grubenhort. Sie staunen, schreiben und bezahlen.', 'world'); }
-    else if (G.lvl >= 3 && chance(0.4)) { G.pts = Math.max(GOB_LVL[G.lvl], G.pts - 5); log('Ordensritter überfallen Grubenhort: „Ungeziefer bleibt Ungeziefer.“ Die Stadt verliert Zeit beim Wiederaufbau.', 'war'); }
+    else if (G.lvl >= 3 && chance((S.after?.zeal || 0) >= 4 ? 0.7 : 0.4)) { G.pts = Math.max(GOB_LVL[G.lvl], G.pts - 5);   /* T23 S3: Eifer ≥ 4 — der Orden überfällt fast sicher */ log('Ordensritter überfallen Grubenhort: „Ungeziefer bleibt Ungeziefer.“ Die Stadt verliert Zeit beim Wiederaufbau.', 'war'); }
     else log('Der Weiße Orden predigt gegen das „Goblinnest“ im Süden.', 'world'); }
 }
 // ================= Tiefhall — Königsstadt der Zwerge (Nutzer §5d.6) =================
@@ -12418,6 +12447,8 @@ function garmadonParley(g) {
 function garmadonServe(g) {
   const r = S.ranks.undead ?? -1;
   if (r >= 3) return UI.dialogue(g, '„Mehr gebe ich nur dem, der die Eisenfeste bricht. Bring mir ihre Mauern.“', [{ text: 'Weiter', fn: () => garmadonParley(g) }]);   // §65: Kommandant erst mit der Eisenfeste
+  const TN = deadTrialMiss(r + 1); if (TN) return UI.dialogue(g, `„${DEAD_TRIAL.say[r + 1]}“\n(Rangprüfung für ${FACTIONS.undead.ranks[r + 1]}: ${TN})`, [{ text: 'Weiter', fn: () => garmadonParley(g) }]);   /* E40 S4: Rangprüfungen der Stillen */
+  if (r + 1 >= 2) { removeItem(S.player, 'soul_vial', DEAD_TRIAL.souls); log(`Garmadon nimmt ${DEAD_TRIAL.souls} Seelen. Die Phiolen werden kalt und leer.`, 'faction'); }
   S.ranks.undead = Math.max(0, r + 1); S.factions.undead = clamp(Math.max(S.factions.undead || 0, 20) + 25, -100, 100);
   for (const f of ['valen', 'order']) S.factions[f] = clamp((S.factions[f] || 0) - 20, -100, 100);
   log(`Du kniest vor Garmadon. Die Toten: ${FACTIONS.undead.ranks[S.ranks.undead]}. Valen und der Orden: −20.`, 'faction');
@@ -12790,7 +12821,7 @@ function faithDay() {
   if (d >= E.feast) { E.feast = d + 7; opferfest(); }
   if (d >= E.hunt && !S.hunt0) { E.hunt = d + 6; ketzerjagd(); }
   if (d >= E.pilgrim && !S.pilgrims) { E.pilgrim = d + 9; wallfahrt(); }
-  if (d >= E.crusade && !S.crusade) { E.crusade = d + 12; kreuzzug(); }
+  if (d >= E.crusade && !S.crusade) { E.crusade = d + crusadeEvery(); kreuzzug(); }   /* T23 S3: Takt 12 − Eifer */
   if (S.hunt0 && d > S.hunt0.until) huntEnd(false);
   if (S.crusade && d >= S.crusade.back) crusadeEnd();
 }
@@ -12857,6 +12888,9 @@ function pilgrimTick() {
     S.ents.world = S.ents.world.filter(e => !W.ids.includes(e.id)); S.pilgrims = null;
   }
 }
+/* T23 S3: Eifer des Ordens (S.after.zeal 0–5) setzt Takt und Siegchance des Kreuzzugs */
+const crusadeEvery = () => Math.max(1, Math.round(12 - (S.after?.zeal || 0)));
+const crusadeChance = (joined, alive) => Math.min(1, 0.45 + 0.05 * (S.after?.zeal || 0) + (joined ? 0.35 : 0) + alive * 0.02);
 // Kreuzzug (Konrad): acht Paladine ziehen zum Knochentor und kommen nach drei Tagen zurück — wer mitzieht, zählt.
 function kreuzzug() {
   const [kx, ky] = EM(946, 384), gate = S.ents.world.find(e => e.kind === 'prop' && e.label === 'Knochentor'); if (!gate) return;
@@ -12866,7 +12900,8 @@ function kreuzzug() {
   log('Paladinmarschall Konrad ruft zum Kreuzzug: acht Paladine ziehen zum Knochentor gegen die Toten. Wer mitzieht, soll sich bei ihm melden.', 'world'); chronicle('Kreuzzug zum Knochentor', 'war', 'Acht Paladine ziehen nach Osten.');
 }
 function crusadeEnd() {
-  const C = S.crusade; if (!C) return; const alive = C.ids.map(byId).filter(c => c && c.alive).length, win = chance(0.45 + (C.joined ? 0.35 : 0) + alive * 0.02);
+  const C = S.crusade; if (!C) return; const alive = C.ids.map(byId).filter(c => c && c.alive).length, win = chance(crusadeChance(C.joined, alive));   /* T23 S3: + 0,05 × Eifer */
+  if (win) { witchZeal(FAC_RES.order.crusadeWin); SIM.resAdd('undead', -FAC_RES.undead.crusade); } else witchZeal(-FAC_RES.order.crusadeLoss);   /* T23 S3: Sieg nährt den Eifer und kostet die Gruft Seelen */
   if (win) { S.factions.chain = clamp((S.factions.chain || 0) + (C.joined ? 10 : 2), -100, 100); if (C.joined) { S.gold += 150; const O = (S.omega ||= { faith: 0, frags: {} }); O.faith = Math.min(100, (O.faith || 0) + 10); } }
   log(`Der Kreuzzug kehrt zurück: ${win ? 'das Knochentor gehalten' : 'geschlagen'}, ${alive} von 8 leben.${C.joined && win ? ' Konrad nennt deinen Namen. 150 Gold, Glaube +10.' : ''}`, 'world');
   chronicle(win ? 'Kreuzzug siegreich' : 'Kreuzzug gescheitert', 'war', `${alive} von 8 Paladinen kehren heim.`);
@@ -12879,6 +12914,7 @@ function faithFigureTalk(n) {
   if (n.faithKey === 'mechthild') { opts.push({ text: 'Wen jagt ihr?', fn: say('„Jeden, der zweifelt. Zweifel ist die Tür, durch die die Toten kommen.“') });
     if (S.flags.kasimirBetrayed === 'pending') opts.push({ text: 'Bruder Kasimir zweifelt. Er plant zu fliehen.', fn: () => kasimirEnd(false) }); }
   if (n.faithKey === 'aldebrand') opts.push({ text: 'Was siehst du?', fn: say('„Ein Auge, größer als die Eisenfeste. Engel um es herum wie Motten ums Licht. Und dich, Fremder — mit Blut an den Händen, das nicht deins ist.“') });
+  if (n.faithKey === 'konrad') opts.push({ text: 'Wann zieht der nächste Kreuzzug?', fn: say(`„${S.crusade ? 'Er ist unterwegs.' : `In ${Math.max(0, FE().crusade - (S.day | 0))} Tagen.`} Je heißer der Eifer, desto öfter ziehen wir — und desto sicherer kehren wir heim. ${(S.after?.zeal || 0) >= 3 ? 'Der Eifer brennt.' : (S.after?.zeal || 0) <= 1 ? 'Der Eifer ist kalt. Alle zwölf Tage, nicht öfter.' : 'Der Eifer hält sich.'}“`) });   /* T23 S3 */
   if (n.faithKey === 'konrad') { opts.push({ text: 'Was ist ein Eisenpaladin?', fn: say('„Wir haben drei Orden. Eisen hält die Linie. Sterne heilen, was bricht. Die Inquisition sorgt dafür, dass nichts von innen fault.“') });
     if (S.crusade && !S.crusade.joined) opts.push({ text: 'Ich ziehe mit zum Knochentor.', fn: () => { S.crusade.joined = true; log('Konrad: „Dann halt Schritt. Am Knochentor zählt jeder Schwertarm.“', 'quest'); UI.closeDialogue(); } }); }
   if (n.faithKey === 'kasimir' && (S.flags.huntsSeen || 0) >= 1 && !S.flags.kasimirDone) {
@@ -13679,6 +13715,16 @@ const VAULTS = {
   /* Nutzer §5e.3: Endlosgewölbe — jede Ebene schwerer, alle fünf Ebenen ein Wächter und eine Truhe */
   schlund: { name: 'Der Schlund', at: 'sunkentemple', dx: -6, dy: -8, tier: 3, floors: 999, endless: true, pool: ['skeleton', 'ghoul', 'bandit', 'wraith', 'bone_knight', 'automat'], boss: 'death_knight', bossName: 'Wächter der Tiefe',
     deco: ['bones', 'broken_pillar', 'candles', 'gravestone'], enter: 'Eine Treppe, die nicht aufhört. Wie tief kommst du?' },
+  /* E40 S6 Gruftnetz (⚖): vier Grüfte unter dem Osten, eine führt zur nächsten — der Hort jeder Gruft trägt die Karte zur nächsten (net/netI, nicht in der
+     allgemeinen Kartenfolge der geheimen Gewölbe). Lage = vorhandene Orte, Ebenen und Pools aus den vorhandenen Untoten. */
+  schaedelstollen: { name: 'Schädelstollen', at: 'schaedelwald', dx: 6, dy: 10, tier: 3, floors: 2, net: 'gruft', netI: 0, pool: ['skeleton', 'skeleton', 'ghoul', 'bone_archer'], boss: 'skel_brute', bossName: 'Der Schädelzähler',
+    deco: ['bones', 'bone_spire', 'candles', 'gravestone'], enter: 'Schädel in den Wänden, Reihe um Reihe, wie Steine in einer Mauer. Der erste Gang des Gruftnetzes.' },
+  graeberschlucht: { name: 'Gräberschlucht', at: 'graeberfeld', dx: -9, dy: -7, tier: 4, floors: 3, hidden: true, net: 'gruft', netI: 1, pool: ['skeleton', 'ghoul', 'wraith', 'bone_archer', 'zombie'], boss: 'bone_knight', bossName: 'Graf Ohnegrab',
+    deco: ['gravestone', 'bones', 'broken_pillar', 'candles'], enter: 'Eine Schlucht aus Gräbern, eines über dem anderen. Unten ist es wärmer, als es sein dürfte.' },
+  seelengruft: { name: 'Seelengruft', at: 'seelenhuegel', dx: 10, dy: 9, tier: 4, floors: 3, hidden: true, net: 'gruft', netI: 2, pool: ['wraith', 'shade', 'necromancer', 'skeleton'], boss: 'crypt_warden', bossName: 'Die Hüterin der leeren Phiolen',
+    deco: ['candles', 'bones', 'candles', 'broken_pillar'], enter: 'Leere Phiolen in Nischen, tausende. Manche summen noch.' },
+  erstegruft: { name: 'Gruft der Ersten Stillen', at: 'totenruinen', dx: 8, dy: 12, tier: 5, floors: 4, hidden: true, net: 'gruft', netI: 3, pool: ['bone_knight', 'bone_archer', 'necromancer', 'shade', 'death_knight'], boss: 'death_knight', bossName: 'Die Erste Stille',
+    deco: ['bones', 'bone_spire', 'gravestone', 'candles'], enter: 'Hier begruben die Stillen ihre ersten Toten — und die standen als Erste wieder auf. Sehr schwer — nur für die Stärksten.' },
 };
 const VAULT_MOD = { dunkel: 'Es ist stockdunkel hier unten.', 'überflutet': 'Das Wasser steht knöcheltief — jeder Schritt ist schwer.', verflucht: 'Ein Fluch liegt auf dieser Ebene: die Wächter sind stärker, der Lohn auch.' };
 /* P3.x Gewölbe: Runentür — drei Steine in der Folge, die die Inschrift am Eingang beschreibt (Texte ⚖) */
@@ -13780,7 +13826,11 @@ function vaultHoardOpened(t) {
   chronicle(`${VAULTS[t.vaultHoard].name} geplündert`, 'news', `${S.player.name} kam mit dem Hort wieder herauf.`);
   if (t.vaultHoard === 'ausbrecherstollen') stollenChoice();          /* Geheime Orte S2 */
   if (t.vaultHoard === 'walknochen') walknochenChoice();              /* Geheime Orte S5 */
-  const next = Object.keys(VAULTS).find(k => VAULTS[k].hidden && !VAULTS[k].secretKey && !S.flags['vaultHint_' + k]);   /* §5e.3: im Hort liegt eine Karte zum nächsten geheimen Gewölbe (nicht für Geheimorte) */
+  const NV = VAULTS[t.vaultHoard], nn = NV.net && Object.keys(VAULTS).find(k => VAULTS[k].net === NV.net && VAULTS[k].netI === NV.netI + 1);   /* E40 S6: Gruftnetz — der Hort zeigt die nächste Gruft */
+  if (nn && !S.flags['vaultHint_' + nn]) { S.flags['vaultHint_' + nn] = 1; ensureVaultSites(); const L = LOCATIONS.find(l => l.key === VAULTS[nn].at);
+    log(`Im Hort liegt eine Gruftkarte aus Knochenpapier: Der Gang setzt sich fort — ${VAULTS[nn].name} bei ${L?.name || 'einem alten Ort'}. Sie ist jetzt auf der Karte.`, 'quest'); UI.toast(`GRUFTNETZ: ${VAULTS[nn].name.toUpperCase()}`, 3000); }
+  else if (NV.net && NV.netI === 3 && !S.flags.gruftNetDone) { S.flags.gruftNetDone = S.day | 0; chronicle('Das Gruftnetz ist durchschritten', 'legend', `${S.player.name} kam aus der Gruft der Ersten Stillen wieder herauf.`); log('Die Gruft der Ersten Stillen ist geplündert. Das Gruftnetz unter dem Osten hat keine Geheimnisse mehr.', 'quest'); }
+  const next = Object.keys(VAULTS).find(k => VAULTS[k].hidden && !VAULTS[k].secretKey && !VAULTS[k].net && !S.flags['vaultHint_' + k]);   /* §5e.3: im Hort liegt eine Karte zum nächsten geheimen Gewölbe (nicht für Geheimorte, nicht das Gruftnetz) */
   if (next) { S.flags['vaultHint_' + next] = 1; const L = LOCATIONS.find(l => l.key === VAULTS[next].at); ensureVaultSites();
     log(`Im Hort liegt eine verblasste Karte: ein Eingang nahe ${L?.name || 'einem alten Ort'} — ${VAULTS[next].name}. Er ist jetzt auf der Karte.`, 'quest'); UI.toast(`KARTE GEFUNDEN: ${VAULTS[next].name.toUpperCase()}`, 3000); }
 }
@@ -14532,8 +14582,8 @@ function aurelFallDay() {
   if (S.flags.skyDead?.kaiserin && !A?.throne && afterLive()) { AF().throne = { day, until: afterUntil() };
     afterSay('Thronstreit in Aurelion', 'Seit die Kaiserin tot ist, stehen die Grenzen des Hochreichs offen. Die Toten wittern es — Städte Aurelions werden fallen, wenn niemand sie hält.', 'war'); return; }
   if (!A) return;
-  if (A.throne && (A.throne.until == null || day < A.throne.until) && (A.afallN || 0) < 3 && chance(0.3)) { const T = aurelCities().filter(k => !heldBy(k) && !TOWN_PLAN[k].metro); if (T.length) aurelFall(pick(T), 'Tod der Kaiserin'); }
-  for (const [k, F] of Object.entries(A.afall || {})) if (afterHeals() && day >= F.day + AFTER_DAYS && heldBy(k)) { Object.assign(S.war.nodes[k], { owner: 'aurel', garrison: 20 }); log(`Die Sonnenlegion erobert ${townName(k)} zurück.`, 'war'); }
+  if (A.throne && (A.throne.until == null || day < A.throne.until) && (A.afallN || 0) < 3 && chance(0.3 * FAC_RES.aurel.fallMul[SIM.resStageOf('aurel')])) {   /* T23 S4 (F1): je reicher Aurelion, desto seltener fällt eine Stadt */ const T = aurelCities().filter(k => !heldBy(k) && !TOWN_PLAN[k].metro); if (T.length) aurelFall(pick(T), 'Tod der Kaiserin'); }
+  for (const [k, F] of Object.entries(A.afall || {})) if (afterHeals() && day >= F.day + AFTER_DAYS && heldBy(k)) { Object.assign(S.war.nodes[k], { owner: 'aurel', garrison: FAC_RES.aurel.legion[SIM.resStageOf('aurel')] }); log(`Die Sonnenlegion erobert ${townName(k)} zurück (Besatzung ${FAC_RES.aurel.legion[SIM.resStageOf('aurel')]} — je nach Wohlstand des Hochreichs).`, 'war'); }   /* T23 S4 (F1) */
   aurelCheck();
 }
 function aurelSplit() {
@@ -14636,7 +14686,7 @@ function quarSecond() {
 // Hexenjagd-Welle zieht durch andere Städte (je drei Tage eine Anklage, am Tag darauf der Scheiterhaufen, außer man spricht für sie oder
 // bringt sie nachts fort — jede Rettung senkt den Eifer). Die Welle endet nach zwei Anklagen, wenn der Eifer sinkt, oder auf Angsthase.
 function witchZeal(n) {
-  const A = AF(); A.zeal = clamp((A.zeal || 0) + n, 0, 5);
+  const A = AF(); A.zeal = clamp((A.zeal || 0) + n, 0, 5); A.zealAt = S.day | 0;   /* T23 S3: Anlass — das Abklingen beginnt von vorn */
   if (A.zeal >= 2 && !A.hunt) { A.hunt = { next: (S.day | 0) + 2, left: 2, until: afterUntil() };
     afterSay('Hexenjagd', `Der Orden ist erstarkt (Eifer ${A.zeal}). Inquisitoren ziehen durch die Städte und suchen Hexen. In den nächsten Tagen wird anderswo jemand angeklagt — wer für die Angeklagten einsteht, bremst den Orden.`, 'crime'); }
 }
@@ -15102,7 +15152,49 @@ function facSay(f, st, was) {
   if (!S._quiet) UI.toast(`${nm.toUpperCase()}: ${C.name.toUpperCase()} ${RES_STAGE[st].toUpperCase()}`, 3200);
   if (!S.flags.powersHint) { S.flags.powersHint = 1; log('Im Kodex (H) unter „Mächte“ steht, woher jede Macht ihre Kraft nimmt — und wie du daran drehst.', 'quest'); }
 }
-function resDaily(R, first) {}                                       /* Tagesquellen und -senken (S3–S5), aus facResDay */
+function resDaily(R, first) {                                         /* Tagesquellen und -senken (S3–S5), aus facResDay */
+  const day = S.day | 0, O = FAC_RES.order;
+  if (S.after?.zeal != null || SIM.undNodeCount() >= O.holdNodes) {   /* S3 Eifer: Land der Toten (≥ 4 Orte) nährt ihn höchstens alle 5 Tage; ohne Anlass −0,5 je 10 Tage */
+    const A = AF(); A.zealAt ??= day;
+    if (SIM.undNodeCount() >= O.holdNodes && day - (A.zealHold ?? -99) >= O.holdEvery) { A.zealHold = day; witchZeal(1); log(`Die Toten halten ${SIM.undNodeCount()} Orte — der Orden predigt den Kreuzzug (Eifer ${resFmt('order', A.zeal)}).`, 'faction'); }
+    else if ((A.zeal || 0) > 0 && day - A.zealAt >= O.decayEvery) { A.zeal = Math.max(0, A.zeal - O.decay); A.zealAt = day; }
+    R.order.v = A.zeal || 0;
+  }
+  const M = FAC_RES.merch, RM = R.merch;   /* S4 Händler: drei Tage unter 15 → Handelssperre, die Große Karawane bleibt 3 Tage im Tor */
+  RM.low = SIM.facRes('merch') < M.embargo ? (RM.low || 0) + 1 : 0;
+  if (RM.low >= M.embargoDays) { RM.low = 0; RM.embargo = day + M.embargoDays; S.caravanBack = Math.max(S.caravanBack || 0, day + M.embargoDays);
+    chronicle('Die Gilde stellt den Zug ein', 'news', 'Zu viele Wagen sind verloren. Die Große Karawane bleibt drei Tage im Tor. Die Gilde sucht Söldner.');
+    log('Handelssperre: Die Gilde hat zu viele Züge verloren und stellt die Große Karawane für drei Tage ein. Geleitaufträge zahlen jetzt mehr.', 'economy'); if (!S._quiet) UI.toast('HANDELSSPERRE DER GILDE', 3000); }
+  seaPrizeDay(R, day);
+}
+/* T23 S5 Seevolk: Prisen der Sturmklinge (Tageshash statt rnd) — etwa eine in 10 Tagen (+0,10 wer für die Klinge segelt), Salzfrieden: keine, nach Weißbarts
+   Tod zehn Tage Schwarzsegel (0,2), danach 0,05. Ein Hafen verliert 30 % seines Salzes (höchstens 12). Drei Prisen in 10 Tagen: Hellas Mannschaft wächst.
+   Salz knapp: Kopfgeld des Salzbunds auf die Schwarzsegel (eins zur Zeit). Salz reichlich: am Agendatag Salz ins Binnenland. */
+function seaPrizeDay(R, day) {
+  const Se = FAC_RES.sea, RS = R.sea; RS.prizes = (RS.prizes || []).filter(d => d > day - 10);
+  let p = Se.prize + (S.seaSide === 'raider' ? Se.raider : 0);
+  if (S.flags.whitebeardSlain) p = (S.flags.blackDays ?? -1) > day ? Se.black : Se.blackAfter;
+  if (S.flags.seaPeace) p = 0;
+  if (p > 0 && SIM.resHash(11, 1000) < p * 1000) { const port = Se.ports[SIM.resHash(13, Se.ports.length)], t = S.towns?.[port];
+    if (t) { const n = Math.min(Se.takeMax, Math.round((t.stock.salt || 0) * Se.take)); t.stock.salt = Math.max(0, (t.stock.salt || 0) - n); RS.prizes.push(day);
+      const who = S.flags.whitebeardSlain ? 'Die Schwarzsegel kapern' : 'Die Sturmklinge kapert';
+      chronicle(`${who} ein Salzschiff vor ${townName(port)}`, 'news', `${n} Lasten Salz gehen verloren. Wer den Salzfrieden stiftet, beendet das.`); log(`${who} ein Salzschiff vor ${townName(port)} (${n} Lasten Salz verloren).`, 'economy'); } }
+  if (RS.prizes.length >= Se.prizesHigh && !((RS.crewDay ?? -99) > day - 10)) { RS.crewDay = day; RS.crewWant = true; }   /* Figuren und Aushang erst in factionAgenda (würfeln dort, nicht in facResDay) */
+  if (SIM.resStageOf('sea') === 0 && !(S.contracts || []).some(c => c.seaBounty && !['claimed', 'failed'].includes(c.state))) RS.bountyWant = true;
+  if (SIM.resStageOf('sea') === 2 && day % 5 === 0) { const to = Se.inlandTo.filter(k => S.towns?.[k]); if (to.length) { stockShock(to, 'salt', Se.inland); chronicle('Salzbund-Schiffe bringen Salz ins Binnenland', 'news', `${to.map(townName).join(' und ')} bekommen Salz.`); } }
+}
+const zealHealMul = npc => npc?.faction === 'order' && (S.ranks?.order ?? -1) < 0 && (S.after?.zeal || 0) >= 3 ? 1 + 0.05 * ((S.after.zeal || 0) - 2) : 1;   /* T23 S3: Ordensheiler verlangen von Fremden mehr */
+function resPriceMul(key, isBuy, npc) {                              /* T23: Preise nach Fraktionsressourcen (nur Laden-Kauf/-Verkauf) */
+  let m = 1; if (!npc) return m;
+  const tk = ecoTown(npc) || npc.homeTown || npc.town;
+  if (key === 'soul_vial' && isBuy) m *= [FAC_RES.undead.vialLow, 1, FAC_RES.undead.vialHigh][SIM.resStageOf('undead')];   /* S3: satte Gruft ×0,7, schweigende ×1,5 */
+  if (isBuy && key === 'bandage' && tk === 'lichtenrain' && (S.after?.zeal || 0) <= 1) m *= 0.9;   /* S3: Eifer ≤ 1 — der Orden ist milde */
+  const R = S.facRes, day = S.day | 0;
+  if (isBuy && npc.faction === 'merch') m *= 1 + (50 - SIM.facRes('merch')) / FAC_RES.merch.priceDiv;   /* S4: Läden der Gilde ±20 % nach Handelswert */
+  if (!isBuy && R?.merch?.fairDay === day && ['eren', 'northcity'].includes(tk)) m *= FAC_RES.merch.fairMul;   /* S4: Messe — Verkauf +15 % für einen Tag */
+  if (isBuy && R?.aurel?.festDay === day && npc.map === 'sky') m *= 0.9;   /* S4: Fest des Hohen Rats — Himmelsinsel −10 % */
+  return m;
+}
 const resFmt = (f, v) => f === 'order' ? String(Math.round(v * 2) / 2).replace('.', ',') : f === 'aurel' ? (v >= 99 ? '99+' : String(Math.round(v * 10) / 10).replace('.', ',')) : String(Math.round(v));
 function powerGuide(f) {                                             /* Kodex „Mächte“ und Fraktionsfenster */
   const C = FAC_RES[f]; if (!C) return null;
@@ -15111,8 +15203,11 @@ function powerGuide(f) {                                             /* Kodex �
   let extra = '';
   if (f === 'aurel') { const I = SIM.aurelIndex(); extra = `Nahrung für ${resFmt('aurel', I.food)} Tage, Magitech für ${resFmt('aurel', I.magi)} Tage.`; }
   if (f === 'goblin') extra = S.flags.goblinsFreed ? `Stufe: ${GOB_NAME[S.gobCity?.lvl || 0]}.` : 'Die Grubenstämme sind noch in Ketten — der Hort wächst erst, wenn sie frei sind.';
-  if (f === 'chain' && S.flags.chainsBroken) extra = 'Die Eisenfeste ist gefallen. Die Kette hat keine Hände mehr.';
-  return { name: C.name, unit: C.unit, val: resFmt(f, v) + arrow, v, stage: st, stageName: f === 'goblin' ? '' : RES_STAGE[st], does: C.does, lever: C.lever, extra };
+  if (f === 'chain') extra = S.flags.chainsBroken ? 'Die Eisenfeste ist gefallen. Die Kette hat keine Hände mehr.' : `Nächster Feldzug: ${campSize('zug', v)} Mann, Stoßtrupp ${campSize('raid', v)}${v < FAC_RES.chain.heer ? ', kein Heerzug' : `, Heerzug ${campSize('heer', v)}`}${v < FAC_RES.chain.hunt ? ' — Sklavenjagd droht' : ''}.`;
+  if (f === 'order') extra = `Kreuzzug alle ${crusadeEvery()} Tage, Siegchance ohne dich ${Math.round(crusadeChance(false, 8) * 100)} %.`;
+  if (f === 'merch') { const R = S.facRes?.merch; extra = R?.embargo > (S.day | 0) ? 'Handelssperre: Die Große Karawane steht im Tor.' : R?.fairDay === (S.day | 0) ? 'Heute ist Messe in Eren und Nordfurt.' : `${2 + Math.round(v / 25)} neue Züge am Tag.`; }
+  if (f === 'sea') extra = S.flags.seaPeace ? 'Salzfrieden: keine Prisen.' : `Prisen in den letzten 10 Tagen: ${(S.facRes?.sea?.prizes || []).filter(d => d > (S.day | 0) - 10).length}.`;
+  return { name: C.name, unit: C.unit, val: resFmt(f, v), arrow, v, stage: st, stageName: f === 'goblin' ? '' : RES_STAGE[st], does: C.does, lever: C.lever, extra };
 }
 function facResDebug() {
   const V = () => SIM.facResView().map(r => `${FACTIONS[r.f]?.name || r.f}: ${r.name} ${resFmt(r.f, r.v)} (${RES_STAGE[r.stage]})`).join(' · ');
@@ -15125,9 +15220,33 @@ function facResDebug() {
     'Seelen +50': setV('undead', 50), 'Seelen −50': setV('undead', -50),
     'Handelszüge +25': setV('merch', 25), 'Handelszüge −25': setV('merch', -25),
     'Eifer +1': setV('order', 1), 'Eifer −1': setV('order', -1),
+    'Tote/Orden (S3): Kreuzzug-Takt, Siegchance und Heilerpreis anzeigen': () => UI.toast(`Eifer ${resFmt('order', S.after?.zeal || 0)}: Kreuzzug alle ${crusadeEvery()} Tage, Siegchance ${Math.round(crusadeChance(false, 8) * 100)} % (mit dir ${Math.round(crusadeChance(true, 8) * 100)} %), Ordensheiler ×${zealHealMul({ faction: 'order' }).toFixed(2)} · Seelen ${Math.round(SIM.facRes('undead'))} (${RES_STAGE[SIM.resStageOf('undead')]})`, 7000),
+    'Tote/Orden (S3): Kreuzzug jetzt beenden (würfeln)': () => { if (!S.crusade) { FE().crusade = S.day | 0; faithDay(); } if (S.crusade) { S.crusade.back = S.day | 0; crusadeEnd(); } UI.toast(`Eifer ${resFmt('order', S.after?.zeal || 0)} · Seelen ${Math.round(SIM.facRes('undead'))}`, 4000); },
+    'Tote (S3): Gruft satt (Seelen 150, Stufe hoch)': () => { const R = SIM.facResState(); R.undead.v = 150; SIM.facResDay(); UI.toast('Seelen 150 — Schlachten vor Ort kommen gemischt', 3000); },
+    'Tote (S3): Gräber schweigen (Seelen 5)': () => { const R = SIM.facResState(); R.undead.v = 5; SIM.facResDay(); UI.toast(`Seelen ${Math.round(SIM.facRes('undead'))} — kein neues Heer, Besatzungen füllen nicht`, 3000); },
+    'Händler (S4): Handelssperre auslösen (Wert 10, dritter Tag)': () => { const R = SIM.facResState(); R.merch.v = 10; R.merch.low = 2; SIM.facResDay(); },
+    'Händler (S4): Messe jetzt (Wert 90, Agenda der Gilde)': () => { const R = SIM.facResState(); R.merch.v = 90; const d0 = S.day; S.day = (S.day | 0) - ((S.day | 0) % 5) + 2 + (S.day % 1); factionAgenda(); S.day = d0; UI.toast('Messe: Verkauf in Eren und Nordfurt +15 % (heute)', 3000); },
+    'Aurelion (S4): Gesandter jetzt (kauft Nordfurts Korn)': () => { const n = aurelEnvoyBuy(); UI.toast(n ? `Aurelions Gesandter kauft ${n} Korn in Nordfurt` : 'Nordfurt hat kein Korn übrig (behält 8).', 3000); },
+    'Aurelion (S4): Hunger (Nahrung des Hochreichs 0) + Agendatag': () => { for (const [k, t] of Object.entries(S.towns)) if (LOCATIONS.find(l => l.key === k)?.faction === 'aurel') { t.stock.grain = 0; t.stock.meat = 0; } SIM.facResDay(); const d0 = S.day; S.day = (S.day | 0) - ((S.day | 0) % 5) + 4 + (S.day % 1); factionAgenda(); S.day = d0; UI.toast(`Wohlstand ${resFmt('aurel', SIM.facRes('aurel'))} Tage · Zoll ×${(S.tollMul || 1).toFixed(2)}`, 4000); },
+    'Seevolk (S5): Prise jetzt (erzwingt den Tageshash)': () => { const R = SIM.facResState(), d0 = S.day; let d = S.day | 0; while (SIM.resHash(11, 1000) >= 100 && d < (d0 | 0) + 3000) S.day = ++d; const s0 = SIM.seaSalt(); seaPrizeDay(R, S.day | 0); S.day = d0; UI.toast(`Salz der Häfen ${Math.round(s0)} → ${Math.round(SIM.seaSalt())} · Prisen (10 Tage) ${R.sea.prizes.length}`, 4000); },
+    'Seevolk (S5): Salz knapp → Kopfgeld des Salzbunds': () => { const R = SIM.facResState(); for (const k of FAC_RES.sea.ports) if (S.towns[k]) S.towns[k].stock.salt = 3; SIM.facResDay(); R.sea.bountyWant = true; seaAgenda(); },
+    'Seevolk (S5): drei Prisen → Hellas Mannschaft wächst': () => { const R = SIM.facResState(); R.sea.prizes = [S.day | 0, S.day | 0, S.day | 0]; R.sea.crewDay = -99; seaPrizeDay(R, S.day | 0); seaAgenda(); },
+    'Goblins (S5): befreiten Goblin zum Hort schicken (+1)': () => { if (!S.flags.goblinsFreed) return UI.toast('Erst die Grubenstämme befreien (Fall der Eisenfeste).', 3000); freeCaptive({ goblin: true, name: 'Befreiter', kind: 'npc' }, 'freed'); UI.toast(`Grubenhort ${S.gobCity?.pts || 0} Punkte`, 2500); },
+    'Kette (S2): Tribut jetzt in allen Tributdörfern': () => { for (const V of tribVillages()) tribState(V.key).next = S.day | 0; tributeDay(); UI.toast(tribVillages().map(V => `${V.name}: Korn ${Math.round(S.towns[V.key]?.stock.grain || 0)}`).join(' · '), 5000); },
+    'Kette (S2): Feldzug planen (Größe nach Köpfen)': () => { if (S.campaign && S.campaign.phase !== 'done') return UI.toast('Es läuft schon ein Feldzug.'); planCampaign('zug'); UI.toast(`${CAMP_TYPES[S.campaign.type].name}: ${S.campaign.size} Mann bei ${Math.round(SIM.facRes('chain'))} Köpfen`, 4000); },
+    'Kette (S2): Sklavenjagd jetzt (Köpfe auf 4)': () => { SIM.facResState().chain.v = 4; if (S.campaign && S.campaign.phase !== 'done') return UI.toast('Es läuft schon ein Feldzug.'); planCampaign('raid'); UI.toast(`${CAMP_TYPES[S.campaign.type].name} gegen ${townName(S.campaign.target)} (${S.campaign.size} Mann) — morgen Musterung`, 4000); },
   }];
 }
+function seaAgenda() {                                               /* T23 S5: was seaPrizeDay vorgemerkt hat — Plünderer auf den Inseln, Kopfgeld des Salzbunds */
+  const RS = S.facRes?.sea; if (!RS) return;
+  if (RS.crewWant) { RS.crewWant = false; if (MAPS.isle && S.ents.isle) { seaTagSpawn('prizecrew', 2, 48, 16, Math.max(5, S.player?.level || 5)); log('Die Prisen machen die Plünderer reich: Hellas Mannschaft auf den Gischtinseln bekommt Zulauf.', 'faction'); } }
+  if (RS.bountyWant) { RS.bountyWant = false; const town = S.towns?.kupferhafen && SIM.resHash(17, 2) ? 'kupferhafen' : 'saltport';
+    if (S.towns?.[town] && !(S.contracts || []).some(c => c.seaBounty && !['claimed', 'failed'].includes(c.state))) { const C = makeContract(town, 'bounty', 'board');
+      Object.assign(C, { seaBounty: true, mtype: 'sea_raider', elite: null, name: 'die Schwarzsegel', title: 'Kopfgeld des Salzbunds: Schwarzsegel', desc: 'Die Schwarzsegel kapern unsere Salzschiffe. Der Salzbund zahlt für jeden Plünderer an der Küste — lebend bei einer Wache abgeliefert mehr.' });
+      (S.contracts ||= []).push(C); log(`Das Salz wird knapp: Der Salzbund setzt in ${townName(town)} ein Kopfgeld auf die Schwarzsegel aus.`, 'faction'); } }
+}
 function factionAgenda() {
+  seaAgenda();
   const W = S.war, und = Object.values(W?.nodes || {}).filter(n => n.owner === 'undead').length, day = S.day | 0;
   const who = ['valen', 'order', 'merch', ...(S.flags.chainsBroken ? [] : ['chain']), 'aurel'][day % (S.flags.chainsBroken ? 4 : 5)];
   const say = (title, detail) => { chronicle(title, 'news', detail); log(`${title}. ${detail}`, 'faction'); return title; };
@@ -15138,13 +15257,18 @@ function factionAgenda() {
     sendPatrol('valen'); return say('Valen verstärkt die Streifen', 'Soldaten der Krone ziehen zwischen den Dörfern.');
   }
   if (who === 'order') {
-    if (und >= 1 && !S.flags.garmadonSlain) { sendPatrol('order'); const C = postContract('order', 'monster') || postContract('valen', 'monster');
-      return say('Der Orden sendet Paladine aus', `Sie jagen, was nicht ruhen will${C ? ` — Aushang in ${townName(C.town)}` : ''}.`); }
-    return say('Der Orden hält Andachten in allen Dörfern', 'Die Glocken läuten länger als sonst.');
+    const zl = S.after?.zeal || 0;   /* T23 S3: Eifer ≤ 1 — Andachten statt Streifen; ab 3 doppelte Streifen und Aushang ×1,3 */
+    if (zl > 1 && und >= 1 && !S.flags.garmadonSlain) { sendPatrol('order'); if (zl >= 3) sendPatrol('order'); const C = postContract('order', 'monster') || postContract('valen', 'monster'); if (C && zl >= 3) C.reward.gold = Math.round(C.reward.gold * 1.3);
+      return say(zl >= 3 ? 'Der Orden sendet doppelte Streifen aus' : 'Der Orden sendet Paladine aus', `Sie jagen, was nicht ruhen will${C ? ` — Aushang in ${townName(C.town)}${zl >= 3 ? ', der Orden zahlt gut' : ''}` : ''}.`); }
+    return say('Der Orden hält Andachten in allen Dörfern', zl <= 1 ? 'Der Eifer ist erkaltet. Die Glocken läuten, die Schwerter ruhen — in Lichtenrain sind Verbände billiger.' : 'Die Glocken läuten länger als sonst.');
   }
   if (who === 'merch') {
+    const M = FAC_RES.merch, mv = SIM.facRes('merch');   /* T23 S4: Gildenspeicher nach Handelswert (6 × Wert/50, höchstens 10, unter 25 leer); über 80 Messe */
+    if (mv > M.fair) { const R = SIM.facResState(); R.merch.fairDay = day; chronicle('Die Gilde ruft zur Messe', 'news', 'Eren und Nordfurt zahlen heute 15 % mehr für alles, was man ihnen verkauft.'); log('Die Gilde ruft zur Messe: Heute zahlen Eren und Nordfurt 15 % mehr für alles, was du verkaufst.', 'economy'); if (!S._quiet) UI.toast('MESSE IN EREN UND NORDFURT', 3000); }
     { let best = null; for (const [k, t] of Object.entries(S.towns || {})) for (const g of GOODS) { const need = ECO.target(t, g) - (t.stock[g] || 0); if (need > 4 && (!best || need > best.need)) best = { k, g, need }; }
-      if (best) { stockShock([best.k], best.g, 6); return say('Die Kaufleute öffnen ihre Speicher', `${townName(best.k)} bekommt ${GOOD_NAME[best.g] || ITEMS[best.g]?.name || best.g} aus den Lagern der Gilde.`); } }
+      const n = mv < M.shockMin ? 0 : Math.min(M.shockMax, Math.round(M.shock * mv / 50));
+      if (best && n > 0) { stockShock([best.k], best.g, n); return say('Die Kaufleute öffnen ihre Speicher', `${townName(best.k)} bekommt ${GOOD_NAME[best.g] || ITEMS[best.g]?.name || best.g} aus den Lagern der Gilde.`); }
+      if (best) log('Die Lager der Gilde sind leer — sie hat nichts zu verteilen. Wer Züge sicher ankommen lässt, füllt sie wieder.', 'economy'); }
     const C = postContract('merch', 'escort') || postContract('valen', 'escort'); sendPatrol('merch');
     return say('Die Gilde zahlt für Geleitschutz', C ? `Aushang in ${townName(C.town)}.` : 'Söldner ziehen mit den Wagen.');
   }
@@ -15154,8 +15278,26 @@ function factionAgenda() {
       return say('Die Gruben stehen halb leer — Varg schickt Treiber in die Dörfer', 'Der nächste Tribut wird doppelt eingetrieben. Wer die Pferche geöffnet hat, weiß warum.'); }
     return say('Varg lässt die Mauern der Eisenfeste ausbessern', 'In den Gruben wird doppelt gearbeitet.');
   }
-  if (chance(0.5)) { S.tollMul = Math.min(1.3, (S.tollMul || 1) * 1.05); return say('Aurelion erhöht die Zölle', 'Waren aus dem Hochreich werden teurer.'); }
+  { const roll = chance(0.5), F = FAC_RES.aurel, ai = SIM.facRes('aurel');   /* T23 S4 (F1): Wohlstand = Index aus Versorgung und Magitech */
+    const bought = ai < F.buyBelow ? aurelEnvoyBuy() : 0;
+    if (ai < F.lt) { S.tollMul = Math.min(1.3, (S.tollMul || 1) + F.toll); const fr = aurelFreight();
+      return say('Aurelion hungert', `Nahrung oder Magitech reichen nur noch für ${resFmt('aurel', ai)} Tage. Die Zölle steigen${bought ? `, ein Gesandter kauft ${bought} Korn in Nordfurt` : ''}${fr ? ', und in Kupferhafen hängt ein Frachtauftrag für Korn (doppelter Lohn)' : ''}.`); }
+    if (bought) return say('Aurelions Gesandter kauft Nordfurts Korn auf', `${bought} Korn gehen nach Aurelheim. In Nordfurt wird das Brot teurer — und Valens Heer isst weniger.`);
+    if (ai > F.ge) { const R = SIM.facResState(); R.aurel.festDay = day; return say('Der Hohe Rat gibt ein Fest', 'Aurelion schwimmt in Wohlstand: Heute ist auf der Himmelsinsel alles 10 % billiger, und die Zölle fallen schneller.'); }
+    if (roll) { S.tollMul = Math.min(1.3, (S.tollMul || 1) * 1.05); return say('Aurelion erhöht die Zölle', 'Waren aus dem Hochreich werden teurer.'); } }
   return say('Ein Gesandter Aurelions reist nach Nordfurt', 'Man spricht von Verträgen. Oder von Drohungen.');
+}
+/* T23 S4: Aurelions Gesandter kauft Nordfurts Korn (höchstens 12, Nordfurt behält 8) — Aurelion-Hunger wird Valen-Schwäche */
+function aurelEnvoyBuy() {
+  const F = FAC_RES.aurel, nf = S.towns?.northcity, ah = S.towns?.aurelheim; if (!nf || !ah || S.war?.nodes?.northcity?.owner === 'undead') return 0;
+  const n = Math.max(0, Math.floor(Math.min(F.buyMax, (nf.stock.grain || 0) - F.buyKeep))); if (!n) return 0;
+  nf.stock.grain -= n; ah.stock.grain = (ah.stock.grain || 0) + n; return n;
+}
+/* T23 S4: Frachtauftrag in Kupferhafen — 15 Korn, doppelter Lohn (S.eco.orders-Muster, fac: aurel), einer zur Zeit */
+function aurelFreight() {
+  const E = S.eco, F = FAC_RES.aurel; if (!E || !S.towns?.kupferhafen || E.orders.some(o => o.fac === 'aurel')) return null;
+  const o = { id: uid(), town: 'kupferhafen', good: 'grain', n: F.freight, reward: ECO.orderPay('kupferhafen', 'grain', F.freight) * F.freightPay, until: (S.day | 0) + 7, fac: 'aurel', pay: F.freightPay };
+  E.orders.push(o); return o;
 }
 // S14 Jahreszeiten: Wechsel wird angesagt; im Winter ziehen Rudel an die Weiden der Norddörfer (Wolfswinter) und die Bretter suchen Jäger
 function seasonDay() {
@@ -15274,7 +15416,7 @@ function dayTick() {
     chronicle(`${w.name} erhält einen Namen`, 'item', w.lore);
     UI.toast(`${w.name}`, 4000);
   }
-  if (S.tollMul && S.tollMul !== 1) S.tollMul = S.tollMul > 1 ? Math.max(1, S.tollMul - 0.01) : Math.min(1, S.tollMul + 0.01);   /* T09: Zölle fallen zurück; der Zufallspreis ist weg */
+  if (S.tollMul && S.tollMul !== 1) S.tollMul = S.tollMul > 1 ? Math.max(1, S.tollMul - 0.01 * (SIM.resStageOf('aurel') === 2 ? 2 : 1)) : Math.min(1, S.tollMul + 0.01);   /* T23 S4: Aurelion im Wohlstand — Zölle fallen doppelt so schnell */   /* T09: Zölle fallen zurück; der Zufallspreis ist weg */
   save();
   log(`Tag ${S.day} bricht an.`, 'world');
   for (const town of Object.keys(TOWN_PLAN)) if (festDay(town)) log(`Heute ab dem Nachmittag feiert ${townName(town)} sein Stadtfest.`, 'world');
@@ -15574,7 +15716,7 @@ const isHealer = n => n.prof === 'Heilerin' || n.prof === 'Heiler' || n.prof ===
    aenderte c.hp nicht, der Heiler sagte „Dir fehlt nichts“. Zusaetzlich die einzelnen Koerperteile pruefen. */
 const limbHurt = c => c.body && Object.values(c.body).some(p => !p.mech && !p.lost && p.hp < p.max);   /* 03.10.: Prothesen heilt der Heiler nicht (Werkbank), also auch nicht berechnen */
 const woundedGroup = () => [S.player, ...partyMembers().filter(m => m.alive && !m.downed && dist(m, S.player) < 200)].filter(c => c.hp < c.maxHp || limbHurt(c) || (c.status || []).some(s => SLEEP_CURES.has(s.key)));
-const healCost = () => Math.max(5, Math.round(woundedGroup().reduce((n, c) => n + (c.maxHp - c.hp) * 0.5 + ((c.status || []).some(s => SLEEP_CURES.has(s.key)) ? 8 : 0), 0)));
+const healCost = (npc = null) => Math.max(5, Math.round(woundedGroup().reduce((n, c) => n + (c.maxHp - c.hp) * 0.5 + ((c.status || []).some(s => SLEEP_CURES.has(s.key)) ? 8 : 0), 0) * zealHealMul(npc)));   /* T23 S3: Ordensheiler nach Eifer */
 /* GUI Heiler (Entwickler 03.10.2026: „jedes System ein Fenster“): healerView liefert Gruppe (Glieder, Zustände), Heilpreis und Schienenpreis;
    healerAct führt die zwei bisherigen Behandlungen aus (Wunden heilen = healerTreat, Schienen/Reinigen = woundCare). Proben und Koop-Gäste
    behalten das Gespräch (healerTreat ohne Fenster). */
@@ -15582,20 +15724,20 @@ const SPLINT_COST = 25;
 const splintGroup = () => [S.player, ...partyMembers()].filter(c => c?.alive && c.body && (B.PARTS.some(k => c.body[k].broken && !c.body[k].splint) || stat(c, 'infektion')));
 function healerView(npc) {
   const grp = [S.player, ...partyMembers().filter(m => m.alive && dist(m, S.player) < 200)], w = woundedGroup(), sp = splintGroup();
-  return { title: `${npc.name} (${npc.prof})`, gold: S.gold, cost: healCost(), wounded: w.length, splint: sp.length, splintCost: SPLINT_COST, busy: !!S.player.channel,
+  return { title: `${npc.name} (${npc.prof})`, gold: S.gold, cost: healCost(npc), wounded: w.length, splint: sp.length, splintCost: SPLINT_COST, busy: !!S.player.channel,
     group: grp.map(c => ({ name: c.name, hp: Math.round(c.hp), max: Math.round(c.maxHp), hurt: w.includes(c), splint: sp.includes(c),
       parts: B.PARTS.map(k => { const q = c.body?.[k]; return { k, name: B.PART_NAME[k], hp: q ? Math.round(q.hp) : 0, max: q ? Math.round(q.max) : 0, broken: !!q?.broken, splinted: !!q?.splint, lost: !!q?.lost, mech: !!q?.mech }; }),
       status: (c.status || []).map(s => s.name || s.key) })) };
 }
 function healerAct(npc, what) {
-  if (what === 'heal') { if (!woundedGroup().length) return 'Euch fehlt nichts.'; if (S.gold < healCost()) return 'Zu wenig Gold.'; healerTreat(npc, true); return null; }
+  if (what === 'heal') { if (!woundedGroup().length) return 'Euch fehlt nichts.'; if (S.gold < healCost(npc)) return 'Zu wenig Gold.'; healerTreat(npc, true); return null; }
   const who = splintGroup(); if (!who.length) return 'Nichts zu schienen.'; if (S.gold < SPLINT_COST) return 'Zu wenig Gold.';
   S.gold -= SPLINT_COST; for (const c of who) { for (const k of B.PARTS) if (c.body[k].broken) c.body[k].splint = true; c.status = c.status.filter(q => q.key !== 'infektion'); }
   log('Die Brüche sind geschient (heilen doppelt so schnell), die Wunden ausgebrannt und verbunden.', 'party'); UI.refreshHUD(); return null;
 }
 function healerTreat(npc, fromWin = false) {
   if (!fromWin && !S._quiet && S.coop?.role !== 'guest') { UI.closeDialogue(); UI.openModal('healer', npc); return; }
-  const p = S.player, cost = healCost();
+  const p = S.player, cost = healCost(npc);
   if (!woundedGroup().length) return UI.dialogue(npc, '„Dir fehlt nichts. Komm wieder, wenn es blutet.“', [{ text: 'Weiter', fn: () => talk(npc) }]);
   if (S.gold < cost) return UI.dialogue(npc, `„${cost} Gold. Kräuter und Leinen wachsen nicht umsonst.“`, [{ text: 'Weiter', fn: () => talk(npc) }]);
   UI.closeDialogue(); p.channel = { healer: npc.id ?? true, targetId: npc.id, t: 0, dur: HEALER_MS, cost }; p.vx = p.vy = 0;
@@ -15727,7 +15869,7 @@ function enemyBark(e, m) {
 // S13 (Nutzer: „ausführlichere Tooltips — Berufe“): Was eine Figur dir geben kann, aus denselben Merkmalen, die das Gespräch nutzt.
 function npcOffers(n) {
   const o = [];
-  if (n.shop) o.push('Handel'); if (n.smith) o.push('Ausbessern'); if (isHealer(n)) o.push(`Heilen (${healCost()} Gold)`);
+  if (n.shop) o.push('Handel'); if (n.smith) o.push('Ausbessern'); if (isHealer(n)) o.push(`Heilen (${healCost(n)} Gold)`);
   if (n.teaches) o.push('Ausbildung'); if (n.coach) o.push('Kutschfahrten'); if (n.ferry) o.push('Überfahrt'); if (n.airMaster) o.push('Luftschiff-Passagen, Flottenstatus');
   if (n.merc && !S.party.includes(n.id)) o.push(`Söldner (${n.merc.hire} Gold)`); if ((n.recruit || n.retainer) && !S.party.includes(n.id)) o.push('Kommt vielleicht mit');
   if (n.vm || n.prof === 'Tributoffizier') o.push('Aufträge der Wache'); else if (PROF_CON[n.prof] && n.homeTown && conGiverOk(n)) o.push(`Auftrag: ${CON[PROF_CON[n.prof]].name}`);   /* P1.8: nur wer wirklich Arbeit vergibt (Deckel 3/4/6) */
@@ -15811,7 +15953,7 @@ function talk(npc) {
   else if (npc.shop && refusesChain(npc)) choices.push({ text: 'Zeig mir deine Waren.', fn: () => UI.dialogue(npc, '„Ich verkaufe nicht an Kettenleute. Nimm es dir mit Gewalt, wenn du willst — geben tu ich es nicht.“', leave) });
   else if (npc.shop) choices.push({ text: 'Zeig mir deine Waren.', fn: () => { UI.closeDialogue(); UI.openModal('trade', npc); } });
   if (npc.smith && !(npc.dwarf && !S.flags.dwarfFriend)) choices.push({ text: 'Kannst du das ausbessern?', fn: () => repairAll(npc) });   /* Zwergenschmiede erst als Freund der Halle */
-  if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost()} Gold)`, fn: () => healerTreat(npc) });   // AUDIT H-03
+  if (isHealer(npc) && !npc.hostile) choices.push({ text: `Versorg meine Wunden. (${healCost(npc)} Gold)${zealHealMul(npc) > 1 ? ' — der Orden verlangt mehr, solange sein Eifer brennt' : ''}`, fn: () => healerTreat(npc) });   // AUDIT H-03
   choices.push(...bionicChoices(npc)); leaveChoices(npc, choices);   /* NPC-Ziele N2 */ if (npc.household && !npc.famKid) choices.push({ text: 'Wer wohnt bei dir?', fn: () => UI.dialogue(npc, `„${familyLine(npc)}“`, [{ text: 'Zurück', fn: () => talk(npc) }]) });   /* Planlauf P1.10 */ atoneChoices(npc, choices); karakChoices(npc, choices); keepChoices(npc, choices); envoyChoices(npc, choices); kinChoices(npc, choices); vanishChoices(npc, choices); grudgeChoices(npc, choices); rumorChoices(npc, choices); tavernChoices(npc, choices); facRecruitChoices(npc, choices); woundCare(npc, choices); bandChoices(npc, choices); geroChoices(npc, choices); dynastyChoices(npc, choices); studentChoices(npc, choices); gobChoices(npc, choices); dwarfChoices(npc, choices); varonChoices(npc, choices); cityChoices(npc, choices); vampChoices(npc, choices); captiveChoices(npc, choices); cultChoices(npc, choices); cultCatChoices(npc, choices); cultCourtChoices(npc, choices); cultPathChoices(npc, choices);   /* Nutzer §5d.2: Karak-Atar */   /* Roadmap P5: Kybernetiker, Medica, Vell, Schwarzmarkt */
   const eT = !occupied && !npc.hostile && ecoTown(npc);
   if (eT && (sellsGoods(npc) || ECO.marketNpc(eT) === npc)) choices.push({ text: 'Handelskontor (Markt, Wagen, Betriebe, Lieferungen)', fn: () => ecoMenu(npc, eT) });   // S13 Wirtschaft
@@ -16931,6 +17073,7 @@ function rankGuide(f) {
       'Bürger und Ansehen 52', 'Bürger und Ansehen 64', 'Bürger und Ansehen 76', 'Bürger und Ansehen 88', 'Hoher Beamter und die Quest „Eine Stimme im Rat“'][i];
     if (f === 'goblin') return ['Die Grubenstämme befreien (Varg stürzen)', 'Befreit und Ansehen 20', 'Befreit und Ansehen 60'][i];
     if (f === 'sea') return ['Ankunft auf den Gischtinseln oder Ansehen 10 beim Seevolk', 'Den zweiten Auftrag eines Clans erfüllen (Salzbund oder Sturmklinge)', 'Nach der Seitenwahl: Ansehen 50 beim Seevolk', 'Salzbund: dritter Auftrag · Sturmklinge: Weißbarts Auftrag gegen Morra', 'Nach Rang Steuermann: Ansehen 100 beim Seevolk'][i];   /* Audit 2.9 / A-14: Ränge 0, 2, 4 über Ruf (autoRanks, 03.10.) */   // S15 P8: aus dem Code, nichts erfunden
+    if (f === 'undead' && i > 0) return deadTrialText(i);   /* E40 S4: Rangprüfungen der Stillen */
     if (i === 0) return f === 'undead' ? 'Beitritt bei einem Mitglied (Ansehen 15) — oder vor Garmadon knien' : 'Beitritt bei einem Mitglied, Ansehen 10';   /* S15 Hinweise */
     if (f === 'chain' && i === 4) return 'Aufseher und die Weihe der Kette bei Varg';
     const L = RANK_LINES[f]; return `Ansehen ${i * 25}, dann die Rangprüfung (zwei Aufträge) bei ${L?.giver ? NPCS.find(n => n.key === L.giver)?.name : L?.giverName || 'einer Kettenwache der Festung'}`;
@@ -17184,11 +17327,11 @@ const craftMatValue = key => { const R = RECIPES[key]; return R ? Object.entries
 function rawPrice(key, isBuy, npc, inst = null) {
   if (ITEMS[key].good && npc && ecoTown(npc)) {
     const p = SIM.townPrice(ecoTown(npc), key, isBuy), t = (S.player.skills.trading || 0) / 100;
-    return Math.max(1, Math.round((isBuy ? p * (1 - t * 0.2) : p * (1 + t * 0.2)) * repPrice(npc, isBuy)));
+    return Math.max(1, Math.round((isBuy ? p * (1 - t * 0.2) : p * (1 + t * 0.2)) * repPrice(npc, isBuy) * resPriceMul(key, isBuy, npc)));   /* T23 */
   }
   const v = ITEMS[key].value * Math.min(isBuy ? 9 : 1.3, baseMul(npc && ecoTown(npc), baseOf(key))) * (inst ? RARITY_VALUE[rarOf(inst)] || 1 : 1) * afterItemMul(key);   /* T09: Preis nach Stadtlager statt Weltfaktor */   /* Folgen §5c: Streik verteuert Bionik */
   const t = (S.player.skills.trading || 0) / 100;
-  return Math.max(1, Math.round((isBuy ? v * (1.35 - t * 0.3) : v * (0.45 + t * 0.25)) * repPrice(npc, isBuy)));   // §43: Ruf verändert den Preis
+  return Math.max(1, Math.round((isBuy ? v * (1.35 - t * 0.3) : v * (0.45 + t * 0.25)) * repPrice(npc, isBuy) * resPriceMul(key, isBuy, npc)));   /* §43: Ruf verändert den Preis; T23: Fraktionsressourcen */
 }
 function shopStock(npc) {
   if (!npc._stockDay || npc._stockDay !== S.day) {
@@ -17360,7 +17503,8 @@ function ecoMenu(npc, town) {
     (coming.length ? `Unterwegs hierher: ${coming.join('; ')}` : 'Kein Händlerzug unterwegs hierher.') + (t.hunger ? '\nDie Stadt hungert.' : '') +
     (X => `\nAbgaben hier: Betriebssteuer ${Math.round(X.tax * 100)} % vom Gewinn, Einzahlgebühr ${Math.round(X.fee * 100)} %${X.own ? ' (Stadtrecht)' : ` (${FACTIONS[X.fac]?.name || 'ohne Herrn'})`}.`)(ECO.taxOf(town)) +
     (ECO.DEAD_GOODS.some(g => (t.use[g] || 0) > 0 || (t.prod?.[g] || 0) > 0) ? `\nTotenware: ${ECO.DEAD_GOODS.map(g => `${ITEMS[g].name} ${ECO.ecoPrice(town, g, false)}`).join(', ')} (Verkaufspreis hier).` : '') +
-    ((R => R && R.why.some(w => w.add > 0) ? `\nGefährlichste Straße: ${R.txt.replace(/^Nach /, 'nach ')}` : '')(ECO.routeLines(town)[0])), [   /* T12 B1 */
+    ((R => R && R.why.some(w => w.add > 0) ? `\nGefährlichste Straße: ${R.txt.replace(/^Nach /, 'nach ')}` : '')(ECO.routeLines(town)[0])) +
+    ((v, R) => `\nGilde: Handelswert ${Math.round(v)} von 100${R?.embargo > (S.day | 0) ? ' — Handelssperre, die Große Karawane steht im Tor' : R?.fairDay === (S.day | 0) ? ' — heute ist Messe in Eren und Nordfurt' : v < FAC_RES.merch.lt ? ' — wir verlieren Züge, Geleit zahlt besser' : v > FAC_RES.merch.fair ? ' — die Straßen sind voll Wagen' : ''}.`)(SIM.facRes('merch'), S.facRes?.merch), [   /* T12 B1; T23 S4 */
     { text: 'Straßen und Gefahren', fn: () => roadMenu(npc, town) },
     { text: 'Waren kaufen und verkaufen', fn: () => { if (!npc.goodsOnly) { npc.goodsOnly = true; npc._kontor = true; } UI.closeDialogue(); UI.openModal('trade', npc); } },   /* goodsOnly endet mit dem Handelsfenster (tradeEnd) */
     { text: 'Wo ist was billig, wo teuer?', fn: () => ecoPrices(npc, town) },
@@ -20355,7 +20499,7 @@ function debugSections() {
       'Totenland: Belagerung der Feste vorführen an/aus (Mauerwachen)': () => { (S.dbg ||= {}).keepSiege = !S.dbg.keepSiege; UI.toast(S.dbg.keepSiege ? 'Vorschau Belagerung: Mauerwachen kommen' : 'Vorschau aus'); },
       'Totenland: Brett der Stillen neu beschreiben': () => { (S.conDay ||= {})['vharnholm:board'] = -99; const L = townContracts('vharnholm', 'board'); UI.toast(L.map(c => c.title).join(' · ') || 'leer', 3500); },
     }],
-    ['Welt: Totenland groß (E40 S1–S3)', '', {
+    ['Welt: Totenland groß (E40 S1–S4, S6)', '', {
       'E40 S1: zum Siegelmeister vor Vharnholm': () => { const n = S.ents.world.find(e => e.sealMaster === 'vharnholm'); if (n) tp(n.x / TS2 | 0, (n.y / TS2 | 0) + 2); else UI.toast('Kein Siegelmeister (Vharnholm geräumt?).'); },
       'E40 S1: in die Viertel (Seelenschreiberei)': () => { const n = S.ents.world.find(e => e.deadQ === 'hall'); if (n) tp(n.x / TS2 | 0, (n.y / TS2 | 0) + 2); else UI.toast('Viertel nicht gebaut.'); },
       'E40 S1: Totensiegel 5 Tage geben / entziehen': () => { if ((S.deadPass ?? -1) >= (S.day | 0)) { S.deadPass = -1; UI.toast('Totensiegel entzogen'); } else { S.deadPass = (S.day | 0) + DEAD_LAW.seal; delete S.flags.deadBan; UI.toast(`Totensiegel bis Tag ${S.deadPass}`); } },
@@ -20373,6 +20517,10 @@ function debugSections() {
       'E40 S3: Fehde jetzt / Stand zeigen': () => { if (S.flags.deadSucc?.path === 'princes') succFeud(); UI.toast(succLine(), 5000); },
       'E40 S3: zum nächsten Fürsten': () => { const f = S.ents.world.filter(e => e.succPrince && e.alive).sort((a, b) => dist(a, p) - dist(b, p))[0]; if (f) tp(f.x / TS2 | 0, (f.y / TS2 | 0) + 2); else UI.toast('Keine Fürsten (Pfad „Fürstentümer“ nicht aktiv).'); },
       'E40 S3: Nachfolge zurücksetzen (nur die Nachfolge-Daten)': () => { delete S.flags.deadSucc; keepRng(ensurePrinces); UI.toast('Nachfolge zurückgesetzt'); },
+      'E40 S6: zum Schädelstollen (Gruftnetz)': () => { const g = S.ents.world.find(e => e.vaultSite === 'schaedelstollen'); if (g) tp(g.x / TS2 | 0, (g.y / TS2 | 0) + 2); else UI.toast('Kein Eingang gefunden.'); },
+      'E40 S6: Gruftnetz ganz aufdecken': () => { for (const k of Object.keys(VAULTS)) if (VAULTS[k].net) S.flags['vaultHint_' + k] = 1; ensureVaultSites(); UI.toast('Gruftnetz auf der Karte'); },
+      'E40 S4: Rangprüfung der Stillen — was fehlt für den nächsten Rang?': () => { const r = S.ranks.undead ?? -1; UI.toast(r < 0 ? 'Noch kein Rang bei den Toten (knien oder beitreten).' : r >= 3 ? 'Nächster Rang nur über die Eisenfeste.' : `${FACTIONS.undead.ranks[r + 1]}: ${deadTrialMiss(r + 1) || 'alles erfüllt — vor Garmadon knien'}`, 5000); },
+      'E40 S4: Prüfungen erfüllt setzen (6 Aufträge, 1 Überfall, 3 Seelen)': () => { Object.assign(S.flags.deadTrial ||= {}, { jobs: Math.max(6, S.flags.deadTrial.jobs || 0), raids: Math.max(1, S.flags.deadTrial.raids || 0) }); addItem(p, 'soul_vial', DEAD_TRIAL.souls); UI.toast('Rangprüfungen der Stillen erfüllt'); },
     }],
     ['Regie (T17)', sel('dbBoss', Object.keys(BOSS_CARDS).map(k => [k, BOSS_CARDS[k].title])), {
       'Boss-Auftritt vorspielen (gewählt)': () => { const k = v('dbBoss'), b = REGION_BOSSES.find(x => x.id === k), e = spawnEnemy(b ? b.mtype : k, S.map, (p.x / TS | 0) + 5, p.y / TS | 0); if (!e) return UI.toast('Kein Platz'); e.transient = true; e.bossCard = k; if (b) e.title = b.title; bossIntro(e, true); },   /* P3.x: auch Graumähne/Karrak (Regionalbosse) */
@@ -20641,6 +20789,7 @@ export function simFight(mtype, o = {}) {
 }
 export function selftest() {
   const fame0 = structuredClone(S.fame || null), anom0 = S.anomaly || null, after0 = structuredClone({ a: S.after ?? null, r: S.resettle ?? null });   /* Folgen §5c: S.after bleibt vom Test unberührt */   // S15: Ruhm und Anomalie bleiben vom Test unberührt
+  const quests0 = structuredClone(S.quests || {});   /* 10.10.: Probe-Aufträge (E2, Auftraggeberin) blieben sonst als aktive Einträge in S.quests stehen */
   const out = [], quiet0 = S._quiet;   // AUDIT P-05: Proben setzen S._quiet zurück — am Ende gilt wieder der Wert von vorher
   S._quiet = true;                     // S13: der ganze Test ist still (keine Kamerafahrten, Chronik, Speicherstände aus Proben)
   const ok = (name, cond) => { out.push((cond ? 'PASS ' : 'FAIL ') + name); if (!cond) console.error('FAIL', name); };
@@ -21642,7 +21791,7 @@ export function selftest() {
     const keep = structuredClone({ st: S.settlement, res: S.res });
     try {
       const p = stage(), h = actor(330, 300, { prof: 'Heilerin' }); h.kind = 'npc'; S.gold = 500;
-      B.damagePart(p, 'larm', 8); p.status = [{ key: 'bleeding', name: 'Blutend', left: 60000 }]; const cost = healCost(); healerTreat(h);
+      B.damagePart(p, 'larm', 8); p.status = [{ key: 'bleeding', name: 'Blutend', left: 60000 }]; const cost = healCost(h); healerTreat(h);
       tickChannel(p, 1000, false); const notYet = p.hp < p.maxHp;
       for (let t = 0; t < HEALER_MS; t += 100) tickChannel(p, 100, false);
       const healed = notYet && p.hp === p.maxHp && !p.status.some(s => s.key === 'bleeding') && S.gold === 500 - cost;
@@ -22061,6 +22210,79 @@ export function selftest() {
       if (!ui) console.warn('T23-S1-UI', { n0, known, n1, fw }); } finally { S.flags.codexAll = fl; document.querySelector('[data-t="ranks"]')?.click(); UI.closeModal(); }
     const res = { eight, silent, dflt, once, hint, noRnd, guide, ui }; if (!Object.values(res).every(Boolean)) console.warn('T23-S1-Probe', res, said);
     return Object.values(res).every(Boolean);
+  }));
+  ok('T23 S2 Kette und Tribut: Köpfe = Gefangene + 2 je Tributdorf; Feldzuggröße folgt den Köpfen (56 → alte Mitte 11/25/45, 7 → Stoßtrupp ≤ 6, kein Heerzug), unter 10 Köpfen seltener, unter 6 Sklavenjagd (Grubenhort −10, vier neue Köpfe im Pferch); Tribut nimmt 25 aus dem Dorfmarkt, die Feste bekommt sie, leeres Dorf hungert; alter Vorrat 60 → +30 Korn und gelöscht', t23(() => {
+    const day = S.day | 0, F = FAC_RES.chain; S.flags.chainsBroken = false;
+    const heads = chainHeads() === S.ents.world.filter(e => e.captive && e.alive && !e.freed).length + F.village * tribVillages().filter(V => !S.tribute?.[V.key]?.free).length;
+    const size = campSize('raid', 56) === 11 && campSize('zug', 56) === 25 && campSize('heer', 56) === 45 && campSize('raid', 7) <= 6 && campType('heer', 7) === 'zug' && campType('heer', 12) === 'heer';
+    SIM.facResState().chain.v = 4; delete S.campaign; planCampaign('heer'); const heer = S.campaign.type === 'zug' && S.campaign.size === CAMP_TYPES.zug.size[0] - 4;
+    delete S.campaign; S.campNext = { heer: day + 99, zug: day + 99, raid: day }; campaignDay(); const C = S.campaign;
+    const jagd = C?.type === 'jagd' && jagdTargets().includes(C.target) && C.size >= 8 && C.size <= 10 && S.campNext.raid >= day + CAMP_TYPES.raid.every[0] + (F.slow - 4);
+    const J = { id: 'tj23', type: 'jagd', target: 'grubenhort', size: 9, phase: 'return', win: true }; S.gobCity = { pts: 40, lvl: 2 }; jagdEnd(J, true);
+    const pen0 = penList().length; campArrive(J, null); const hunt = S.gobCity.pts === 30 && J.taken === F.huntGain && penList().length === pen0 + F.huntGain;
+    const V = tribVillages()[0], T = tribState(V.key), st = S.towns[V.key].stock, kf = S.towns.kettenfeste.stock;
+    for (const W of tribVillages()) tribState(W.key).next = day + 99;
+    Object.assign(T, { next: day, paid: false, harsh: 0, garrison: 1e9, hunger: 0 }); st.grain = 40; st.meat = 0; const k0 = kf.grain || 0, ids = new Set(S.ents.world.map(e => e.id));
+    const unbrawl = () => { for (const e of S.ents.world) if (e.brawlV === V.key) { e.brawl = false; e.brawlSide = null; if (e.villager) e.brave = false; } if (S.brawls) delete S.brawls[V.key]; };
+    tributeDay(); const L = S.ents.world.find(e => e.tribV === V.key && !ids.has(e.id)); unbrawl();
+    const took = st.grain === 15 && L?.tribCargo === TRIB_TAKE; if (L) arriveTribute(L); const fort = kf.grain === k0 + TRIB_TAKE;
+    T.next = day; st.grain = 5; tributeDay(); unbrawl(); const hungry = T.hunger >= 1 && st.grain === 0;
+    T.vorrat = 60; st.grain = 10; tribState(V.key); const migr = st.grain === 40 && !('vorrat' in T);
+    const res = { heads, size, heer, jagd, hunt, took, fort, hungry, migr }; if (!Object.values(res).every(Boolean)) console.warn('T23-S2-Probe', res, C, J);
+    return Object.values(res).every(Boolean);
+  }));
+  ok('T23 S3 Tote und Orden: Schlacht im Graphen erntet 30 % des Verlusts als Seelen; schweigende Gräber (10 Seelen): kein neues Heer, Besatzungen füllen nicht; 60 Seelen: Heer Stärke 32 für 30 Seelen; Heerzug −40; satte Gruft schickt gemischte Heere; Eifer 4: Kreuzzug alle 8 Tage, Siegchance 0,65, Ordensheiler +10 %; Land der Toten nährt den Eifer, ohne Anlass −0,5', t23(() => {
+    const R = SIM.facResState(), W = S.war, U = () => SIM.facRes('undead'), und = () => W.armies.filter(a => a.faction === 'undead');
+    R.undead.v = 50; const a = { id: 't3a', faction: 'valen', strength: 100, name: 'A', at: 'marsh', prev: 'marsh' }, d = { id: 't3d', faction: 'undead', strength: 10, name: 'D', at: 'marsh', prev: 'marsh' };
+    W.nodes.marsh.owner = 'valen'; SIM.battleForTest('marsh', a, d); const harvest = U() === 50 + Math.round((10 - d.strength) * 0.3) && d.strength < 10;
+    const seedFor = () => { for (let s = 1; s < 500; s++) { seedRng(s); if (rnd() < 0.35) return s; } return 1; }, sd = seedFor();
+    const caps = Object.keys(W.nodes).filter(k => W.nodes[k].owner === 'undead' && k !== 'varonheim');
+    W.armies = W.armies.filter(x => x.faction !== 'undead'); R.undead.v = 10; R.undead.stage = 0; for (const k of caps) W.nodes[k].garrison = 0;
+    seedRng(sd); SIM.warDay(); const starve = !und().length && caps.every(k => W.nodes[k].owner !== 'undead' || W.nodes[k].garrison === 0);
+    W.armies = W.armies.filter(x => x.faction !== 'undead'); R.undead.v = 60; R.undead.stage = 1; for (const k of caps) W.nodes[k].garrison = 10;
+    seedRng(sd); SIM.warDay(); const fresh = und()[0], army = fresh?.strength === 32 && U() === 30 + SIM.undNodeCount();
+    S.day = 90; W.armies = W.armies.filter(x => !x.host); W.nodes.varonheim.owner = 'valen'; W.hostCd = 0; R.undead.v = 100; const host = !!SIM.launchHost() && U() === 60;
+    R.undead.stage = 2; const att = { id: 't3m', faction: 'undead', strength: 56, name: 'M', at: 'marsh', prev: 'graveyard' }, def = { id: 't3v', faction: 'valen', strength: 20, name: 'V', at: 'marsh', prev: 'marsh' };
+    SIM.materializeForTest('marsh', att, def); const types = new Set(S.ents.world.filter(e => e.armyId === 't3m').map(e => e.mtype)); W.battles = []; const mixed = types.size >= 2;
+    const A = AF(); A.zeal = 4; const order = crusadeEvery() === 8 && Math.abs(crusadeChance(false, 0) - 0.65) < 1e-9 && Math.abs(zealHealMul({ faction: 'order' }) - 1.1) < 1e-9 && zealHealMul({ faction: 'valen' }) === 1;
+    A.zeal = 0; A.zealHold = -99; A.hunt = null; resDaily(R, false); const hold = A.zeal === (SIM.undNodeCount() >= FAC_RES.order.holdNodes ? 1 : 0);
+    A.zeal = 2; A.zealHold = S.day | 0; A.zealAt = (S.day | 0) - 10; resDaily(R, false); const decay = A.zeal === 1.5 && R.order.v === 1.5;
+    const res = { harvest, starve, army, host, mixed, order, hold, decay }; if (!Object.values(res).every(Boolean)) console.warn('T23-S3-Probe', res, { d: d.strength, U: U(), fresh, types: [...types] });
+    return Object.values(res).every(Boolean);
+  }));
+  ok('T23 S4 Händler und Aurelion: Ankunft +4, Lieferung +2 (höchstens 4 am Tag), Große Karawane verloren −10; Handelswert 10 → höchstens 2 neue Züge mit Söldnern, Geleitlohn ×1,4, Gildenladen +16 %, drei Tage unter 15 → Handelssperre; über 80 Messe (+15 % Verkauf in Eren); Aurelion unter 4 Tagen: Gesandter kauft 12 Korn in Nordfurt, Zoll +0,1, Frachtauftrag in Kupferhafen mit doppeltem Lohn', t23(() => {
+    const R = SIM.facResState(), day = S.day | 0, mv = () => SIM.facRes('merch'); R.merch.v = 50; S.eco.orders = [];
+    S.eco.caravans = [{ id: 'tc', from: 'eren', to: 'northcity', good: 'grain', n: 5, guards: 0, eta: day, raided: true }]; ECO.ecoDay(); const arrive = mv() === 54 && S.eco.caravans.length <= 4;
+    R.dlv = null; for (let i = 0; i < 3; i++) { const o = { id: 'to' + i, town: 'eren', good: 'grain', n: 1, until: day + 5 }; S.eco.orders.push(o); ECO.deliver(o, 1, () => {}, 'merch'); } const dlv = mv() === 58;
+    SIM.caravanDied({}); const died = mv() === 48;
+    R.merch.v = 10; S.eco.caravans = []; ECO.ecoDay(); const few = S.eco.caravans.length <= 2 && S.eco.caravans.every(c => c.guards >= 1);
+    R.merch.v = 50; const c1 = makeContract('eren', 'escort', 'board'); R.merch.v = 10; const c2 = makeContract('eren', 'escort', 'board'); const pay = c2.reward.gold - 30 === Math.round((c1.reward.gold - 30) * 1.4);
+    const shop = Math.abs(resPriceMul('bread', true, { faction: 'merch', map: 'world', homeTown: 'eren' }) - 1.16) < 1e-9;
+    R.merch.low = 2; S.caravanBack = 0; resDaily(R, false); const embargo = S.caravanBack === day + 3 && R.merch.embargo === day + 3;
+    R.merch.v = 90; S.day = 7; factionAgenda(); const fair = R.merch.fairDay === 7 && Math.abs(resPriceMul('grain', false, { homeTown: 'eren', town: 'eren', map: 'world' }) - 1.15) < 1e-9;
+    for (const [k, t] of Object.entries(S.towns)) if (LOCATIONS.find(l => l.key === k)?.faction === 'aurel') { t.stock.grain = 0; t.stock.meat = 0; }
+    SIM.facResDay(); S.towns.northcity.stock.grain = 30; S.war.nodes.northcity.owner = 'valen'; const ah0 = S.towns.aurelheim.stock.grain, toll0 = S.tollMul || 1; S.day = 9; factionAgenda();
+    const fr = S.eco.orders.find(o => o.fac === 'aurel');
+    const aurel = SIM.facRes('aurel') < 4 && S.towns.northcity.stock.grain === 18 && S.towns.aurelheim.stock.grain === ah0 + 12 && Math.abs((S.tollMul || 1) - Math.min(1.3, toll0 + 0.1)) < 1e-9 && fr?.town === 'kupferhafen' && fr.n === 15 && fr.pay === 2;
+    const res = { arrive, dlv, died, few, pay, shop, embargo, fair, aurel }; if (!Object.values(res).every(Boolean)) console.warn('T23-S4-Probe', res, { mv: mv(), car: S.eco.caravans.length, c1: c1.reward.gold, c2: c2.reward.gold, ai: SIM.facRes('aurel'), nf: S.towns.northcity.stock.grain });
+    return Object.values(res).every(Boolean);
+  }));
+  ok('T23 S5 Seevolk und Goblins: Prise nach Tageshash (kein rnd) nimmt einem Hafen 30 % Salz (höchstens 12) und zählt; Salzfrieden: keine; Weißbart tot: zehn Tage Schwarzsegel (0,2), danach 0,05; Salz knapp → ein Kopfgeld des Salzbunds; Hort = Punkte des Grubenhorts, befreiter Goblin +1 (höchstens 4 am Tag)', t23(() => {
+    const R = SIM.facResState(), Se = FAC_RES.sea, side0 = S.seaSide, F = fortState(), fz = { fr: F.freed, bo: F.bought }, ports = () => Se.ports.reduce((n, k) => n + (S.towns[k]?.stock.salt || 0), 0);
+    try {
+      S.seaSide = undefined; Object.assign(S.flags, { seaPeace: false, whitebeardSlain: false }); delete S.flags.blackDays;
+      const dayWhere = (lo, hi) => { for (let d = S.day | 0; d < (S.day | 0) + 2000; d++) { S.day = d; const h = SIM.resHash(11, 1000); if (h >= lo && h < hi) return d; } return -1; };
+      const fill = () => { for (const k of Se.ports) if (S.towns[k]) S.towns[k].stock.salt = 40; R.sea.prizes = []; };
+      fill(); const d1 = dayWhere(0, 100), s0 = ports(); seedRng(77); seaPrizeDay(R, d1); const a = rnd(); seedRng(77); const prize = d1 >= 0 && ports() === s0 - 12 && R.sea.prizes.length === 1 && a === rnd();
+      fill(); S.flags.seaPeace = true; seaPrizeDay(R, d1); const peace = ports() === s0 && !R.sea.prizes.length; S.flags.seaPeace = false;
+      fill(); const d2 = dayWhere(100, 200); S.flags.whitebeardSlain = true; S.flags.blackDays = d2 + 5; seaPrizeDay(R, d2); const black = R.sea.prizes.length === 1;
+      fill(); S.flags.blackDays = d2 - 1; seaPrizeDay(R, d2); const after = !R.sea.prizes.length; S.flags.whitebeardSlain = false;
+      R.sea.stage = 0; S.contracts = []; seaPrizeDay(R, d2); seaAgenda(); R.sea.bountyWant = true; seaAgenda(); const bounty = S.contracts.filter(c => c.seaBounty).length === 1 && S.contracts[0].mtype === 'sea_raider';
+      S.gobCity = { pts: 12, lvl: 1 }; S.flags.goblinsFreed = true; SIM.facResDay(); const hort = SIM.facRes('goblin') === 12;
+      for (let i = 0; i < 5; i++) freeCaptive({ goblin: true, name: 'Probe' }, 'freed'); const freed = S.gobCity.pts === 16;
+      const res = { prize, peace, black, after, bounty, hort, freed }; if (!Object.values(res).every(Boolean)) console.warn('T23-S5-Probe', res, { d1, d2, s0, now: ports(), pz: R.sea.prizes, g: S.gobCity });
+      return Object.values(res).every(Boolean);
+    } finally { S.seaSide = side0; F.freed = fz.fr; F.bought = fz.bo; }
   }));
   ok('T15 V10 Messing-Schwächen: Prototyp ohne Energiezelle nach 3 Tagen nur halber Vorteil, Zelle lädt ihn; Schock = Kurzschluss (Status, doppelter Verschleiß); Regen draußen nutzt ×1,3 ab', sandbox(() => {
     const p = stage(), W0 = S.weather; try {
@@ -25860,6 +26082,32 @@ export function selftest() {
       return throne && pushed && crowned && instant && peace && princes && oath && fallen && gone;
     } finally { S.ents.world = W0; S.war = WAR; S.day = d0; if (V0 && v0) Object.assign(V0, v0); }
   }));
+  ok('E40 S4: Rangprüfungen der Stillen — Knien allein hebt den Rang nicht mehr: Adept 3 Aufträge der Toten, Grabgebundener 6 + 3 Seelen (verbraucht), Todesritter Überfall + 3 Seelen; Aufträge der Toten und Überfälle zählen mit', sandbox(() => {
+    const p = stage(), g = actor(340, 300, { name: 'Garmadon' });
+    try {
+      S.ranks.undead = 0; S.flags.deadTrial = {}; p.inv = []; garmadonServe(g); const blocked = S.ranks.undead === 0; UI.closeDialogue();
+      const C = makeContract('vharnholm', 'souls', 'board'); C.state = 'active'; C.have = C.need; claimContract(C, null); const counted = S.flags.deadTrial.jobs === 1;
+      S.flags.deadTrial.jobs = 3; garmadonServe(g); const adept = S.ranks.undead === 1; UI.closeDialogue();
+      S.flags.deadTrial.jobs = 6; garmadonServe(g); const noSoul = S.ranks.undead === 1; UI.closeDialogue();
+      addItem(p, 'soul_vial', 3); garmadonServe(g); const bound = S.ranks.undead === 2 && !hasItem(p, 'soul_vial'); UI.closeDialogue();
+      addItem(p, 'soul_vial', 3); garmadonServe(g); const noRaid = S.ranks.undead === 2; UI.closeDialogue(); S.flags.deadTrial.raids = 1; garmadonServe(g); const knight = S.ranks.undead === 3; UI.closeDialogue();
+      const guide = /Rangprüfung/.test(rankGuide('undead')?.rows?.[2]?.need || '');
+      if (!(blocked && counted && adept && noSoul && bound && noRaid && knight && guide)) console.log('E40-S4-Probe', JSON.stringify({ blocked, counted, adept, noSoul, bound, noRaid, knight, guide }));
+      return blocked && counted && adept && noSoul && bound && noRaid && knight && guide;
+    } finally { UI.closeDialogue(); }
+  }));
+  ok('E40 S6: Gruftnetz — vier Grüfte im Osten, nur die erste offen, jeder Hort zeigt die nächste (nicht die übernächste), fremde Horte decken das Gruftnetz nicht auf, alle Ebenen baubar', sandbox(() => {
+    const p = stage(), f0 = { ...S.flags }, va = structuredClone(S.vaults || {}), W0 = S.ents.world, ents0 = S.ents.vault, mv = MAPS.vault, dv = { ...DUNGEONS.vault }, at0 = S.vaultAt, vm = S.vaultMod;
+    try { const NET = Object.keys(VAULTS).filter(k => VAULTS[k].net === 'gruft'); for (const k of Object.keys(VAULTS)) delete S.flags['vaultHint_' + k]; S.ents.world = W0.filter(e => !e.vaultSite); ensureVaultSites();
+      const first = NET.length === 4 && S.ents.world.some(e => e.vaultSite === 'schaedelstollen') && !NET.slice(1).some(k => S.ents.world.some(e => e.vaultSite === k));
+      S.vaults = { kasematten: { best: 3, cleared: {}, looted: false }, schaedelstollen: { best: 2, cleared: {}, looted: false } }; vaultHoardOpened({ vaultHoard: 'kasematten' }); const apart = !NET.some(k => S.flags['vaultHint_' + k]);
+      vaultHoardOpened({ vaultHoard: 'schaedelstollen' }); const chain = S.ents.world.some(e => e.vaultSite === 'graeberschlucht') && !S.ents.world.some(e => e.vaultSite === 'seelengruft');
+      let built = true; for (const k of NET) for (let f = 1; f <= VAULTS[k].floors; f++) { S.vaults = {}; buildVault(k, f); built = built && S.ents.vault.some(e => e.kind === 'enemy'); }
+      const pools = NET.every(k => [...VAULTS[k].pool, VAULTS[k].boss].every(m => MONSTERS[m]));
+      if (!(first && apart && chain && built && pools)) console.log('E40-S6-Probe', JSON.stringify({ first, apart, chain, built, pools }));
+      return first && apart && chain && built && pools;
+    } finally { S.flags = f0; S.vaults = va; S.ents.world = W0; S.ents.vault = ents0; MAPS.vault = mv; Object.assign(DUNGEONS.vault, dv); S.vaultAt = at0; S.vaultMod = vm; }
+  }));
   ok('T17 Szenen 3/4: Goblinsturm-Sieg (jubeln, dann heim — auch beim Überspringen), Garmadon-Herzschlag (Hof kniet, Welt steht), Hrodvar-Frostring, Hinrichtung am Galgen (Falltür nimmt den Verurteilten, auch beim Überspringen), „Morrgrund brennt“ wartet auf freie Bahn', sandbox(() => {
     const p = stage(), c0 = S.cine, GA = S.ents.garmadon, d0 = S.day;
     try {
@@ -26372,6 +26620,7 @@ export function selftest() {
     S.ranks.undead = 0; const raid = !raidSources({ x: 487 * TS, y: 443 * TS, map: 'world' }).some(x => x.src === 'undead');
     return seen && rep && hidden && raid; }));
   ok('BUG-123/BUG-132: Der Selbsttest ändert den echten Helden, sein Gold, die Märkte und die Chronik nicht und startet keine Kamerafahrt', !hero0 || hero0 === JSON.stringify([S.player.xp, S.player.level, S.player.xpNext, S.player.attrPoints, S.player.skillPoints, S.player.inv.map(i => i.key + (i.count || 1)), S.gold, S.eco?.my, S.towns?.eren?.stock, S.chronicle?.length, !!S.cine]));
+  S.quests = quests0;
   S.fame = fame0 || undefined; if (!fame0) delete S.fame; S.anomaly = anom0;
   if (after0.a) S.after = after0.a; else delete S.after; if (after0.r) S.resettle = after0.r; else delete S.resettle;
   S._quiet = quiet0; UI.questSnap?.();   /* Q-1: Zustandswechsel aus Proben lösen keine Briefe aus */

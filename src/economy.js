@@ -3,7 +3,10 @@
 // Handel in jeder Stadt, eigene Karawane, Betriebe kaufen und ausbauen, Lieferaufträge.
 // Läuft einmal am Tag (ecoDay). Arbeiter sind die NPCs der Welt: wer tot, am Boden oder in der Gruppe des Helden ist, arbeitet nicht.
 import { S, log, chronicle, chance, ri, rnd, clamp, uid, seasonOf, SEASON_FARM } from './state.js?v=25';
-import { ITEMS, GOODS, TOWNS } from './data.js?v=25';
+import { ITEMS, GOODS, TOWNS, FAC_RES } from './data.js?v=25';
+/* T23 S4 Händler: Handelswert der Gilde (S.facRes.merch.v, 0–100). Lesen/Schreiben hier, weil sim.js economy.js importiert (kein Rückimport). */
+export const merchV = () => { const v = S.facRes?.merch?.v; return typeof v === 'number' && isFinite(v) ? v : FAC_RES.merch.def; };
+export function merchAdd(n) { const R = (S.facRes ||= { day: -1 }); R.merch ||= { v: null, stage: 1 }; R.merch.v = clamp(Math.round((merchV() + n) * 10) / 10, 0, FAC_RES.merch.max); return R.merch.v; }
 import { LOCATIONS, HOUSES, TS, TOWN_PLAN, MAPS } from './world.js?v=25';
 
 // Waren, die in Städten gehandelt werden. GOODS (data.js) ist die volle Liste.
@@ -387,18 +390,19 @@ function caravanDay() {
   const E = S.eco;
   for (const c of [...E.caravans]) {
     if (!c.raided && chance(riskOf(c.from, c.to, c.guards))) {
-      c.raided = true; const lost = Math.ceil(c.n * (0.5 + rnd() * 0.5)); c.n -= lost;
+      c.raided = true; const lost = Math.ceil(c.n * (0.5 + rnd() * 0.5)); c.n -= lost; merchAdd(-FAC_RES.merch.raid);   /* T23 S4: ein überfallener Zug kostet die Gilde */
       const bd = raidBand(c.from, c.to);   /* T12 B2: war es eine Bande, bekommt sie die Beute */
       if (bd) onBandRaid(bd, lost, c.good, `einen Zug nach ${townName(c.to)}`);
       else log(`Räuber überfielen einen Händlerzug nach ${townName(c.to)}: ${lost} ${ITEMS[c.good].name} verloren.`, 'economy');
       if (chance(0.3)) chronicle(bd ? `${bd.name} überfielen einen Händlerzug nach ${townName(c.to)}` : `Ein Händlerzug nach ${townName(c.to)} wurde überfallen`, 'news');
     }
-    if (S.day >= c.eta) { if (S.towns[c.to] && c.n > 0) S.towns[c.to].stock[c.good] += c.n; E.caravans.splice(E.caravans.indexOf(c), 1);
+    if (S.day >= c.eta) { if (S.towns[c.to] && c.n > 0) { S.towns[c.to].stock[c.good] += c.n; merchAdd(FAC_RES.merch.arrive); } E.caravans.splice(E.caravans.indexOf(c), 1);   /* T23 S4: angekommener Zug +4 */
       if (c.n > 0 && DEAD_GOODS.includes(c.good) && !S.flags?.deadGoodsHint) { (S.flags ||= {}).deadGoodsHint = 1; log(`Schmuggler bringen ${c.n} ${ITEMS[c.good].name} nach ${townName(c.to)}. Totenware hat ihren Markt: Vharnholm und die Schwarze Feste geben Knochen und Seelen her und kaufen Grabgut zurück; bei den Lebenden zahlen nur Alchemisten, Apotheker und Gelehrte etwas dafür.`, 'quest'); } }
   }
   // Neue Züge: vom Überschuss zur größten Not, bis zu sechs am Tag, höchstens sechzehn unterwegs
   const T = tradeTowns(), TD = [...T, ...Object.keys(S.towns).filter(k => isDead(k) && LOC[k] && !razed(k))];   /* E40.5: Totenorte handeln nur Totenwaren */
-  for (let k = 0; k < 6 && E.caravans.length < 16; k++) {
+  const mv = merchV(), nNew = 2 + Math.round(mv / 25);   /* T23 S4: so viele Züge, wie die Gilde tragen kann (0 → 2, 100 → 6) */
+  for (let k = 0; k < nNew && E.caravans.length < 16; k++) {
     let best = null;
     for (const g of GOODS) for (const a of (DEAD_GOODS.includes(g) ? TD : T)) {
       const ta = S.towns[a], sur = ta.stock[g] - target(ta, g) * 1.3; if (sur < 6) continue;
@@ -412,7 +416,7 @@ function caravanDay() {
     }
     if (!best || best.score <= 0) break;
     S.towns[best.a].stock[best.g] -= best.n;
-    E.caravans.push({ id: uid(), from: best.a, to: best.b, good: best.g, n: best.n, guards: ri(0, 2), eta: (S.day | 0) + tripDays(best.a, best.b) });
+    E.caravans.push({ id: uid(), from: best.a, to: best.b, good: best.g, n: best.n, guards: ri(0, 1 + (mv > 60 ? 1 : 0)) + (mv < FAC_RES.merch.lt ? 1 : 0), eta: (S.day | 0) + tripDays(best.a, best.b) });
   }
 }
 
@@ -504,8 +508,10 @@ function ordersDay() {
 export const orderPay = (town, g, n) => Math.max(n, Math.round(ecoPrice(town, g, false) * n * 1.15));
 export function deliver(o, have, take, fac = 'merch') {
   if (have < o.n) return `Du brauchst ${o.n} ${ITEMS[o.good].name} (du hast ${have}).`;
-  o.reward = orderPay(o.town, o.good, o.n); take(o.good, o.n); S.gold += o.reward; S.towns[o.town].stock[o.good] += o.n;
+  o.reward = orderPay(o.town, o.good, o.n) * (o.pay || 1); take(o.good, o.n);   /* T23 S4: Frachtauftrag Aurelions zahlt doppelt */ S.gold += o.reward; S.towns[o.town].stock[o.good] += o.n;
   S.eco.orders.splice(S.eco.orders.indexOf(o), 1);
+  { const R = (S.facRes ||= { day: -1 }), D = (R.dlv ||= { day: -1, n: 0 }); if (D.day !== (S.day | 0)) { D.day = S.day | 0; D.n = 0; }   /* T23 S4: Lieferung +2 Handelswert, höchstens +4 am Tag */
+    if (D.n < FAC_RES.merch.deliverDay) { const g = Math.min(FAC_RES.merch.deliver, FAC_RES.merch.deliverDay - D.n); D.n += g; merchAdd(g); } }
   if (S.factions[fac] != null) S.factions[fac] = clamp(S.factions[fac] + 2, -100, 100);   /* Entwickler 03.10.: Ruf bei der Macht der Zielstadt (vorher immer Händlergilde) */
   log(`Lieferung nach ${townName(o.town)}: ${o.n} ${ITEMS[o.good].name}, ${o.reward} Gold.`, 'economy'); return null;
 }

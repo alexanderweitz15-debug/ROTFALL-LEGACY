@@ -200,7 +200,7 @@ function effectsUI(body) {
     : '<div class="ledger">Keine besonderen Effekte. Du bist ein unbeschriebenes Blatt.</div>';
 }
 
-// S13 (Nutzer: „Codex/Handbuch im Spiel“): Taste H. Das Handbuch ist docs/GUIDE.md selbst (eine Quelle für Spieler und Doku; ohne ?dev
+// S13 (Nutzer: „Codex/Handbuch im Spiel“): Taste H. Das Handbuch ist docs/MECHANIKEN.md selbst (seit der Doku-Bereinigung 08.10. statt GUIDE.md) (eine Quelle für Spieler und Doku; ohne ?dev
 // ohne den Debug-Abschnitt), dazu alle Rangfolgen, alle Zustände mit Erklärung und die Gegner, die man schon getroffen hat. Suche filtert.
 let guideMd = null, codexTab = 'guide';
 const esc = t => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -224,7 +224,7 @@ export function mdToHtml(md) {
 }
 function guideSections(md) {                                               // nach „## “ geteilt; Debug-Abschnitt nur mit ?dev
   const parts = md.split(/\n(?=## )/), dev = /[?&]dev/.test(location.search);
-  return parts.filter(p => dev || !/^## \d+\. Zum Ausprobieren/.test(p));
+  return parts.filter(p => dev || !/^## \d+\. (Zum Ausprobieren|Werkzeuge für Tests)/.test(p));
 }
 // S15 (Nutzer): Kapitel des Handbuchs öffnen sich im Spiel; der Code im Kodex schaltet alles frei
 function guideLock(sec) {
@@ -242,7 +242,7 @@ function codexUI(body) {
   const render = () => {
     const needle = q.value.trim().toLowerCase(), hit = t => !needle || t.toLowerCase().includes(needle);
     if (codexTab === 'guide') {
-      if (guideMd == null) { cb.innerHTML = '<div class="ledger">Lade das Handbuch …</div>'; fetch('docs/GUIDE.md').then(r => r.ok ? r.text() : Promise.reject()).then(t => { guideMd = t; render(); }).catch(() => { guideMd = ''; cb.innerHTML = '<div class="ledger">Das Handbuch liegt nicht bei (docs/GUIDE.md fehlt).</div>'; }); return; }
+      if (guideMd == null) { cb.innerHTML = '<div class="ledger">Lade das Handbuch …</div>'; fetch('docs/MECHANIKEN.md').then(r => r.ok ? r.text() : Promise.reject()).then(t => { guideMd = t; render(); }).catch(() => { guideMd = ''; cb.innerHTML = '<div class="ledger">Das Handbuch liegt nicht bei (docs/MECHANIKEN.md fehlt).</div>'; }); return; }
       const secs = guideSections(guideMd).map(s => { const lk = guideLock(s); return lk ? `${s.split('\n')[0]}\n\n*Noch unbekannt — ${lk}*\n` : s; }).filter(hit); cb.innerHTML = secs.length ? mdToHtml(secs.join('\n')) : '<div class="ledger">Nichts gefunden.</div>';   // S15: Kapitel öffnen sich im Spiel
     } else if (codexTab === 'magic') {                                     // S15 P5: Schulen, Zauber, Lehrer, Haltung der Mächte
       const SC = A.schools || {}, keys = A.spellKeys || [], p = S.player;
@@ -259,7 +259,7 @@ function codexUI(body) {
     } else if (codexTab === 'powers') {                                    /* T23: woher die Mächte ihre Kraft nehmen — nur bekannte Mächte (wie „Ränge“) */
       const L = (A.facResKeys || []).filter(f => FACTIONS[f] && (S.flags.codexAll || (S.factions[f] || 0) !== 0 || (S.ranks[f] ?? -1) >= 0));
       cb.innerHTML = `<div class="ledger">Jede Macht lebt von einer Sache. Wird sie knapp, wird die Macht schwach — und jede davon kannst du drehen. ▲/▼: seit gestern.</div>`
-        + (L.map(f => { const G = A.powerGuide?.(f); return G && hit(FACTIONS[f].name + G.name + G.does + G.lever) ? `<h3>${FACTIONS[f].name}</h3><div class="statline"><span>${G.name}</span><b>${G.val} ${G.unit}${G.stageName ? ' · ' + G.stageName : ''}</b></div>${G.extra ? `<div class="ledger">${G.extra}</div>` : ''}<div class="fx-row"><div><b>Was sie bewirkt:</b> ${G.does}</div></div><div class="fx-row"><div><b>Wie du sie änderst:</b> ${G.lever}</div></div>` : ''; }).join('')
+        + (L.map(f => { const G = A.powerGuide?.(f); return G && hit(FACTIONS[f].name + G.name + G.does + G.lever) ? `<h3>${FACTIONS[f].name}</h3><div class="statline"><span>${G.name}</span><b>${G.val} ${G.unit}${G.arrow || ''}${G.stageName ? ' · ' + G.stageName : ''}</b></div>${G.extra ? `<div class="ledger">${G.extra}</div>` : ''}<div class="fx-row"><div><b>Was sie bewirkt:</b> ${G.does}</div></div><div class="fx-row"><div><b>Wie du sie änderst:</b> ${G.lever}</div></div>` : ''; }).join('')
         || '<div class="ledger">Noch kennst du keine Macht gut genug.</div>');
     } else if (codexTab === 'states') {
       const D = A.fxDesc || {}; cb.innerHTML = Object.entries(D).filter(([k, d]) => A.codexKnown('states', k) && hit(k + d)).map(([k, d]) => `<div class="fx-row"><div>${d}</div></div>`).join('') || '<div class="ledger">Nichts gefunden.</div>';
@@ -1646,7 +1646,7 @@ function facUI(body) {
     <div><h3>${f.name}</h3><div class="ledger">${f.desc}</div>
       <div class="statline" title="Ansehen reicht von −100 bis +100 (die befreiten Grubenstämme bis +300)."><span>Ansehen</span><b>${rep > 0 ? '+' : ''}${Math.round(rep)} · ${A.repTier(selFac).name}</b></div>
       <div class="ledger">${(t => t.price == null ? 'Kein Handel, Wachen greifen an.' : `Preise ${t.price < 1 ? '−' + Math.round((1 - t.price) * 100) + ' %' : t.price > 1 ? '+' + Math.round((t.price - 1) * 100) + ' %' : 'normal'}${t.greet ? ', ' + (t.price < 1 ? 'herzliche' : 'kühle') + ' Begrüßung' : ''}.`)(A.repTier(selFac))}${(S.bounty || {})[selFac] ? ` Kopfgeld: <b>${S.bounty[selFac]} Gold</b>.` : ''}</div>
-      ${(G => G ? `<div class="statline" title="${G.does} — ${G.lever}"><span>Ressource</span><b>${G.name} ${G.val}${G.stageName ? ' · ' + G.stageName : ''}</b></div>` : '')(A.powerGuide?.(selFac))}
+      ${(G => G ? `<div class="statline" title="${G.does} — ${G.lever}"><span>Ressource</span><b>${G.name} ${G.val} ${G.unit}${G.arrow || ''}${G.stageName ? ' · ' + G.stageName : ''}</b></div>` : '')(A.powerGuide?.(selFac))}
       <div class="statline"><span>Rang</span><b>${rank >= 0 ? f.ranks[Math.min(rank, f.ranks.length - 1)] : 'Kein Mitglied'}</b></div>
       <h3 style="margin-top:14px">Rangfolge</h3>
       ${(G => G ? `<div class="ledger"><b>${G.next}</b></div><table class="rank-tab">${G.rows.map(x => `<tr class="r-${x.state}"><td>${x.state === 'done' ? '✔' : x.state === 'next' ? '➜' : '·'} ${x.name}</td><td>${x.need}</td><td>${x.perk}</td></tr>`).join('')}</table>` : '')(A.rankGuide(selFac))}
