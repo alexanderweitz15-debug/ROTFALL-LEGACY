@@ -413,3 +413,9 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
 - **E49 Aurelion nach Wohlstand:** soll **stärker wirken** — auch Wachen, Preise und Automaten-Streifen.
 - **E50 Kurzschluss:** das getroffene Glied versagt 1 s — Arm: kein Hieb/Block, Bein: stark verlangsamt; dazu doppelter Verschleiß.
 - **E51 T21 Zelte:** Leute in Zelten — ja, flüchtig (nachts ein Schläfer je Zelt, bezahlte Bande sitzt friedlich darin). Bandenbeute stehlen — ja, nachts ungesehen (halbe Beute als Ware, Bande wird feindlich, Hinterhalt).
+- **E52 Gegner-Scaling (T24):** Gruppen + Rollenmix — ab Heldenstufe 20/35/50 bekommen Begegnungen +1/+2/+3 Begleiter mit Rollen (Schildträger, Schütze, Heiler/Nekromant); Leben je Stufe über 30 nur noch +2 %; Frühspiel unverändert. Ziel: Smart-Bot verliert im Mittel > 10 %.
+- **E53 Frühspiel-Ausreißer:** Knochenritter, Fleischgolem, Goblinkrieger in frühen Gebieten (Gefahr 1–2) nicht oder nur als Boss/Elite mit Vorwarnung; im Totenland bleiben sie hart.
+- **E-A1 Kleriker nach Totenpakt:** Sühne beim Orden hebt die Sperre (gebaut: 250 Gold ⚖).
+- **E-A2 Endbosse:** nur Endbosse wachsen mit (Stufe = max(fest, Held − 3)); Auswahl ⚖ Garmadon, Omega, Aldhelm, Varg (Kettenmeister), Weißbart.
+- **E-A4 Erbe:** Rooks Feindschaft gegen den Mönch endet mit seinem Tod; „Zwanzig Jahre später“ lässt die Welt 20 Tagesschritte laufen.
+- **E-A5 Schadensdeckel:** messen und Wert vorschlagen.
