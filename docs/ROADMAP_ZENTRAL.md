@@ -127,6 +127,14 @@ Zentrale Abhängigkeiten:
 | UX-2 | **Fall der Eisenfeste = Menschheit verloren** | Endkarte „Die Menschheit ist gefallen“, danach Wahl: aufhören (Chronik/Erbe) oder in der toten Welt weiterspielen | Agent Krieg | ☐ |
 | UX-3 | **Welt-Wandel** | je mehr die Toten halten, desto mehr wird der Norden nach und nach zu Totenland-Boden/-Landschaft (wie im Osten); umgekehrt heilt das Land, wenn Lebende untote Orte einnehmen (Kachel-Überlagerung, deterministisch, Spielstand-tauglich) | Welle 2 (Gate zuerst) | ☐ |
 | UX-4 | **Neue Untote** | Zombies, Vampire (außerhalb Varonheims) u. a. — Figuren (Stil R), Verhalten, Spawns in Totengebieten | Welle 2 (nach Agent Gegenstände) | ☐ |
+| KR-a | Waffenruhe unter Veyl gilt für beide Seiten (Fragerunde 4) | in WE-4 einbauen: auch Valen greift nicht an | Agent Krieg | ☐ |
+| KR-b | Große Krise = nur echte Bedrohungen (Fragerunde 4) | in WE-2: Großereignis-Katastrophen, Kreuzzug, Ketzerjagd, Dorfüberfall, Feldzug; nicht Turnier/Ball/Schatzwagen/Dauerfolgen | Agent Krieg | ☐ |
+| KR-c | Seuche schwächer und ~1,5× länger (Fragerunde 4) | in WB-6 | Agent Krieg | ☐ |
+| SE-1 | Katanas senken | Katana/Gischtklinge −1 Schaden, Nebelklinge 15 | Claude | ☐ |
+| SE-2/3 | Band §D + Hundertschritt 25 % | Band für legendäre Hände/Beine/Füße/Schilde in REGELN §D; Ruprecht Einauge: Hundertschritt nur 25 % | Claude | ☐ |
+| KG-2 | Glanz für Gefährten und Bosse | `glowTier` nicht nur Held/Koop-Held | Claude | ☐ |
+| KG-4 | Koop-Effekte | `atkTag` in coop.js DYN | Claude | ☐ |
+| KG-5 | Doppelklinge | eigene Wirbel-Animationsklasse | später | ☐ |
 
 **Reihenfolge (09.10.):** Welle 1 läuft — Agent Krieg (alle Kriegsgraph-Punkte, ein Besitzer, eine Abschlussmessung), Agent Roadmap (S3c-a/b, WE-1, WE-3), Agent Cutscenes (WC), dazu Animation und Gegenstände. Welle 2 danach — UX-3 Welt-Wandel (nur Bild, nie Kollision ändern, aus dem Kriegszustand abgeleitet, ohne rnd()), UX-4 Zombies/Vampire + E55 Bossreihe (nach dem Gegenstands-Agenten, weil data.js), E54 Teilregionen, E57 Messung. Welle 3: E56 Story.
 
@@ -959,20 +967,20 @@ E2 Ersatz-Lebensbalken 5 s · E12 Klassenprüfungen (Platz halten 50 s, Grube ×
 ### Kampf-Glanz 09.10. (Agent Kampfanimation)
 | Nr. | Frage | Vorschlag |
 |---|---|---|
-| KG-1 | Die **Sensenlanze** heißt nach der Sense, ist aber eine Stoßwaffe (Reichweite 90). Mähen oder stoßen? | bleibt Stangenwaffe (stoßen) — so gebaut |
-| KG-2 | **Glanz für Gefährten und Bosse** mit seltenen Waffen? Heute nur Held und Koop-Helden. | Gefährten später nur Spur (Glanz 1), Bosse nein (Lesbarkeit) |
-| KG-3 | Der helle **Mond bei normalen Hieben in Pack A** ist weg — das Band an der Klinge ist jetzt der Swoosh (Recherche: ein Schmierbild je Hieb). So lassen? | so lassen |
-| KG-4 | **Koop:** Gäste sehen Ausweichhieb-Nachbilder und Gegenhieb-Linie des Hosts nicht (`atkTag` fehlt in `coop.js DYN`, nicht meine Datei). Aufnehmen? | ja, ein Feld in DYN |
-| KG-5 | **Doppelklinge** (Stange, Bogen 3,2) mäht nicht mit — eigene Wirbel-Bewegung oder Sense? | später eigene Klasse (Stab-Wirbel) |
-| KG-6 | **Lichtblitz** beim legendären Wuchtschlag hellt den Bildschirm kurz auf (≤ 10 %, aus bei „Bewegung reduzieren“). Reicht das, oder eigener Schalter? | reicht |
+| KG-1 | Die **Sensenlanze** heißt nach der Sense, ist aber eine Stoßwaffe (Reichweite 90). Mähen oder stoßen? | ✔ 12.10. so lassen (Vorschlag war: bleibt Stangenwaffe (stoßen) — so gebaut) |
+| KG-2 | **Glanz für Gefährten und Bosse** mit seltenen Waffen? Heute nur Held und Koop-Helden. | ✔ 12.10. Gefährten **und** Bosse voller Glanz → §1c (Vorschlag war: Gefährten später nur Spur (Glanz 1), Bosse nein (Lesbarkeit)) |
+| KG-3 | Der helle **Mond bei normalen Hieben in Pack A** ist weg — das Band an der Klinge ist jetzt der Swoosh (Recherche: ein Schmierbild je Hieb). So lassen? | ✔ 12.10. so lassen (Vorschlag war: so lassen) |
+| KG-4 | **Koop:** Gäste sehen Ausweichhieb-Nachbilder und Gegenhieb-Linie des Hosts nicht (`atkTag` fehlt in `coop.js DYN`, nicht meine Datei). Aufnehmen? | ✔ 12.10. ja → §1c (Vorschlag war: ja, ein Feld in DYN) |
+| KG-5 | **Doppelklinge** (Stange, Bogen 3,2) mäht nicht mit — eigene Wirbel-Bewegung oder Sense? | ✔ 12.10. ja, eigene Wirbel-Bewegung → §1c (Vorschlag war: später eigene Klasse (Stab-Wirbel)) |
+| KG-6 | **Lichtblitz** beim legendären Wuchtschlag hellt den Bildschirm kurz auf (≤ 10 %, aus bei „Bewegung reduzieren“). Reicht das, oder eigener Schalter? | ✔ 12.10. reicht (Vorschlag war: reicht) |
 
 ### Seltenheitsstufen je Art (09.10., Agent — vorläufig gebaut ⚖)
 | Nr. | Frage | Vorschlag (läuft so) |
 |---|---|---|
-| SE-1 | Die E38-Katanas liegen über §D (Katana 65 bei Band selten 56–64, Gischtklinge 68, Nebelklinge 75 bei episch 60–68). Absenken oder Band für Katanas anheben? Die neue legendäre Salzträne liegt mit 68 knapp am Band. | Katana/Gischtklinge −1 Schaden, Nebelklinge 15 |
-| SE-2 | §D hat kein Band für legendäre Hände/Beine/Füße/Schilde (und selten = episch). Gebaut: Rüstung 5 (Schild 6) + feste Zusatzwerte aus den Affixen des Platzes. Passt das? | so lassen, Band in §D eintragen |
-| SE-3 | Sechs Kopfgeld-Elite lassen jetzt das passende neue Stück fallen statt Langschwert/Langbogen/Wurfmesser/Rapier/Kriegssense/Kettenpeitsche; Ruprecht Einauge gibt damit sicher ein Unikat (Hundertschritt). Ok? | ja; Hundertschritt sonst nur zu 25 % |
-| SE-4 | Neue Unikate hängen an den Boss-Listen (Weißbart, Varg, Hrodvar je 2, Garmadon, Gorak, Aldhelm je 1): das Boss-Unikat bleibt 25 %, die übrigen Listenstücke werden seltener. Ok? | ja |
+| SE-1 | Die E38-Katanas liegen über §D (Katana 65 bei Band selten 56–64, Gischtklinge 68, Nebelklinge 75 bei episch 60–68). Absenken oder Band für Katanas anheben? Die neue legendäre Salzträne liegt mit 68 knapp am Band. | ✔ 12.10. leicht senken → §1c (Vorschlag war: Katana/Gischtklinge −1 Schaden, Nebelklinge 15) |
+| SE-2 | §D hat kein Band für legendäre Hände/Beine/Füße/Schilde (und selten = episch). Gebaut: Rüstung 5 (Schild 6) + feste Zusatzwerte aus den Affixen des Platzes. Passt das? | ✔ 12.10. so lassen, Band in §D → §1c (Vorschlag war: so lassen, Band in §D eintragen) |
+| SE-3 | Sechs Kopfgeld-Elite lassen jetzt das passende neue Stück fallen statt Langschwert/Langbogen/Wurfmesser/Rapier/Kriegssense/Kettenpeitsche; Ruprecht Einauge gibt damit sicher ein Unikat (Hundertschritt). Ok? | ✔ 12.10. ja, Hundertschritt nur 25 % → §1c (Vorschlag war: ja; Hundertschritt sonst nur zu 25 %) |
+| SE-4 | Neue Unikate hängen an den Boss-Listen (Weißbart, Varg, Hrodvar je 2, Garmadon, Gorak, Aldhelm je 1): das Boss-Unikat bleibt 25 %, die übrigen Listenstücke werden seltener. Ok? | ✔ 12.10. ja (Vorschlag war: ja) |
 
 ### Design offen
 E1 Haltung/Humpeln verwundeter Gegner · E3 Händlergesicht nach Ruf · E4 schwerer Hieb (Faktor, Ladezeit, Ausdauer, Touch, Koop) · E5 14 Gegnerideen · E6 Mutanten-Hinterhalt/Blutschöpfer · E7 Skilltree-Scheiben 3/4 streichen · E8/E9 Betriebskasse · E10 Bewohner rufen / Story-Szene / Beute-Hinweis · E11 Kartenausschnitt im Brief · E13 Symbolsatz Sprechblasen · E18 Belagerung S3 (Kellerweg, Varons Strenge) · E19 Bionik im Krieg · E20 Luftbrücke (4) · E21 NPC-Ziele (4) · E22 Welt-Ereignis-Karte (4) · E23 Städte-Visual (4) · E24 Morrgrund (3) · E25 Wasservolk · E26 organische Stadtanordnung (Vorschlag: nur neue Häuser) · E27 Karraks Wüste (Vorschlag: friedlich) · E28 Bodenauflösung · E29 Ende der Brüder (8 Ideen) · E30 70 stumme Figuren · E31 Gift/Feuer/Blutung 60 % · E32 Pferde-Sprites reichen? · E33 17 Fit-Urteile · E34 Ideenspeicher freigeben? · E35 Welle 2 Reihenfolge · **E37 Spec-Reihenfolge vs. alte APPROVED-Pakete** · **E38 Katana: Schwert-Unterart oder eigene Waffenklasse?** · **E39 Skill-System: Sternbild-Talente bleiben und Skills ergänzen (Vorschlag) oder zusammenlegen?** · **E41 Holz endlich? (09.10.):** Gefällte Bäume hinterlassen einen Stumpf mit Schösslingen, wachsen aber nicht nach — (a) nie, (b) nach N Tagen wieder Baum (Vorschlag: 10 Tage), (c) nur gepflanzt · **E43 Gold und Ruf (09.10., Agent Städte):** (a) Sollen die 36 Ruf-Stellen mit `+=` ohne Grenze auch auf ±100 begrenzt werden? (Vorschlag ja) (b) Hinterlegtes im Kontor beim Erbe ganz erhalten? (gebaut: ja) (c) Betriebssteuer 10 % / Einzahlgebühr 3 % bestätigen · **E42 Sternbilder zusammenlegen?** Sichtbarkeitsregel ist gebaut (1–4 statt 25 sichtbar); Bäume/Klassen zusammenlegen hieße Klassen zusammenlegen — gewünscht? (Vorschlag: nein, nur doppelte Allerwelts-Sterne streichen)

@@ -453,3 +453,17 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
   - **Fällt die Eisenfeste**, ist die Menschheit verloren: Endkarte „Die Menschheit ist gefallen“, danach Wahl — aufhören (Chronik/Erbe) oder in der toten Welt weiterspielen.
   - **Die Welt passt sich an:** Je mehr die Toten halten, desto mehr sehen Boden und Landschaft im Norden nach und nach aus wie im Osten (Skelettgebiet). **Umgekehrt** heilt das Land, wenn Lebende untote Orte einnehmen.
   - **Neue Monster** gehören zur Expansion: Zombies, Vampire (außerhalb Varonheims) u. a.
+
+## 12.10.2026 — Fragerunde 4 (Krieg, Gegenstände, Kampfanimation)
+
+- **Waffenruhe unter Veyl:** beide Seiten ruhen — weder Totenheere noch Valen greifen an.
+- **Große Krise (Obergrenze 3):** nur echte Bedrohungen — Großereignis-Katastrophen, Kreuzzug, Ketzerjagd, Dorfüberfall, Feldzug der Kette. Nicht: Turnier, Ball, Schatzwagen, Dauerfolgen (bleibende Seuche, Häuserkrieg). Belagerungen laufen immer.
+- **Seuche:** schwächer und länger — weniger Tote pro Tag, dafür etwa 1,5× so lang.
+- **SE-1 Katanas:** leicht senken — Katana und Gischtklinge −1 Schaden, Nebelklinge 15.
+- **SE-2:** legendäre Hände/Beine/Füße Rüstung 5 (Schild 6) + feste Zusatzwerte — so lassen, Band in §D eintragen.
+- **SE-3:** sechs Kopfgeld-Elite lassen das passende neue Stück fallen; Hundertschritt (Ruprecht Einauge) nur zu 25 %.
+- **SE-4:** neue Unikate an den Boss-Listen, Boss-Unikat bleibt 25 %.
+- **KG-2 Glanz:** Gefährten **und** Bosse bekommen den vollen Glanz nach Seltenheit ihrer Waffe.
+- **KG-1/3/6:** Sensenlanze bleibt Stoßwaffe; Klingenband statt Mond bleibt; Lichtblitz aus bei „Bewegung reduzieren“ reicht.
+- **KG-4:** Koop-Gäste sehen Nachbilder und Gegenhieb-Linie des Hosts (`atkTag` in coop.js DYN).
+- **KG-5:** Doppelklinge bekommt eine eigene Wirbel-Bewegung.
