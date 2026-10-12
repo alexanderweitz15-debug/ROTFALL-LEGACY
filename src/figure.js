@@ -7,7 +7,7 @@
 // alten 20×25-Rasters). Jedes Teil wird mit eigenem Volumen schattiert (Licht oben links, Formschatten rechts), wirft
 // Schlagschatten auf Teile dahinter; danach Kontur und handgesetzte Details. Noch nicht im Spiel verdrahtet —
 // erst die Grundlage gegen die Referenz prüfen (Nutzervorgabe), dann übertragen.
-import { ramp, mix, toCanvas } from './sprites.js?v=31';
+import { ramp, mix, toCanvas } from './sprites.js?v=32';
 
 export const FW = 40, FH = 66, FPX = 1, FOX = 20, FOY = 57;   // Rastergröße, Welt je Pixel, Pivot (Fußmitte)
 // Proportion (Nutzer: „noch etwas weird“): Formen werden im Entwurfsmaß (Füße bei y 53) gezeichnet und beim Rastern
@@ -1048,6 +1048,27 @@ function katanaW(C, M, o) {                                         /* E38: geme
 }
 const WBY = { sword: 'longsword', great: 'greatsword', axe: 'axe', mace: 'mace', spear: 'spear', dagger: 'dagger', staff: 'staff', whip: 'chain_whip',
   rapier: 'rapier', katana: 'katana', hammer: 'warhammer', polearm: 'halberd', crossbow: 'crossbow', wand: 'wand', bow: 'shortbow', throw: 'wurfmesser', sling: 'schleuder' };
+/* 09.10. Seltenheitsstufen: neue Schlüssel nutzen vorhandene Formen und deren Parameter (keine neue Zeichnung). Sensen brauchen eine
+   Sensenform (sonst fiele polearm auf die Hellebarde zurück); der Rest unterscheidet sich über Seltenheit (Stahl, Messing, Knaufstein, Runen). */
+/* Bögen, Schleudern und Stäbe haben kein Metall — dort setzen Eisenbeschläge (Spitzen, Ringe, Kugel) an; die Seltenheitsregel unten färbt sie
+   wie bei allen Waffen (Messing, Gold, Knaufstein). fitW: vorhandene Form + Beschläge obenauf. */
+const fitW = (base, add) => [base[0], base[1], (C, M) => { const r = base[2](C, M); add(C, M); return r; }];
+const ring = (C, M, x, y0 = 8.4, y1 = 12.4) => C.poly(M.ir, [[x, y0], [x + 2, y0], [x + 2, y1], [x, y1]]);
+const bowTips = (C, M, y1) => { C.ell(M.ir, 5.5, 2, 1.5, 1.5); C.ell(M.ir, 5.5, y1, 1.5, 1.5); };
+Object.assign(WDES, {
+  wanderkatana: [64, 14, (C, M) => katanaW(C, M, { long: 2 })], salztraene: [66, 14, (C, M) => katanaW(C, M, { long: 4, ray: true, mist: true })],
+  knochensense: WDES.erntesense, aschensense: WDES.kriegssense, seelenernte: WDES.doppelsense, grubenfalke: WDES.wurfbeil,
+  hunting_bow: fitW(WDES.shortbow, (C, M) => bowTips(C, M, 38)),
+  hornbogen: fitW(WDES.shortbow, (C, M) => { bowTips(C, M, 38); C.poly(M.ir, [[9, 15.8], [13, 15.8], [13, 17.2], [9, 17.2]]); C.poly(M.ir, [[9, 22.8], [13, 22.8], [13, 24.2], [9, 24.2]]); }),
+  hundertschritt: fitW(WDES.longbow, (C, M) => { bowTips(C, M, 54); C.poly(M.ir, [[10, 22.6], [14, 22.6], [14, 24], [10, 24]]); C.poly(M.ir, [[10, 32], [14, 32], [14, 33.4], [10, 33.4]]); }),
+  hirtenschleuder: fitW(WDES.schleuder, (C, M) => C.ell(M.ir, 1.6, 5, 1.5, 1.5)),
+  bleischleuder: fitW(WDES.schleuder, (C, M) => { C.ell(M.ir, 1.6, 5, 1.5, 1.5); C.ell(M.ir, 21, 5, 1.8, 1.8); }),
+  stabschleuder: fitW(WDES.schleuder, (C, M) => { C.poly(M.wd, [[0, 3.8], [12, 3.8], [12, 6.2], [0, 6.2]]); C.ell(M.ir, 12.5, 5, 1.4, 1.4); C.ell(M.ir, 21, 5, 1.8, 1.8); }),
+  riesentoeter: fitW(WDES.schleuder, (C, M) => { C.ell(M.ir, 1.6, 5, 1.5, 1.5); C.ell(M.ir, 21, 5, 1.8, 1.8); for (const x of [8, 13]) C.poly(M.ir, [[x, 3.8], [x + 1.4, 3.8], [x + 1.4, 6.2], [x, 6.2]]); }),
+  pilgerstab: fitW(WDES.staff, (C, M) => ring(C, M, 0.5, 9.4, 12.6)),
+  runenstab: fitW(WDES.staff, (C, M) => { ring(C, M, 0.5, 9.4, 12.6); ring(C, M, 13); ring(C, M, 37); }),
+  grabstab: fitW(WDES.staff, (C, M) => { ring(C, M, 0.5, 9.4, 12.6); for (const x of [19, 31, 42]) ring(C, M, x); }),
+  erzruferstab: fitW(WDES.staff, (C, M) => { ring(C, M, 0.5, 9.4, 12.6); for (const x of [13, 25, 37]) ring(C, M, x); C.poly(M.ir, [[44, 8.6], [46.5, 8.6], [46.5, 13.4], [44, 13.4]]); }) });
 export function paintWeapon2(key, wtype, St, Wood, Wrap, Iron, sc = 1, rar = '', bare = false) {   // bare: Bogen ohne Sehne (die Sehne zeichnet render.js beim Spannen)   // sc < 1: S14 Stil R — dieselbe Form im gröberen Zielraster gemalt
   const d = WDES[key] ? key : WBY[wtype] || 'longsword', [w0, h0, fn] = WDES[d], w = Math.ceil(w0 * sc), h = Math.ceil(h0 * sc);
   const C = new Canvas2(w, h);

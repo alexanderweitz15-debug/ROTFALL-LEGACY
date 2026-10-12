@@ -1,8 +1,8 @@
 // Weltsimulation (Phase 18–20): Stadtmärkte, Karawanen, Heere und Front. Läuft ohne den Spieler.
-import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=31';
-import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS, MONSTERS, FAC_RES } from './data.js?v=31';
-import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=31';
-import * as ECO from './economy.js?v=31';
+import { S, log, chronicle, rnd, ri, pick, chance, clamp, year, uid } from './state.js?v=32';
+import { ITEMS, TOWNS, GOODS, WAR_NODES, WAR_EDGES, FACTIONS, MONSTERS, FAC_RES } from './data.js?v=32';
+import { LOCATIONS, TS, T, SOLID, HOUSES, MAPS, tileAt, worldPt, wT, OX } from './world.js?v=32';
+import * as ECO from './economy.js?v=32';
 
 export const H = {};                     // von game.js: spawnEnemy(type,map,tx,ty,opts), spawnRefugee(x,y,to), toast(t)
 const LOC = Object.fromEntries(LOCATIONS.map(l => [l.key, l]));
@@ -57,7 +57,7 @@ export function launchHost() {                                     // Morvaths H
   resAdd('undead', -FAC_RES.undead.host);   /* T23 S3 F2 (Entwickler 01.10.): der Heerzug kostet 40 Seelen, ist aber an keine Bedingung geknüpft */
   chronicle('Die Toten marschieren auf Varonheim', 'legend', `${a.name} (Stärke ${a.strength}) bricht von ${LOC[base].name} auf. Ziel: die Hauptstadt.`);
   log(`Morvaths Heerzug bricht von ${LOC[base].name} auf — Ziel ist Varonheim. Wer die Front hält, gewinnt Zeit.`, 'faction');
-  H.toast('DIE TOTEN MARSCHIEREN AUF VARONHEIM'); H.scene?.('host', a);   /* T17: Szene */
+  if (!H.scene?.('host', a)) H.toast('DIE TOTEN MARSCHIEREN AUF VARONHEIM');   /* T17: Szene; 09.10.: Hinweis nur ohne Szene (sonst doppelt) */
   return a;
 }
 export function capThreatDay() {                                   // einmal am Tag aus warDay
@@ -90,7 +90,7 @@ function siegeTick(und, val) {                                     // ein Zug (6
   const n = S.war.nodes[CAPK];
   if (!n.siege) { n.siege = { day: S.day | 0, by: und.id }; n.walls ??= 100;
     chronicle('Varonheim wird belagert', 'battle', `${und.name} (Stärke ${Math.round(und.strength)}) lagert vor den Mauern der Hauptstadt.`);
-    log(`${und.name} schließt Varonheim ein. Die Mauern halten — noch. Valens Heere eilen zum Entsatz.`, 'faction'); H.toast('VARONHEIM WIRD BELAGERT'); H.scene?.('siege', und); return; }
+    log(`${und.name} schließt Varonheim ein. Die Mauern halten — noch. Valens Heere eilen zum Entsatz.`, 'faction'); if (!H.scene?.('siege', und)) H.toast('VARONHEIM WIRD BELAGERT'); return; }
   if (val) return nearPlayer(CAPK) ? materialize(CAPK, und, val) : battleAbstract(CAPK, und, val, CAP_SIEGE.sally);   /* Entsatz mit Ausfall der Besatzung */
   if (n.walls > 0) {
     if (n.siege.noHit) { n.siege.noHit = false; return; }   /* S3b: nach gelungenem Ausfall ruhen die Rammen einen Zug */

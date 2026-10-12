@@ -1,14 +1,14 @@
 // Rendering: Kacheln, Props, Sprites (prozedural gezeichnet), Effekte, Licht, Wetter.
-import { S, clamp, seasonOf } from './state.js?v=31';
-import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=31';
-import * as HB from './buildings.js?v=31';
-import { ITEMS, MONSTERS, FACTIONS, NPCS } from './data.js?v=31';
-import { buildOf, crawling, lightR, eyeOf, lifeOf } from './body.js?v=31';
-import * as SP from './sprites.js?v=31';
-import { trailPt, WAGON_GAP } from './sim.js?v=31';
-import { ICON_R, ruleIcon } from './iconsR.js?v=31';
-import { airPos, airPt } from './economy.js?v=31';
-import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance, HIT_RX } from './anim.js?v=31';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
+import { S, clamp, seasonOf } from './state.js?v=32';
+import { MAPS, T, TS, SOLID, tileAt, regionAt, townAt, seaLine, HOUSES, DUNGEONS, CAPITAL } from './world.js?v=32';
+import * as HB from './buildings.js?v=32';
+import { ITEMS, MONSTERS, FACTIONS, NPCS } from './data.js?v=32';
+import { buildOf, crawling, lightR, eyeOf, lifeOf } from './body.js?v=32';
+import * as SP from './sprites.js?v=32';
+import { trailPt, WAGON_GAP } from './sim.js?v=32';
+import { ICON_R, ruleIcon } from './iconsR.js?v=32';
+import { airPos, airPt } from './economy.js?v=32';
+import { ANIM_DEFS, deathPose, tinted, atkPlan, atkFx, atkU, snapU, atkSpin, atkThrust, legacyTiming, ATK_PACKS, animClassOf, atkStance, HIT_RX, atkWeight, glowTier, GLOW_FX, atkProfile } from './anim.js?v=32';   /* Roadmap P8: Todesarten */   /* Roadmap P6: Flotte am Himmel */
 const PX = SP.PX;
 const OUT_COL = '#0c0a08';
 
@@ -297,8 +297,10 @@ function drawEmote(e, now) {
   ctx.globalAlpha = 1;
 }
 const barK = e => { if (e.body) { const [h, m] = lifeOf(e); return h / m; } return e.barMax ? e.barHp / e.barMax : e.hp / (e.maxHp || 1); };   /* 09.10. (Entwickler): Balken = Gesamtleben aller Körperteile (vorher HB2-01: nur Rumpf); Koop-Gäste ohne Körper: Rumpfwert vom Wirt */
+/* WC-4 (Entwickler 09.10.): in Kamerafahrten keine Kampf-Hinweise im Bild — Boss-Lebensbalken und Zielbalken aus */
+export const combatHudOff = () => !!S.cine;
 function drawBossBar() {
-  const p = S.player; if (!p) return;
+  const p = S.player; if (!p || combatHudOff()) return;
   const b = (VIS.arr === S.ents[S.map] ? VIS.boss : S.ents[S.map]).find(e => e.boss && e.alive && Math.hypot(e.x - p.x, e.y - p.y) < 520);   /* PERF-R: Bossliste aus visibleEnts */
   if (!b) return;
   const w = Math.min(420, W - 40), x = Math.round((W - w) / 2), y = H - 46, k = clamp(barK(b), 0, 1);
@@ -2306,8 +2308,12 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit, ox = 0, oy = 0) {
   /* Kampfanimation: Pack-Optik (nur eigene Figur und Koop-Helden; alle anderen Pack A) — Vorschub zum Einschlag, Wirbel dreht den Körper,
      Nachbilder (C), Sichelbogen (B/C). Alles per Verschiebung/Überlagerung, kein neues Figurenbild. */
   let AF = null, ghost = 0;
+  /* Kampfanimation Glanz (09.10.): Glanzstufe der eigenen Waffe (anim.js glowTier: Seltenheit, Meisterhaltung +1) — nur eigene Figur und Koop-Helden */
+  if (W && !RANGED_W.has(W.wt)) W.glow = own ? glowTier(w.rar || wit.rarity, !!e.masteries?.[wit.skill]) : 0;
   if (W && W.mode === 'swing' && !RANGED_W.has(W.wt)) {
-    const pk = own && ATK_PACKS.includes(S.dbg?.pack) ? S.dbg.pack : 'A', u = W.u;
+    /* Glanz 09.10. (Fehler behoben): Pack-Optik folgt dem Pack des Schwungs (e.atkPk = Seltenheit der Waffe bzw. Test-Room-Wahl, im Koop übertragen) —
+       vorher galt außerhalb des Test Rooms immer A, obwohl Form und Takt schon B/C waren */
+    const pk = own && ATK_PACKS.includes(e.atkPk) ? e.atkPk : own && ATK_PACKS.includes(S.dbg?.pack) ? S.dbg.pack : 'A', u = W.u;
     AF = atkFx(W.ac, pk); W.trail = AF.trail;
     const fin = e.atkStep === 2 && e.atkH > 0, k = u < 0.4 ? -0.3 * u / 0.4 : u <= 0.5 ? -0.3 + 1.3 * (u - 0.4) / 0.1 : 1 - (u - 0.5) / 0.5, push = AF.push * (fin ? 2 : 1) * k;
     if (S.settings.motion !== false) { x += Math.cos(dir) * push; y += Math.sin(dir) * push * 0.6; }
@@ -2336,6 +2342,7 @@ function drawHumanoidR(e, now, c, spec, pz, w, wit, ox = 0, oy = 0) {
     if (AF) drawSlash(c, e, W, AF, hx, hy, dir, wit); drawWeaponR(c, e, now, wit, w, W, hx, hy, dir); };   /* Schritt 3 (04.10.): Swoosh in allen Packs */
   if (ghost) { const g = SP.flashOf(f); Object.assign(g, { px: f.px, ox: f.ox, oy: f.oy });   /* Kampfanimation C: zwei Nachbilder hinter dem Vorstoß */
     for (const k of [2, 1]) { c.globalAlpha = 0.12 * (3 - k); SP.blit(c, g, x - Math.cos(dir) * ghost * k, y + 6 - Math.sin(dir) * ghost * k * 0.6); } c.globalAlpha = 1; }
+  if (W && W.mode === 'swing' && AF) afterImages(c, e, spec, pz, pose, W, x, y, dir, w, wit);   /* Glanz 09.10.: Nachbilder (episch+, Ausweichhieb) */
   if (behind) weapon();
   c.save(); c.translate(x, y + 6); c.scale(bsx, bsy); SP.blit(c, f, 0, 0);
   const bd = e.body;                                                // verlorene Gliedmaßen: blutige Stelle am Gelenk
@@ -2377,12 +2384,7 @@ function leechGlow(c, e, now, it) {
 }
 function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
   const wt = W.wt, a = SP.weaponAngle(W.tm ? { ...W, q: W.u } : W, dir), Wsp = SP.weaponSprite(wi.key, wi.rar || it.rarity, it.holy, wt, wt === 'bow' && W.mode === 'aim'), WP = Wsp.px || PX, len = (Wsp.cv.width - Wsp.gx) * WP;   /* Kampfanimation: Klinge fließend in u, Hand an der Bild-Stützstelle */
-  if (W.mode === 'swing' && !RANGED_W.has(wt) && W.tm) {           // Klingenspur: frühere Winkel derselben Kurve um die Hand (Länge je Pack)
-    const col = Wsp.runes ? (it.holy ? '242,230,176' : '255,200,110') : '240,232,210', sw = W.sw, n = W.trail || 6;
-    for (let k = 1; k <= n; k++) { const past = sw - k * 0.03; if (past <= 0) break; const pa = SP.weaponAngle({ ...W, q: atkU(W.tm.w, W.tm.h, past) }, dir), t = 1 - k / (n + 1);
-      const bx = hx + Math.cos(pa) * len * 0.9, by = hy + Math.sin(pa) * len * 0.9, s2 = Math.round(2 * t + 1);
-      c.fillStyle = `rgba(${col},${0.6 * t})`; c.fillRect(Math.round(bx - s2), Math.round(by - s2), s2 * 2, s2 * 2); }
-  }
+  if (W.mode === 'swing' && !RANGED_W.has(wt) && W.tm) { drawSmear(c, e, W, it, wi, Wsp, hx, hy, dir, len, a); windGlint(c, W, hx, hy, a, len); }   /* Glanz 09.10.: Klingenspur als Band + Aufblitzen am Ende des Ausholens */
   if (wt === 'bow' && W.mode === 'aim') {                         // S15: Sehne und Pfeil — die Sehne läuft von beiden Bogenenden zur Zughand
     const ax = Math.cos(dir), ay = Math.sin(dir), pl = W.pull || 0, st = Wsp.str || [4, 2, Wsp.cv.height - 2];
     const ca = Math.cos(a), sa = Math.sin(a), on = (sx0, sy0) => { const lx = (sx0 - Wsp.gx) * WP, ly = (sy0 - Wsp.gy) * WP; return [hx + lx * ca - ly * sa, hy + lx * sa + ly * ca]; };   // Bildpunkt des Bogens → Welt
@@ -2393,17 +2395,110 @@ function drawWeaponR(c, e, now, it, wi, W, hx, hy, dir) {
     if (!fresh) { const tx = hx + ax * 6, ty = hy + ay * 6;
       c.strokeStyle = '#b8a47e'; c.lineWidth = 1.5; c.beginPath(); c.moveTo(Math.round(sx), Math.round(sy)); c.lineTo(Math.round(tx), Math.round(ty)); c.stroke();
       c.fillStyle = '#d8d0c0'; c.fillRect(Math.round(tx - 1), Math.round(ty - 1), 2, 2); c.fillStyle = '#8a2a20'; c.fillRect(Math.round(sx - 1), Math.round(sy - 1), 2, 2); } }
-  if (W.tm && !RANGED_W.has(wt) && W.u >= 0.38 && W.u <= 0.53) {   /* Kampfanimation: Schleier im schnellsten Bild — Fläche, die die Klinge eben überstrichen hat */
-    const pa = SP.weaponAngle({ ...W, q: atkU(W.tm.w, W.tm.h, Math.max(0.001, W.sw - 0.05)) }, dir), L2 = len * 0.95;
-    if (Math.abs(pa - a) > 0.15) { c.fillStyle = 'rgba(236,228,206,0.32)'; c.beginPath(); c.moveTo(hx, hy); c.lineTo(hx + Math.cos(pa) * L2, hy + Math.sin(pa) * L2);
-      for (let k = 1; k <= 6; k++) { const t = pa + (a - pa) * k / 6; c.lineTo(hx + Math.cos(t) * L2, hy + Math.sin(t) * L2); } c.closePath(); c.fill(); } }
+  /* (Glanz 09.10.: der frühere „Schleier im schnellsten Bild“ ist im Band von drawSmear aufgegangen — dort reicht das Band im Schlag bis nah an die Hand) */
   c.save(); c.translate(Math.round(hx), Math.round(hy)); c.rotate(a);
   if (wt !== 'bow' && Math.cos(dir) < 0) c.scale(1, -1);
+  const G = RANGED_W.has(wt) ? 0 : W.glow | 0;
+  if (G >= 3 && W.mode !== 'rest') bladeHalo(c, Wsp, WP, glowCol(wi.rar || it.rarity), W.mode === 'swing' ? 1 : 0.45, now, e.seed);   /* Glanz 3: Klinge leuchtet (Hof hinter dem Blatt) */
   c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP);
+  if (G >= 3 && W.mode !== 'rest') { c.globalCompositeOperation = 'lighter'; c.globalAlpha = (W.mode === 'swing' ? 0.42 : 0.2) + 0.08 * Math.sin(now / 260 + (e.seed || 0));
+    c.drawImage(tinted(Wsp.cv, `rgb(${glowCol(wi.rar || it.rarity)})`), -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
+  if (W.tm && e.atkFx && W.u >= 0.5 && W.u < 0.545) { c.globalAlpha = (W.two || W.ac === 'scythe' ? 0.5 : 0.8) * (1 - (W.u - 0.5) / 0.045);   /* 1–2 Bilder; lange Schäfte blasser */   /* Glanz 09.10.: Einschlag-Bild — die Klinge blitzt hell auf, nur wenn der Hieb wirklich traf */
+    c.drawImage(SP.flashOf(Wsp.cv), -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP); c.globalAlpha = 1; }
   if (Wsp.orb) { const f = ((now / 90 + (e.seed || 0)) | 0) % 5; c.fillStyle = f === 0 ? '#e8f4ff' : f < 3 ? '#8fb7e8' : '#5f8fd0'; c.fillRect((Wsp.orb[0] - Wsp.gx) * WP, (Wsp.orb[1] - Wsp.gy - 2) * WP, 2, 2); }
   if (Wsp.runes && ((now / 140 + (e.seed || 0)) | 0) % 6 === 0) { c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.5; c.drawImage(Wsp.cv, -Wsp.gx * WP, -Wsp.gy * WP, Wsp.cv.width * WP, Wsp.cv.height * WP); c.globalAlpha = 1; c.globalCompositeOperation = 'source-over'; }
   weaponPulse(c, Wsp, WP, now, e.seed);
   c.restore(); leechGlow(c, e, now, it);
+}
+/* ================= Kampfanimation Glanz (Entwickler 09.10.: „Kampfanimationen verbessern … später wirklich flashy im Endgame“) =================
+   Nur Optik, aus dem Schwungzustand gerechnet (kein Spielzufall, nichts gespeichert). Prinzipien aus der Recherche (REGELN_UND_SPECS §I.9):
+   ein Schmierbild auf dem Schlagbogen in zwei Tönen, ein Aufblitzen am Ende des Ausholens, ein Einschlag-Bild, Funken nach Gewicht,
+   Nachbilder und Leuchten erst mit der Seltenheit (Glanzstufe, anim.js glowTier) — Lesbarkeit vor Effekt: Füllungen bleiben durchscheinend. */
+const MASTER_RGB = '232,214,160', LITE = new Map();
+const glowCol = rar => (RAR_LV[rar] ?? 0) >= 2 ? RAR_RGB[rar] : MASTER_RGB;   /* Glanz 1 durch Meisterhaltung an schlichter Waffe: blasses Gold */
+function lite(col, k) { const key = col + k; let v = LITE.get(key); if (v) return v; v = col.split(',').map(n => Math.round(+n + (255 - n) * k)).join(','); LITE.set(key, v); return v; }
+/* Klingenspur als Band: Spitze (außen) und Klingenmitte (innen) früherer Winkel derselben Kurve um die Hand. Im Schlag dicht und bis nah an die Hand
+   (Schmierbild), im Nachschwung dünner und blasser, im Ausholen nur kurz. Drei Alpha-Bänder + helle Kante = 4 Pfade je Figur. Stoß: Tempolinien. */
+function drawSmear(c, e, W, it, wi, Wsp, hx, hy, dir, len, a) {
+  const u = W.u, sw = W.sw, n = W.trail || 6, G = W.glow | 0, gc = G >= 1 ? glowCol(wi.rar || it.rarity) : null;
+  const base = gc ? lite(gc, 0.25) : Wsp.runes ? (it.holy ? '242,230,176' : '255,200,110') : '236,228,206', edge = gc ? lite(gc, 0.6) : '255,250,236';
+  if (atkThrust(W.ac, W.v)) {
+    if (u < 0.4 || u > 0.62) return; const k = u <= 0.5 ? (u - 0.4) / 0.1 : 1 - (u - 0.5) / 0.12, ca = Math.cos(a), sa = Math.sin(a), tx = hx + ca * len, ty = hy + sa * len;
+    for (const [o, L, lw] of [[0, 0.8, 2], [-3, 0.5, 1], [3, 0.42, 1]]) { const ox = -sa * o, oy = ca * o; c.strokeStyle = `rgba(${o ? base : edge},${(0.6 * k).toFixed(3)})`; c.lineWidth = lw;
+      c.beginPath(); c.moveTo(tx + ox, ty + oy); c.lineTo(tx + ox - ca * len * L, ty + oy - sa * len * L); c.stroke(); }
+    return;
+  }
+  const live = u >= 0.38 && u < 0.84, K = live ? n : Math.min(2, n), fade = u < 0.38 ? 0.45 : u <= 0.52 ? 1 : Math.max(0, 1 - (u - 0.52) / 0.32);
+  if (fade <= 0.02) return;
+  const A = [a]; for (let k = 1; k <= K; k++) { const past = sw - k * 0.03; if (past <= 0) break; A.push(SP.weaponAngle({ ...W, q: atkU(W.tm.w, W.tm.h, past) }, dir)); }
+  const P = [A[0]]; for (let i = 1; i < A.length; i++) { const d = A[i] - A[i - 1], m = Math.min(6, Math.ceil(Math.abs(d) / 0.3)); for (let j = 1; j <= m; j++) P.push(A[i - 1] + d * j / m); }
+  const N = P.length; if (N < 2 || Math.abs(P[N - 1] - P[0]) < 0.12) return;
+  const lng = W.two || W.ac === 'scythe' || W.ac === 'polearm', ri = len * (u >= 0.4 && u <= 0.53 ? (lng ? 0.58 : 0.36) : (lng ? 0.7 : 0.56)), ro = len * 0.97,   /* lange Schäfte: nur das Blatt schmiert, nicht der Stiel */ t1 = Math.max(1, Math.round((N - 1) / 3)), t2 = Math.max(t1, Math.round(2 * (N - 1) / 3));
+  const band = (i0, i1, al) => { if (i1 <= i0) return; c.beginPath(); for (let i = i0; i <= i1; i++) c.lineTo(hx + Math.cos(P[i]) * ro, hy + Math.sin(P[i]) * ro);
+    for (let i = i1; i >= i0; i--) c.lineTo(hx + Math.cos(P[i]) * ri, hy + Math.sin(P[i]) * ri); c.closePath(); c.fillStyle = `rgba(${base},${al.toFixed(3)})`; c.fill(); };
+  band(0, t1, 0.3 * fade); band(t1, t2, 0.18 * fade); band(t2, N - 1, 0.08 * fade);
+  c.strokeStyle = `rgba(${edge},${(0.78 * fade).toFixed(3)})`; c.lineWidth = G >= 3 ? 2 : 1.5; c.beginPath();
+  for (let i = 0; i <= t2; i++) c.lineTo(hx + Math.cos(P[i]) * ro, hy + Math.sin(P[i]) * ro); c.stroke();
+  if (GLOW_FX[G].motes && live) {   /* Glanz 3: Funkenstaub löst sich von der Spur und treibt nach außen (fest je Stützpunkt, kein Zufall je Bild) */
+    c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(${edge},${(0.85 * fade).toFixed(3)})`;
+    for (let i = 1; i < N; i += 2) { const r = ro + 2 + h2(i, e.seed | 0) * 7 + Math.max(0, u - 0.45) * 22, s = h2(e.seed | 0, i) > 0.6 ? 2 : 1;
+      c.fillRect(Math.round(hx + Math.cos(P[i]) * r), Math.round(hy + Math.sin(P[i]) * r - Math.max(0, u - 0.5) * 10), s, s); }
+    c.globalCompositeOperation = 'source-over'; }
+}
+/* Aufblitzen am Ende des Ausholens (klares Ausholen: man sieht, wann der Hieb kommt — für alle Figuren, auch Gegner): kleiner Stern an der Spitze,
+   größer je schwerer die Waffe (anim.js atkWeight). */
+function windGlint(c, W, hx, hy, a, len) {
+  const u = W.u; if (!(u >= 0.28 && u < 0.43)) return; const k = 1 - Math.abs(u - 0.36) / 0.08; if (k <= 0) return;
+  const s = Math.round(2 + 3 * Math.min(1, atkWeight(W.ac)) * k), tx = Math.round(hx + Math.cos(a) * len * 0.92), ty = Math.round(hy + Math.sin(a) * len * 0.92);
+  c.globalCompositeOperation = 'lighter'; c.fillStyle = `rgba(255,244,214,${(0.8 * k).toFixed(3)})`;
+  c.fillRect(tx - s, ty - 1, s * 2, 2); c.fillRect(tx - 1, ty - s, 2, s * 2); c.fillRect(tx - 1, ty - 1, 2, 2);
+  c.globalCompositeOperation = 'source-over';
+}
+/* Glanz 3: weicher Hof hinter dem Blatt (vorgebackener Lichtfleck je Farbe, wie der Beutestrahl) — im Waffen-Koordinatensystem gezeichnet */
+const HALO = new Map();
+function haloOf(col) { let h = HALO.get(col); if (h) return h; h = document.createElement('canvas'); h.width = h.height = 24; const g = h.getContext('2d'), gr = g.createRadialGradient(12, 12, 1, 12, 12, 12);
+  gr.addColorStop(0, `rgba(${col},.9)`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(0, 0, 24, 24); HALO.set(col, h); return h; }
+function bladeHalo(c, Wsp, WP, col, k, now, seed) {
+  const L = (Wsp.cv.width - Wsp.gx) * WP, h = haloOf(col), p = 0.8 + 0.2 * Math.sin(now / 300 + (seed || 0));
+  c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.22 * k * p;
+  for (const t of [0.45, 0.7, 0.95]) c.drawImage(h, t * L - 9, -9, 18, 18);
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+}
+/* Nachbilder: die Figur in den vorigen Bild-Stützstellen als farbige Silhouette, leicht zurückversetzt (Glanz 2+). Katana-Ausweichhieb (atkTag 'dodge'):
+   drei kühle Nachbilder weiter hinten — der Schritt aus der Rolle bleibt sichtbar (Hyper Light Drifter: der Sprung hinterlässt Schatten). */
+function afterImages(c, e, spec, pz, pose, W, x, y, dir, w, wit) {
+  const u = W.u, G = W.glow | 0, dodge = e.atkTag === 'dodge' && e.swing > 0, n = dodge ? 3 : GLOW_FX[G].after;
+  if (!n || u < 0.36 || u > 0.66 || S.settings.motion === false && !dodge) return;
+  const col = dodge ? '196,220,244' : glowCol(w.rar || wit.rarity), k0 = u <= 0.5 ? 1 : 1 - (u - 0.5) / 0.16;
+  for (let i = n; i >= 1; i--) {
+    const q = snapU(Math.max(0, u - 0.07 * i)), f2 = SP.humanFrameR(spec, pz.dir, pose, { ...W, q }), t = tinted(f2, `rgb(${col})`), d = (dodge ? 8 : 3) * i;
+    c.globalAlpha = (dodge ? 0.32 : 0.24) * k0 * (1 - (i - 1) / (n + 0.5)); SP.blit(c, t, x - Math.cos(dir) * d, y + 6 - Math.sin(dir) * d * 0.6);
+  }
+  c.globalAlpha = 1;
+}
+/* Einschlag (game.js atkImpact ruft einmal je treffendem Hieb): Aufprallfunken nach Waffengewicht, Glanz-Funken in Seltenheitsfarbe, Katana-Schnittlinien
+   (Iai-Zug klein, Kreuzschnitt als X, Blitzschnitt und Gegenhieb lang — Sekiro: die gelungene Abwehr belohnt mit Funken und hellem Schnitt),
+   Sense: flacher Mähkreis beim Wuchtschlag, Glanz 3: Lichtblitz beim Wuchtschlag. Nur S.fx (nie gespeichert), Darstellungszufall Math.random. */
+export function atkFlair(c, target, o = {}) {
+  const w = c?.equip?.weapon, it = w && ITEMS[w.key]; if (!it || it.ranged || !target || S.fx.length > 860) return;
+  if (S.player && c !== S.player && Math.abs(c.x - S.player.x) + Math.abs(c.y - S.player.y) > 900) return;   /* große Schlachten: keine Funken außer Sicht */
+  const own = c === S.player || !!c.coopHero || !!c.coopPilot, ac = animClassOf(w.key, it), G = own ? glowTier(w.rar || it.rarity, !!c.masteries?.[it.skill]) : 0, GF = GLOW_FX[G];
+  const col = G >= 1 ? lite(glowCol(w.rar || it.rarity), 0.3) : null, a = Math.atan2(target.y - c.y, target.x - c.x), ix = target.x - Math.cos(a) * 6, iy = target.y - 14 - Math.sin(a) * 3;
+  const fin = !!o.fin, wgt = atkWeight(ac), R = Math.random;
+  const spark = (n, cl, sp) => { for (let i = 0; i < n; i++) { const an = a + (R() - 0.5) * 2.2, v = sp * (0.6 + R() * 0.8);
+    S.fx.push({ x: ix, y: iy, vx: Math.cos(an) * v, vy: Math.sin(an) * v - 0.9, type: 'spark', col: cl, streak: 1, s: 1, life: 200 + R() * 200, maxLife: 400 }); } };
+  spark(2 + Math.round(wgt * 3) + (fin ? 2 : 0), null, 2.2 + wgt);                                  /* Aufprallfunken: Dolch 2, Hammer 6 */
+  if (GF.sparks) spark(GF.sparks + (fin ? 2 : 0), col, 2.6);                                         /* Glanz 2+: farbige Funken */
+  const cut = (ang, L, cl, life = 260) => S.fx.push({ x: target.x, y: target.y - 16, vx: 0, vy: 0, type: 'blitz', a: ang, L, col: cl, life, maxLife: life });
+  if (ac === 'katana') {
+    const sh = atkProfile(ac)?.shapes[c.atkS]?.name || '';
+    if (c.atkTag === 'counter') { cut(a + 0.35, 52, col || '255,244,214', 340); S.fx.push({ x: ix, y: iy, vx: 0, vy: 0, type: 'flare', col: col || '255,244,214', s: 0.8, life: 220, maxLife: 220 }); spark(6, '255,250,230', 3.4); }
+    else if (/^Blitzschnitt/.test(sh)) cut(a + 0.12, 60, col || '255,244,214', 360);
+    else if (/^Kreuzschnitt/.test(sh)) { cut(a + 0.8, 34, col); cut(a - 0.8, 34, col); }
+    else if (/^Iai/.test(sh)) cut(a + 0.5, 24, col, 200);
+  }
+  if (ac === 'scythe' && fin) S.fx.push({ x: c.x, y: c.y + 2, vx: 0, vy: 0, type: 'mow', r: (it.reach || 56) * 0.95, col: col || '226,214,180', life: 360, maxLife: 360 });
+  if (GF.flare && fin) S.fx.push({ x: ix, y: iy, vx: 0, vy: 0, type: 'flare', col: col || '255,244,214', s: 1.4, screen: S.settings.motion !== false, life: 320, maxLife: 320 });
 }
 // Schwungkurve je Waffentyp: Ausholen (Antizipation) → Schlag → Nachschwung. sw 0..1, Trefferprüfung bei 0.42.
 // a = Winkel relativ zur Zielrichtung, ext = Vorschub der Hand entlang der Zielrichtung (Stoßwaffen).
@@ -2437,14 +2532,19 @@ function atkTiming(e, wt, sw) {
 function drawSlash(c, e, W, AF, hx, hy, dir, it) {
   const u = W.u; if (!(u >= 0.42 && u < 0.76) || atkThrust(W.ac, W.v)) return;   /* Stoß: kein Bogen */
   const sgn = Math.cos(dir) < -1e-9 ? -1 : 1, fade = u <= 0.5 ? Math.min(1, (u - 0.42) / 0.05) : 1 - (u - 0.5) / 0.26, big = (AF.slash | 0) + (e.atkStep === 2 ? 1 : 0);
+  /* Glanz 09.10. (Lesbarkeit; Recherche: ein Schmierbild je Hieb, ein zweites nur für den Wuchtschlag): das Band an der Klinge (drawSmear) ist jetzt der
+     Swoosh jedes Hiebs — der Mond kommt nur noch bei Pack B/C und beim Wuchtschlag dazu (Sense: flacher Mähmond immer, ihr eigenes Zeichen) */
+  if (big < 1 && W.ac !== 'scythe') return;
   const a1 = SP.swingOf(W.ac, Math.min(u, 0.58), W.arc, W.v, 0).a, a0 = SP.swingOf(W.ac, 0.4, W.arc, W.v, 0).a, spin = atkSpin(W.ac, W.v);
   let d = a1 - a0; if (!spin) d = Math.atan2(Math.sin(d), Math.cos(d)); if (Math.abs(d) < 0.15) return; d = Math.max(-6.2, Math.min(6.2, d));
-  const from = dir + a0 * sgn, to = from + d * sgn, ccw = d * sgn < 0, L = (it.reach || 40) * 0.72 + big * 4, r2 = L, r1 = L * (0.62 - big * 0.06), cx = e.x + (hx - e.x) * 0.3, cy = hy - 2;
-  c.save(); c.translate(cx, cy); c.scale(1, 0.72);   /* leicht flach: der Bogen liegt im Raum */
+  /* Glanz 09.10.: Sense mäht flach am Boden — eigener, breiter Mond um die Hüfte (ab Pack A); Kante in Seltenheitsfarbe ab Glanz 1 (Füllung bleibt blass, Lesbarkeit) */
+  const mow = W.ac === 'scythe', gc = (W.glow | 0) >= 1 ? lite(glowCol(e.equip?.weapon?.rar || it.rarity), 0.45) : null;
+  const from = dir + a0 * sgn, to = from + d * sgn, ccw = d * sgn < 0, L = (it.reach || 40) * (mow ? 0.92 : 0.72) + big * 4, r2 = L, r1 = L * ((mow ? 0.7 : 0.62) - big * 0.06), cx = mow ? e.x : e.x + (hx - e.x) * 0.3, cy = mow ? e.y - 4 : hy - 2;
+  c.save(); c.translate(cx, cy); c.scale(1, mow ? 0.5 : 0.72);   /* leicht flach: der Bogen liegt im Raum (Sense: noch flacher, am Boden) */
   const mond = (ra, rb, al, col) => { c.fillStyle = `rgba(${col},${al.toFixed(3)})`; c.beginPath(); c.arc(0, 0, ra, from, to, ccw); c.arc(0, 0, rb, to, from, !ccw); c.closePath(); c.fill(); };
-  mond(r2, r1, 0.34 * fade, '236,224,196');
-  mond(r2, r2 - 1.5 - big * 0.5, 0.75 * fade, '255,250,232');   /* helle Außenkante */
-  if (big >= 2) mond(r2 * 1.14, r2 * 1.04, 0.22 * fade, '255,236,190');   /* Pack C / Finisher: zweiter Mond */
+  mond(r2, r1, (mow ? 0.16 : 0.22) * fade, '236,224,196');   /* Füllung blasser als vorher (0,34) — Gegner dahinter bleiben lesbar */
+  mond(r2, r2 - 1.5 - big * 0.5, 0.75 * fade, gc || '255,250,232');   /* helle Außenkante */
+  if (big >= 2 && e.atkStep === 2) mond(r2 * 1.14, r2 * 1.04, 0.22 * fade, gc || '255,236,190');   /* Wuchtschlag ab Pack B: zweiter Mond (Glanz 09.10.: nicht mehr bei jedem C-Hieb) */
   c.restore();
 }
 // Hand + Winkel der Waffe (G3): Nahkampf — die Hand sitzt am Ende des Arms und läuft beim Schlag auf einem Bogen um die
@@ -2927,7 +3027,7 @@ function drawBaked(key, e, box, fn) {
    Nur Anzeige: dieselben Regeln wie canPlace/tryPlace in game.js (feste Kachel, fremder Bau im Feld, Abstand > 400). */
 const PLACE_RANGE = 400;
 let BLDICO = null, bldImgs = {};
-import('./icons.js?v=31').then(m => { BLDICO = m; }).catch(() => {});
+import('./icons.js?v=32').then(m => { BLDICO = m; }).catch(() => {});
 function bldImage(type) {
   if (!BLDICO?.bldURL) return null;
   let im = bldImgs[type];
@@ -3064,7 +3164,8 @@ function drawFx(now) {
     const t = 1 - f.life / f.maxLife;
     ctx.globalAlpha = clamp(f.life / f.maxLife, 0, 1);
     if (f.type === 'blood') { const s = f.s > 2.7 ? 4 : 2; ctx.fillStyle = s > 2 ? '#7a1812' : '#9a241a'; ctx.fillRect(Math.round(f.x), Math.round(f.y), s, s); }
-    else if (f.type === 'spark') { ctx.fillStyle = '#e3c07a'; ctx.fillRect(f.x, f.y, 2, 2); }
+    else if (f.type === 'spark') { ctx.fillStyle = f.col ? `rgb(${f.col})` : '#e3c07a'; ctx.fillRect(f.x, f.y, 2, 2);
+      if (f.streak) { ctx.globalAlpha *= 0.55; ctx.fillRect(Math.round(f.x - f.vx), Math.round(f.y - f.vy), 2, 2); } }   /* Glanz 09.10.: Aufprallfunken ziehen einen kurzen Strich (Flugrichtung) */
     else if (f.type === 'dust') { const s = Math.round(f.s + t * 4) & ~1; ctx.fillStyle = 'rgba(160,150,130,.45)'; ctx.fillRect(f.x - s, f.y - s / 2, s * 2, s); ctx.fillRect(f.x - s / 2, f.y - s, s, s * 2); }
     else if (f.type === 'heal') {                          // Heilung: kleine goldene Pluszeichen steigen auf
       const X = Math.round(f.x), Y = Math.round(f.y); ctx.fillStyle = '#e8d890'; ctx.fillRect(X - 2, Y, 6, 2); ctx.fillRect(X, Y - 2, 2, 6); }
@@ -3096,6 +3197,25 @@ function drawFx(now) {
     else if (f.type === 'ring') {                          // Segen/Stärkung: Pixelring, der sich ausbreitet
       ctx.fillStyle = '#d6c696'; const r = 6 + t * 40;
       for (let i = 0; i < 20; i++) { const an = i / 20 * Math.PI * 2; ctx.fillRect(Math.round(f.x + Math.cos(an) * r) - 1, Math.round(f.y + Math.sin(an) * r * 0.55) - 1, 2, 2); } }
+    else if (f.type === 'blitz') {                         /* Glanz 09.10.: Schnittlinie (Katana) — schießt in 60 ms auf volle Länge, dann gehen die Hälften auseinander und verblassen */
+      const g = 0.45 + 0.55 * Math.min(1, t / 0.2), L = f.L * g, sp = t > 0.3 ? (t - 0.3) * 4 : 0, col = f.col || '255,244,214';
+      ctx.save(); ctx.translate(Math.round(f.x), Math.round(f.y)); ctx.rotate(f.a); ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(${col},${(0.55 * (1 - t)).toFixed(3)})`; ctx.fillRect(-L / 2, -2 - sp, L, 1.5); ctx.fillRect(-L / 2, 0.5 + sp, L, 1.5);
+      ctx.fillStyle = `rgba(255,252,240,${(0.95 * (1 - t)).toFixed(3)})`; ctx.fillRect(-L / 2, -0.75, L, 1.5);
+      if (t < 0.3) ctx.fillRect(L / 2 - 3, -2, 4, 4);
+      ctx.restore(); }
+    else if (f.type === 'flare') {                         /* Glanz 3: Lichtblitz beim Wuchtschlag — Strahlen in Seltenheitsfarbe, kurz; screen: der Bildschirm hellt ganz leicht auf */
+      const col = f.col || '255,244,214', r = (8 + t * 30) * (f.s || 1), al = 1 - t;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      if (f.screen && t < 0.45) { ctx.globalAlpha = 0.1 * (1 - t / 0.45); ctx.fillStyle = `rgb(${col})`; ctx.fillRect(cam.x - 10, cam.y - 10, W / cam.zoom + 20, H / cam.zoom + 20); }
+      ctx.globalAlpha = al; ctx.strokeStyle = `rgba(${col},.8)`; ctx.lineWidth = 1.5; ctx.beginPath();
+      for (let i = 0; i < 8; i++) { const an = i / 8 * Math.PI * 2 + 0.2, r0 = r * (i & 1 ? 0.35 : 0.2); ctx.moveTo(f.x + Math.cos(an) * r0, f.y + Math.sin(an) * r0 * 0.8); ctx.lineTo(f.x + Math.cos(an) * r * (i & 1 ? 0.7 : 1), f.y + Math.sin(an) * r * (i & 1 ? 0.7 : 1) * 0.8); }
+      ctx.stroke(); ctx.fillStyle = `rgba(255,252,240,${(0.9 * al).toFixed(3)})`; const s0 = Math.round(4 * (1 - t)) + 1, X = Math.round(f.x), Y = Math.round(f.y); ctx.fillRect(X - s0 * 2, Y - 1, s0 * 4, 2); ctx.fillRect(X - 1, Y - s0 * 2, 2, s0 * 4);   /* Kern als schmaler Stern, kein Block */
+      ctx.restore(); }
+    else if (f.type === 'mow') {                           /* Glanz 09.10.: Sense — flacher Mähkreis um die Füße beim Rundumschnitt, weitet sich und verblasst */
+      const r = f.r * (0.85 + 0.25 * t), col = f.col || '226,214,180';
+      ctx.fillStyle = `rgba(${col},${(0.8 * (1 - t)).toFixed(3)})`;
+      for (let i = 0; i < 36; i++) { const an = i / 36 * Math.PI * 2, j = (i * 5) % 3; ctx.fillRect(Math.round(f.x + Math.cos(an) * (r + j)) - 1, Math.round(f.y + Math.sin(an) * (r + j) * 0.45) - 1, i % 3 ? 2 : 3, 2); } }
     ctx.globalAlpha = 1;
   }
 }
@@ -3448,6 +3568,7 @@ const ST_GLYPH = { burning: ['fire', '240,140,60'], frost: ['frost', '150,205,24
 export const barTarget = () => { const e = focus.sel || (focus.last && performance.now() - focus.lastAt < 5000 ? focus.last : null);   /* sonst der zuletzt getroffene Gegner, 5 s */
    return !e || !e.alive || !e.maxHp || e.map !== S.map || e.kind === 'caravan' || e === S.player || MONSTERS[e.mtype]?.boss ? null : e; };   /* Boss: eigene Leiste unten */
 function drawTargetBar() {
+  if (combatHudOff()) return;   /* WC-4 */
   const e = barTarget(); if (!e) return;
   const sc = MONSTERS[e.mtype]?.scale || 1, x = Math.round(e.x - 16), y = Math.round(e.y - 70 * sc), k = clamp(barK(e), 0, 1);
   ctx.fillStyle = 'rgba(10,8,6,.85)'; ctx.fillRect(x - 1, y - 1, 34, 6);

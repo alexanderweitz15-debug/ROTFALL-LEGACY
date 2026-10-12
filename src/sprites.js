@@ -12,13 +12,13 @@
 //   Cache       Jeder Frame wird einmal gemalt und gecacht; pro Bildschirm-Frame nur drawImage.
 
 export const PX = 2;
-import { ATLAS } from './ref5_atlas.js?v=31';
-import { ITEMS, RACES, FACTIONS } from './data.js?v=31';
-import { S as GS } from './state.js?v=31';   /* R4 Rangzeichen (09.10.): Fraktionsrang des Helden */   // Nutzer S13: Sprites aus dem Referenzblatt
-import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=31';
+import { ATLAS } from './ref5_atlas.js?v=32';
+import { ITEMS, RACES, FACTIONS } from './data.js?v=32';
+import { S as GS } from './state.js?v=32';   /* R4 Rangzeichen (09.10.): Fraktionsrang des Helden */   // Nutzer S13: Sprites aus dem Referenzblatt
+import { paintHuman, paintWeapon2, paintBeast2, paintBrute as paintBrute2, shoulderOf, FW as FW2, FH as FH2, BEOX, BEOY, BOX, BOY } from './figure.js?v=32';
 export { shoulderOf };   // Figuren v2 (Session 9): feines Raster, Referenz-Formensprache
-import { ATK_U } from './anim.js?v=31';   /* Kampfanimation Scheibe 1 */
-import { paintR, paintTuckR, paintBeastR, paintHorseNSR, paintPetNSR, paintFowlR, PET_NS_TYPES, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=31';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
+import { ATK_U } from './anim.js?v=32';   /* Kampfanimation Scheibe 1 */
+import { paintR, paintTuckR, paintBeastR, paintHorseNSR, paintPetNSR, paintFowlR, PET_NS_TYPES, octOf, weaponAngle, swingOf, RW, ROX, ROY, RPX, BROX, BROY, DX } from './fig5.js?v=32';   // S14 Stil R: Referenz 5, im Code gezeichnet (optional)
 export { octOf, weaponAngle, swingOf };
 // Jeder Figuren-Frame trägt Maßstab und Drehpunkt (px: Welt je Pixel, ox/oy: Pivot im Frame) — alte (20×25, px 2) und neue
 // Frames (40×60, px 1) laufen so nebeneinander; gezeichnet wird überall über blit().
@@ -312,9 +312,13 @@ const ROBOT_LOOK = { skin: '#8a8272', hair: '#8a8272', hs: 2, beard: 0, face: 'm
 // S12: Rüstungsbild je Teil (Material, Farbe, Schulterstücke, Schärpe, Helm). Neue Rüstung = eine Zeile hier.
 /* Hände/Beine je Stück; Set-Teile in den Farben ihres Sets (Thron gold, Blutkette schwarz, Totenkrone knochengrau, Hochritter blanker Stahl) */
 const HAND_LOOK = { lederhandschuhe: '#5a4030', kettenhandschuhe: '#7a7870', panzerhandschuhe: '#6a6660',
-  thron_handschuhe: '#c8a040', blut_handschuhe: '#2a2426', toten_handschuhe: '#3a3a34', hochritter_handschuhe: '#9aa6b8' };
+  thron_handschuhe: '#c8a040', blut_handschuhe: '#2a2426', toten_handschuhe: '#3a3a34', hochritter_handschuhe: '#9aa6b8',
+  /* 09.10. Seltenheitsstufen: jede neue Hand eine eigene Farbe (Bild am Körper und Gegenstandsbild) */
+  schmiedehandschuhe: '#3a2c20', schuetzenhandschuhe: '#7a6040', stulpenhandschuhe: '#4a5262', schuppenhandschuhe: '#8a6a38', kettenfaust: '#3a1c1e' };
+/* [Farbe, Kniebuckel, Wickel (09.10.: Bänder um die Waden)] */
 const LEG_LOOK = { lederbeinlinge: ['#4a3626', 0], kettenbeinlinge: ['#6e6c66', 0], beinschienen: ['#6a6660', 1],
-  thron_beinschienen: ['#2a3e6a', 1], blut_beinschienen: ['#1a1a1e', 1], toten_beinschienen: ['#2a2e2a', 1], hochritter_beinschienen: ['#8a94a4', 1] };
+  thron_beinschienen: ['#2a3e6a', 1], blut_beinschienen: ['#1a1a1e', 1], toten_beinschienen: ['#2a2e2a', 1], hochritter_beinschienen: ['#8a94a4', 1],
+  leinenhose: ['#7a6a50', 0], reithose: ['#5a3a22', 0], seemannshose: ['#2e3e52', 0, 1], gesteppte_beinlinge: ['#8a7a5c', 0], rotgarde_beinschienen: ['#5a1a1c', 1], eiskoenig_beinschienen: ['#7a9ab0', 1] };
 const ARMOR_LOOK = {
   /* R7-Lücken: Stücke, die bisher kein eigenes Aussehen hatten (Beschreibung aus data.js) */
   seemantel: { armor: 'leather', armorCol: '#2a2a24', hem: 44 },                            /* geteertes Leder, langer Schoß */
@@ -322,6 +326,8 @@ const ARMOR_LOOK = {
   garmadon_krone: { helm: 'crown', helmCol: '#1c1a1e', ge: '#e03a2a' },                     /* schwarzes Eisen, rot glimmend */
   dreispitz: { helm: 'hat', helmCol: '#1e1a18' },                                           /* Kapitänshut, breite Krempe */
   iron_boots: { boots: '#4a4844' }, leather_boots: { boots: '#3a2a1c' },
+  /* 09.10. Seltenheitsstufen: Schuhe nur mit boots (und wraps) — ein Fußteil darf keine anderen Felder überschreiben */
+  bundschuhe: { boots: '#6a5038', wraps: 1 }, reitstiefel: { boots: '#1e1612' }, kettenstiefel: { boots: '#6e6c66' }, plattenschuhe: { boots: '#8a94a4' }, seestiefel: { boots: '#5a4630' },
   eisenwache: { armor: 'chain', armorCol: '#2a2a2e', sash: '#5a1a1c', pb: 1 },
   rotgardist: { armor: 'plate', armorCol: '#26272b', pauld: '#4a1418', pb: 2, gg: 1, kn: 1 },
   aufsehermantel: { armor: 'leather', armorCol: '#1e1a18', glove: '#4a1418', scarf: '#4a4640', hem: 44 },
@@ -776,7 +782,7 @@ export function humanSpec(e) {
   const hk = eq.hands?.key, lk = eq.legs?.key;   // S15 P2: Handschuhe und Beinschutz färben Hände und Beine, Beinschienen mit Kniebuckeln
   /* Kampf-Feedback/R7-Fehler: Set-Handschuhe und -Beinschienen behalten die Set-Farbe (vorher wurde jedes unbekannte Paar lederbraun, ohne Kniebuckel) */
   if (hk) s.glove = HAND_LOOK[hk] || s.glove || '#5a4030';
-  if (lk) { const L = LEG_LOOK[lk]; s.pants = L ? L[0] : '#4a3626'; if (L?.[1]) s.kn = 1; }
+  if (lk) { const L = LEG_LOOK[lk]; s.pants = L ? L[0] : '#4a3626'; if (L?.[1]) s.kn = 1; if (L?.[2]) s.wraps = 1; }
   const CL = ARMOR_LOOK[eq.cloak?.key], FL = ARMOR_LOOK[eq.feet?.key];   // S15 Klassen-Rüstung: auch Umhang und Füße haben ein Bild
   if (CL || FL) { Object.assign(s, CL, FL); if (CL && !HL?.hooded && !e.hooded) s.hooded = 0; if (HL?.hooded) s.hooded = 1; }
   const sils = [AL, HL, CL, FL].map(x => x?.sil).filter(Boolean); if (sils.length) s.sil = [...new Set(sils.join(' ').split(' '))].join(' ');
@@ -789,7 +795,7 @@ export function humanSpec(e) {
     const FC = e.kind === 'npc' && !p.shield && FACTIONS[e.faction]?.colors; if (FC) { s.shieldCol = FC[0]; s.markCol = FC[1]; } }   /* R4 Fraktionsregel (08.10.): Schild in den Farben der Fraktion (FACTIONS.colors) */
   { const rt = it => it ? ({ rare: 1, epic: 2, legendary: 3, mythic: 4 }[it.rar || ITEMS[it.key]?.rarity] || 0) : 0; s.rr = Math.max(rt(eq.chest), rt(eq.head)); }   /* R5 (08.10.): Rarität der Rüstung → Zierkante (fig5 rarityEdge) */
   const w = eq.weapon && eq.weapon.key;
-  if (w === 'shortbow' || w === 'longbow' || w === 'hunting_bow') s.quiver = 1;
+  if (w === 'shortbow' || w === 'longbow' || w === 'hunting_bow' || ITEMS[w]?.wtype === 'bow') s.quiver = 1;   /* 09.10.: jeder Bogen trägt Köcher */
   const cls = e.currentClass;
   if (cls === 'mage' || cls === 'warlock') { s.robe = s.cloth; }
   if (e.undead) { s.face = 'skull'; s.glow = s.glow || '#4e8f7a'; }
@@ -1763,7 +1769,7 @@ export function weaponSprite(key, rarity, holy, wtype, bare = false) {
   let g, info;
   if (!OLD_WEAPONS) {                                               // G3: feines Raster (1 Welt je Pixel)
     const sc = ART === 'R' ? (['bow', 'crossbow'].includes(wtype) || key === 'longbow' || key === 'shortbow' ? 0.95 : 0.82) / RPX : 1;   // S14 Stil R: Waffen im 1,5er-Raster; S15 (Nutzer: Waffen zu groß): Nahkampf 18 % kleiner, gleiches Raster
-    const r = paintWeapon2(key === 'longbow' || key === 'hunting_bow' ? (key === 'longbow' ? 'longbow' : 'shortbow') : key, wtype, St, WOOD(), WRAP(), IRON(), sc, rarity, bare);
+    const r = paintWeapon2(key, wtype,   /* 09.10.: Jagdbogen hat eine eigene Zeile in figure.js WDES (Rückfall Bogen = Kurzbogen) */ St, WOOD(), WRAP(), IRON(), sc, rarity, bare);
     g = new G(r.g.w, r.g.h); g.a = r.g.a; info = { gx: r.gx, gy: r.gy, blade: r.blade, orb: r.orb, str: r.str, pulse: r.pulse, px: ART === 'R' ? RPX : 1 / sc };
   } else if (wtype === 'bow' || key === 'shortbow' || key === 'longbow') {
     const L = key === 'longbow' ? 12 : 8, wood = WOOD(), grip = WRAP();

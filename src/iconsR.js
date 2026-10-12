@@ -1,6 +1,6 @@
 // S14 Stil R: handgezeichnete 16×16-Symbole für Verbrauchsgüter und Material (Nutzer: „restliche Sprites“).
 // Zeichen → Farbe je Symbol; '.' leer, 'o' Kontur. Waffen und Rüstung kommen weiter aus den echten Sprites (render.js iconR).
-import { G, ramp, mix, toCanvas } from './sprites.js?v=31';   /* Regel-Symbole (09.10.) */
+import { G, ramp, mix, toCanvas } from './sprites.js?v=32';   /* Regel-Symbole (09.10.) */
 const O = '#1c1512';
 /* Fischen (08.10.2026): ein Fischumriss, je Art eigene Farben (B Rücken, b Bauch, w Auge, T Schwanz) */
 const FISH_ROWS = ['................', '................', '................', '................', '.....oooooo...oo', '...ooBBBBBBo.oTo',
@@ -267,7 +267,7 @@ function shieldIcon(P, L, key) {
 }
 
 // ---- Hände, Beine, Füße ----
-const matOf = (key, it) => /ketten|chain/.test(key) ? 'chain' : /leder|wickel/.test(key) ? 'leather' : (it.armor | 0) >= 2 || /panzer|schien|thron|blut|toten|hochritter|iron/.test(key) ? 'plate' : 'leather';
+const matOf = (key, it) => it.mat || /ketten|chain/.test(key) ? 'chain' : /leder|wickel/.test(key) ? 'leather' : (it.armor | 0) >= 2 || /panzer|schien|thron|blut|toten|hochritter|iron/.test(key) ? 'plate' : 'leather';
 function handIcon(P, L, key, it) {
   const col = L.glove || '#5a4030', m = P.m(col), mat = matOf(key, it), cf = P.m(darker(col, 0.15));
   P.r(m, 4, 3, 6, 6); for (const x of [4, 6, 8]) { P.r(m, x, 1, 1, 2); P.d(x + 1, 2, 'dk'); } P.p(m, 9, 2); P.seg(m, 10, 6, 12, 4, 0.7);
@@ -349,6 +349,10 @@ const KEYED = {
   talisman_ausdauer: P => amulet(P, '#d89a30', 'rund'), talisman_leichtfuss: P => amulet(P, '#9ab8a0', 'feder'), talisman_krieger: P => amulet(P, '#b8322a', 'raute'),
   talisman_waechter: P => amulet(P, '#4a6a9a', 'schild'), talisman_jaeger: P => amulet(P, '#4a7a3a', 'zahn'), talisman_toten: P => amulet(P, '#6affb0', 'rune'),
   talisman_magie: P => amulet(P, '#9a6ad0', 'raute'), talisman_leben: P => amulet(P, '#5ab04a', 'rund'),
+  kupferamulett: P => amulet(P, '#c87a3a', 'schild'),   /* 09.10. Seltenheitsstufen: gewöhnlicher Talisman */
+  grabwall: P => { const st = P.m('#6e6c64'), rim = P.m('#4a4842'); P.rows(rim, 1, [3, 4.5, 5.5, 6, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5, 6.5]);   /* 09.10.: Grabstein als Schild */
+    P.rows(st, 2, [3, 4.5, 5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5, 5.5]); P.dl(7, 3, 7, 10, 'dk'); P.dl(8, 3, 8, 10, 'dk'); P.dl(5, 5, 10, 5, 'dk');
+    for (const y of [11, 12]) P.dl(4, y, 11, y, 'sh'); for (const [x, y] of [[3, 13], [4, 13], [12, 12], [11, 13], [2, 9]]) P.d(x, y, '#4a6a3a'); P.d(6, 3, 'hi'); },
   glocke_moorbach: P => { const m = P.m('#8a7a5a'); P.r(m, 7, 1, 2, 2); P.rows(m, 3, [1.5, 2.5, 3, 3.5, 3.5, 4, 4.5, 5, 6, 6.5]); P.dl(2, 12, 13, 12, 'dk'); P.dl(4, 6, 4, 11, 'hi'); const k = P.m('#4a4038'); P.r(k, 7, 13, 2, 2); P.pat(m, (x, y) => y === 9 && x % 2 ? '#4a6a4a' : 0); },
   magiekern: P => orb(P, '#4a8ae0', BRASS), automatenkern: P => orb(P, '#5ac08a', '#7a6a50', '#d0ffe0'),
   splitter_rotfall: P => shard(P, '#b8302a', '#ff8a6a'), meteorsplitter: P => shard(P, '#5a5470', '#e08a3a'), himmelssplitter: P => shard(P, '#a9d4e8', '#ffffff'),

@@ -760,3 +760,22 @@ Todesfall-Variante:
 8. Sondermomente (Gnadenstoß, Boss-Tod) bekommen eigene, kurze Sonderbehandlung statt Wiederverwendung des Standardtreffers.
 9. Reaktionsposen ersetzen Kamerafahrten in Dialogen — ein Pose-/Soundwechsel reicht für Dramatik ohne 3D.
 10. Partikel- und Kamerabudget skalieren mit der Wichtigkeit des Ereignisses, nicht automatisch mit dem Waffenwert allein.
+
+---
+
+## 9. Nachtrag 09.10.2026 — Recherche Kampf-Glanz (Sense, Katana, Seltenheit)
+
+Auftrag des Entwicklers (09.10.): „Kampfanimationen verbessern, auf jeden Fall Sense und Katana; später soll das im Endgame wirklich flashy aussehen.“ Quellen sind überwiegend Spielerberichte, Rezensionen und allgemeine Pixel-Art-Leitfäden (keine Herstellerzahlen) — übernommen werden nur **Prinzipien**, keine Bilder, Abläufe oder Zahlen eines Spiels.
+
+| Spiel | Prinzip | Wie in ROTFALL (render.js / anim.js) |
+|---|---|---|
+| Dead Cells, Hollow Knight (Leitfäden zu Pixel-Kampf-Effekten) | **Ein** Schmierbild auf dem Schlagbogen, zwei Töne (Grund + helle Kante); ein zweites nur für aufgeladene/Wucht-Schläge. Treffer-Blitz 1–2 Bilder. Funken: leichte Treffer 3–8 Pixel, große Ausbrüche für Kills/Finisher | `drawSmear`: Band an der Klinge (Spitze bis Klingenmitte früherer Winkel), im Schlag dicht, im Nachschwung dünner; Mond (`drawSlash`) nur noch bei Pack B/C und Wuchtschlag; Klinge blitzt im Einschlag 1–2 Bilder hell auf (nur wenn der Hieb traf); Aufprallfunken 2–6 nach Waffengewicht |
+| Hollow Knight, Construct-/Pixel-Leitfäden | Treffergefühl kommt zuerst aus Ausholen → kurzer Schlag → Erholung; Hit-Stop und Wackeln sind „Gewürz“, mit abnehmendem Nutzen | Takt und Trefferzeit unverändert; Hit-Stop bleibt nach Waffengewicht (`FEEL.stop`, 28–118 ms, im Band der Leitfäden: leicht 2–4, schwer 6–10 Bilder); neu nur das **Aufblitzen** an der Spitze am Ende des Ausholens (`windGlint`, größer je schwerer) — man sieht, wann der Hieb kommt |
+| Sekiro | Die gelungene Abwehr wird belohnt: heller Funkenschauer, Schlag-Klang, Druckwelle — Menge zeigt die Güte | Katana-Gegenhieb nach der Parade: lange helle Schnittlinie (`blitz`), kleiner Lichtstern, Funkenschauer |
+| Ghost of Tsushima (Standoff) | Spannung vor dem einen Zug, dann ein einziger, entscheidender Schnitt | Iai-Zug aus tiefer Hüfthaltung mit kurzer Schnittlinie; C-Finisher „Blitzschnitt“: tiefe Hocke, weiter Vorstoß, lange Schnittlinie quer durch das Ziel |
+| Hyper Light Drifter | Der schnelle Sprung hinterlässt dunkle Nachbilder; Lesbarkeit trotz kleiner Figur | Katana-Ausweichhieb: drei kühle Nachbilder hinter dem Hieb; Nachbilder der Pose ab Glanz 2 |
+| Darksiders II (Tod mit Sensen) | Sensenkampf als wirbelnde Drehungen; die große Sense nur im Finisher | Eigene Klasse `scythe`: Mähschnitt und Rückmahd tief und weit (kein Stoß), Wuchtschlag als Drehung (B/C zweimal herum), flacher Mähmond am Boden, Mähkreis beim Rundumschnitt |
+| Salt and Sanctuary, Children of Morta | Schwere Waffen träge, aber verheerend; sekundäre Bewegung und Klang des Luftschnitts tragen das Gefühl | Sense Gewicht 0,8 (Halten im Ausholen, Überschwingen); Rumpf und Knie mähen mit (`BODY.scythe`) |
+| Blasphemous, Hades (schon §1) | Sondermomente selten und eigen inszenieren | Lichtblitz (`flare`, leichter Bildschirm-Schimmer) nur beim Wuchtschlag ab Glanz 3 |
+
+**Glanzstufe (Entwickler 09.10. freigegeben, Zahlen ⚖):** Glanz wächst mit der Seltenheit der Waffe, die Meisterhaltung legt eine Stufe drauf (Deckel 3) — `anim.js glowTier`. 0 gewöhnlich/ungewöhnlich schlicht · 1 selten Spur in Seltenheitsfarbe · 2 episch + Nachbild + farbige Funken · 3 legendär/mythisch + Leuchten der Klinge, Funkenstaub, Lichtblitz beim Wuchtschlag. Diese Regel geht für Waffen vor §8 Regel 10 („nicht automatisch nach Waffenwert“); das Budget bleibt: normaler Treffer 2–6 + höchstens 6 farbige Funken, Wuchtschlag +2/+2, Deckel `S.fx` 860. Nur eigene Figur und Koop-Helden; Gegner bleiben schlicht (Lesbarkeit). Füllungen bleiben durchscheinend (Band ≤ 0,3, Mond ≤ 0,22), Farbe vor allem an den Kanten.
