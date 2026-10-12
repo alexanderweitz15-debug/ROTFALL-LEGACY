@@ -419,3 +419,37 @@ Mindestens zehn Bereiche; Reihenfolge nach Größe und Abhängigkeit. Nach jedem
 - **E-A2 Endbosse:** nur Endbosse wachsen mit (Stufe = max(fest, Held − 3)); Auswahl ⚖ Garmadon, Omega, Aldhelm, Varg (Kettenmeister), Weißbart.
 - **E-A4 Erbe:** Rooks Feindschaft gegen den Mönch endet mit seinem Tod; „Zwanzig Jahre später“ lässt die Welt 20 Tagesschritte laufen.
 - **E-A5 Schadensdeckel:** messen und Wert vorschlagen.
+
+## 09.10.2026 — Kampfanimation und Gegenstände (Entwickler, nachmittags)
+
+- **Kampfanimation überarbeiten:** Sense und Katana auf jeden Fall verbessern, allgemein lesbarer und wuchtiger; Vorbilder aus anderen Spielen nur als Prinzip (keine fremden Grafiken).
+- **Glanz im Endgame:** Der Glanz eines Hiebs wächst mit der **Seltenheit der Waffe** (gewöhnlich/ungewöhnlich schlicht → selten farbige Spur → episch Spur, Nachbild, Funken → legendär/mythisch Leuchten, Partikel, Lichtblitz beim Finisher); eine bestandene **Meisterprüfung** legt eine Stufe drauf. Freigegeben mit „okay dann fang an“; Stärke der Wirkung ⚖. Trefferzeiten und Schwungdauern bleiben unverändert.
+- **Gegenstände in allen Seltenheiten:** Jede Ausrüstungsart (v. a. Hosen, Handschuhe, Katanas, Sensen; auch Stiefel, Nebenhand, Talismane, dünne Waffenarten) bekommt Stücke von gewöhnlich bis legendär; Werte ⚖ nach den Balance-Regeln §D.
+
+## 09.10.2026 — Fragerunde 3 (Benchmark, Weltereignisse, Totenland, Cutscenes)
+
+- **WB-1 Fall-Tempo:** ja — Belagerung Varonheims ~10 statt 5–6 Tage (Mauern halb so schnell), Heerzug frühestens Tag 100 (Schwer) / 80 (Sehr schwer); danach neu messen.
+- **WB-2 Widerstand:** ja — ohne eigene Stadt alle 15–20 Tage ein Aufgebot (Stärke 30) aus dem Exil oder aus Sonnwacht (Orden), solange Krone/Erbe lebt.
+- **WB-3 Gegenangriff:** Ereignis „Valen belagert die Schwarze Feste“ mit Heerlager; Garmadon selbst bleibt dem Spieler vorbehalten.
+- **WB-4 Eisenfeste:** Ist Varonheim gefallen, zieht ein Totenheer gegen die Eisenfeste (Heerzug-Variante).
+- **WB-5 Angsthase:** Valens Heer in der Hauptstadt wächst bis 25 und zieht dann aus.
+- **WB-6 Seuche:** schwächer, aber länger (weniger Tote pro Tag, Dauer bleibt).
+- **WE-1:** Tod der Kaiserin → **Häuserkrieg zuerst** (umsetzen), Städte fallen danach.
+- **WE-2:** höchstens **3 große Krisen** gleichzeitig, weitere warten; Ansagekarten nie still verwerfen.
+- **WE-3:** nach dem Fall der Kette bleiben Opferfest und Wallfahrt als Rest der Gläubigen; keine Ketzerjagd, kein Kreuzzug, kein Ruf bei der toten Kette.
+- **WE-4:** Waffenruhe unter Veyl ist echt — keine Dorfüberfälle, Totenheere halten ihre Orte, die Belagerung der Feste ruht.
+- **WE-5:** Valens Aufgebot (+12) erst ab ≥ 6 Totenorten, ab Müdigkeitsstufe 3 keins mehr.
+- **WE-6:** Beim Zeitsprung „Zwanzig Jahre später“ läuft der Krieg mit (Heere ziehen und kämpfen, Folgen passieren).
+- **WE-7:** Ketten schließen — Kreuzzug-Niederlage → Kettenmüdigkeit; Feldzugsieg der Kette kostet die Toten Seelen; Eifer-Text an den Code anpassen.
+- **N4-a–c:** so gebaut übernommen (kein Kopfgeld bei Rückkehr, Miliz geht mit heim, Nachfolger tritt zurück, Bande bleibt unter dem alten Feldwebel).
+- **S3c-a:** Flucht beim Fall Varonheims mit Kultschlüssel auch durch den Keller (eigener Auftrag). **S3c-b:** nicht übernommen — das 3-Stunden-Limit gilt für Weg B **nicht**.
+- **WC-1–WC-4:** Einflug auf 4–5 Einstellungen kürzen; Heerzug/Belagerung laufen ohne Weiter; Himmelsüberfahrt ab der zweiten ohne Szene; Boss-Balken und Gegner-Hinweise in Kamerafahrten ausblenden.
+- **E54:** Aschenebene = Land um den Aschenpfad, Gräberschluchten = um das Gräberfeld, Totensee = vorhandener Aschensee; Name beim Betreten; Aschenregen = Bild/Klang + −20 % Sicht für Gegner und Held.
+- **E55:** drei Vorbosse als Schlüssel zu Garmadons Gruft — Hauptmann der Toten (Stufe 18), Sael (20), Morvath (22); Elite der Stillen als Kopfgeld-Elite.
+- **E56:** Story-Bogen über Oswin und Veyl, drei Enden (Stille dienen / Leben verteidigen / Waffenruhe vermitteln); Frieden = Waffenruhe auch vor Garmadons Tod, Kreuzzüge ruhen.
+- **E57:** Osten erst messen (60 Tage mit/ohne Ostknoten), nur einbinden, wenn der Westen nicht > 20 % schneller fällt.
+- **Untoten-Expansion (neu, Entwickler):**
+  - **Fällt Varonheim**, werden die Toten **deutlich** stärker (Heere ~+50 % Wachstum, Dörfer fallen etwa doppelt so oft, höhere Gegnerstufen im Norden — Werte vorläufig, danach messen).
+  - **Fällt die Eisenfeste**, ist die Menschheit verloren: Endkarte „Die Menschheit ist gefallen“, danach Wahl — aufhören (Chronik/Erbe) oder in der toten Welt weiterspielen.
+  - **Die Welt passt sich an:** Je mehr die Toten halten, desto mehr sehen Boden und Landschaft im Norden nach und nach aus wie im Osten (Skelettgebiet). **Umgekehrt** heilt das Land, wenn Lebende untote Orte einnehmen.
+  - **Neue Monster** gehören zur Expansion: Zombies, Vampire (außerhalb Varonheims) u. a.

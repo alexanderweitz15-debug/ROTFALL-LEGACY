@@ -186,19 +186,43 @@ export const ANIM_DEFS = {
     /* E38 (Entwickler 09.10.2026: Katana eigene Waffenklasse mit eigenen Animationen). Iai-Zug: aus der Hüfte (Klinge tief am Gürtel) in
        einem Zug schräg nach oben — kurzes Ausholen, schlagartiger Schnitt, langes gehaltenes Nachziehen. Kesa: der Rückweg schräg von oben.
        Ausfallschnitt: weiter Stoß mit Ausfallschritt. Zeiten ⚖ vorläufig zwischen Dolch und Rapier (schneller Zug), Rest wie Rapier. */
+    /* Kampfanimation Glanz (Entwickler 09.10.: „Kampfanimationen verbessern, auf jeden Fall Sense und Katana“): eigene Finisher je Pack —
+       B (selten/episch) Kreuzschnitt: hoch über die Schulter, steil schräg durch; C (legendär/mythisch) Blitzschnitt: aus der Hocke ein langer
+       Zug quer durch das Ziel mit weitem Vorstoß (Nachbilder, Schnittlinie). Treffer- und Ausholzeiten bleiben genau die bisherigen (nur die Form wechselt). */
     katana: {
       name: 'Katana',
       shapes: [
         { name: 'Iai-Zug', a0: 1.25, from: 2.5, hit: -0.25, end: -1.55, a1: -0.8, eW: 0, eS: 3 },
         { name: 'Kesa-Schnitt', a0: -1.55, from: -2.45, hit: 0.3, end: 1.2, a1: 0.6, eW: -2, eS: 3 },
         { name: 'Ausfallschnitt', kind: 'thrust', a0: 0.6, off: -0.05, back: -5, fwd: 19, a1: 0.1 },
+        { name: 'Kreuzschnitt', pre: 1, a0: 0.6, from: -2.75, hit: 0.45, end: 1.75, a1: 0.7, eW: -3, eS: 4 },
+        { name: 'Blitzschnitt', pre: 1, a0: 0.6, from: 2.7, hit: -0.35, end: -2.0, a1: -0.9, eW: -1, eS: 5 },
       ],
       A: { name: 'A Grounded', steps: [{ s: 0, w: 0.16, h: 0.27 }, { s: 1, w: 0.2, h: 0.33 }, { s: 2, w: 0.24, h: 0.37 }],
         fx: { stop: 1, shake: 1, trail: 7, push: 1, slash: 0, after: 0, fin: 0 } },
-      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.13, h: 0.23 }, { s: 1, w: 0.17, h: 0.28 }, { s: 2, w: 0.2, h: 0.32 }],
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.13, h: 0.23 }, { s: 1, w: 0.17, h: 0.28 }, { s: 3, w: 0.2, h: 0.32 }],
         fx: { stop: 1.25, shake: 1.2, trail: 9, push: 3, slash: 1, after: 0, fin: 1 } },
-      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.1, h: 0.19 }, { s: 1, w: 0.13, h: 0.23 }, { s: 2, w: 0.16, h: 0.27 }],
-        fx: { stop: 1.45, shake: 1.35, trail: 11, push: 8, slash: 2, after: 1, fin: 2 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.1, h: 0.19 }, { s: 1, w: 0.13, h: 0.23 }, { s: 4, w: 0.16, h: 0.27 }],
+        fx: { stop: 1.45, shake: 1.35, trail: 11, push: 11, slash: 2, after: 1, fin: 2 } },
+    },
+    /* Sense (Kampfanimation Glanz 09.10.; Spec G §5: „Sense breite Bögen, starke Rotation, großer Flächeneindruck“; Darksiders II: weites Mähen,
+       Drehung als Finisher): eigene Klasse statt der Stangenwaffe — kein Stoß mehr, sondern Mähschnitt (tief von weit hinten quer durch),
+       Rückmahd (der Rückweg, ebenso weit) und als Wuchtschlag eine Drehung um den eigenen Körper (B/C: zweimal herum). Treffer- und
+       Ausholzeiten genau wie bei der Stangenwaffe (Balance unverändert; der Wuchtschlag trifft wie dort rundum). */
+    scythe: {
+      name: 'Sense',
+      shapes: [
+        { name: 'Mähschnitt', a0: 0.3, from: 2.85, hit: -0.1, end: -2.05, a1: -0.9, eW: -3, eS: 6 },
+        { name: 'Rückmahd', a0: -0.9, from: -2.7, hit: 0.12, end: 1.95, a1: 0.8, eW: -2, eS: 5 },
+        { name: 'Rundmahd', a0: 0.8, from: 2.3, hit: 2 * Math.PI - 0.1, end: 2 * Math.PI + 1.2, a1: 2 * Math.PI + 0.5, eW: -2, eS: 6, spin: true },
+        { name: 'Totenreigen', a0: 0.8, from: 2.5, hit: 4 * Math.PI - 0.1, end: 4 * Math.PI + 1.3, a1: 4 * Math.PI + 0.5, eW: -3, eS: 7, spin: true },
+      ],
+      A: { name: 'A Grounded', steps: [{ s: 0, w: 0.36, h: 0.48 }, { s: 1, w: 0.3, h: 0.42 }, { s: 2, w: 0.38, h: 0.5 }],
+        fx: { stop: 1, shake: 1, trail: 9, push: 2, slash: 0, after: 0, fin: 0 } },
+      B: { name: 'B Heroic', steps: [{ s: 0, w: 0.3, h: 0.42 }, { s: 1, w: 0.25, h: 0.36 }, { s: 3, w: 0.35, h: 0.48 }],
+        fx: { stop: 1.25, shake: 1.2, trail: 11, push: 5, slash: 1, after: 0, fin: 1 } },
+      C: { name: 'C Endgame', steps: [{ s: 0, w: 0.22, h: 0.33 }, { s: 1, w: 0.18, h: 0.28 }, { s: 3, w: 0.3, h: 0.44 }],
+        fx: { stop: 1.6, shake: 1.5, trail: 13, push: 10, slash: 2, after: 1, fin: 2 } },
     },
     whip: {                                                          // Peitsche: von oben knallen, quer ziehen
       name: 'Peitsche',
@@ -294,6 +318,16 @@ const BODY = {
     { w: { by: 3, ln: 2, st: 2, hr: -3, hd: 3 }, i: { by: 1, ln: -3, st: 7, hr: 4, hd: -3 }, f: { ln: -2, st: 6, hy: -1, hr: 3, hd: -5 } },
     { w: { by: -1, ln: 2, st: 3, hy: -1, hr: -2, hd: -5 }, i: { by: 3, ln: -3, st: 6, hr: 3, hd: 4 }, f: { by: 3, ln: -3, st: 6, hr: 2, hd: 5 } },
     { w: { by: 2, ln: 3, st: 2, hr: -3 }, i: { by: 2, ln: -4, st: 9, hr: 5 }, f: { by: 2, ln: -3, st: 8, hr: 4 } },
+    /* Glanz 09.10.: Kreuzschnitt = Klinge hoch über die Schulter, tief in die Knie durch; Blitzschnitt = tiefe Hocke, dann weiter Ausfall und halten */
+    { w: { by: -2, ln: 2, st: 3, hy: -1, hr: -2, hd: -6 }, i: { by: 4, ln: -4, st: 7, hy: 1, hr: 3, hd: 5 }, f: { by: 4, ln: -3, st: 7, hy: 1, hr: 2, hd: 6 } },
+    { w: { by: 4, ln: 3, st: 2, hr: -3, hd: 3 }, i: { by: 2, ln: -4, st: 10, hr: 5, hd: -2 }, f: { by: 1, ln: -3, st: 9, hy: -1, hr: 4, hd: -4 } },
+  ],
+  /* Sense (Glanz 09.10.): tief in den Knien, der Rumpf dreht weit mit — Mähen kommt aus Hüfte und Beinen, nicht aus dem Arm */
+  scythe: [
+    { w: { by: 2, ln: 3, st: 3, hr: -3, hd: 2 }, i: { by: 3, ln: -3, st: 7, hr: 4, hd: 1 }, f: { by: 3, ln: -3, st: 7, hr: 3, hd: 2 } },
+    { w: { by: 2, ln: 2, st: 3, hr: -3, hd: 1 }, i: { by: 3, ln: -3, st: 6, hr: 3 }, f: { by: 2, ln: -2, st: 6, hr: 2, hd: 1 } },
+    { w: { by: 3, ln: 2, st: 3, hr: -2 }, i: { by: 4, ln: -3, st: 7, hr: 5 }, f: { by: 3, ln: -2, st: 6, hr: 3 } },
+    { w: { by: 4, ln: 2, st: 3, hr: -2, hd: 1 }, i: { by: 5, ln: -3, st: 8, hr: 6 }, f: { by: 4, ln: -2, st: 7, hr: 4 } },
   ],
   whip: [
     { w: { by: -1, ln: 2, st: 2, hy: -1, hr: -2, hd: -5 }, i: { by: 2, ln: -2, st: 5, hr: 3, hd: 3 }, f: { by: 2, ln: -2, st: 5, hr: 2, hd: 4 } },
@@ -317,6 +351,7 @@ const STANCE = {
   axe:      { ready: { a: -0.6, ext: 0, body: { by: 1, st: 2, ln: 0 } },   guard: { a: -1.3, ext: -2, body: { by: 1, st: 2 } } },   /* Ausrollen 04.10. */
   mace:     { ready: { a: -0.8, ext: -1, body: { by: 1, st: 3, ln: 1 } },  guard: { a: -1.4, ext: -3, body: { by: 2, st: 3 } } },
   polearm:  { ready: { a: 0.0, ext: 3, body: { by: 1, st: 3, ln: 0 } },    guard: { a: -0.6, ext: 2, body: { by: 1, st: 3 } } },
+  scythe:   { ready: { a: 2.25, ext: -1, body: { by: 2, st: 3, ln: 1 } },  guard: { a: -0.75, ext: 1, body: { by: 1, st: 3 } } },   /* Glanz 09.10.: Blatt hängt hinten tief, bereit zum Mähen */
   rapier:   { ready: { a: 0.15, ext: 3, body: { by: 1, st: 3, ln: -1 } },  guard: { a: -1.2, ext: 0, body: { by: 1, st: 2 } } },
   katana:   { ready: { a: 1.0, ext: -1, body: { by: 2, st: 3, ln: 0 } },   guard: { a: -0.9, ext: 1, body: { by: 1, st: 3 } } },   /* E38: Klinge tief an der Hüfte, bereit zum Zug */
   whip:     { ready: { a: 0.9, ext: 0, body: { by: 1, st: 2, ln: 0 } },    guard: { a: -1.2, ext: -1, body: { by: 1, st: 2 } } },
@@ -330,13 +365,30 @@ export const hitKind = wt => !wt || /^(mace|hammer|staff|sling)$/.test(wt) ? 'bl
 export const HIT_RX = { blunt: { T: 380, d: 1.2, wob: 1 }, blade: { T: 160, d: 0.9, wob: 0 }, pierce: { T: 300, d: 2.2, wob: 0 } };
 // Animationsklasse: wtype, außer Großäxte (wtype great mit Axtkopf) — eigene Bewegung; Liste von Hand wie die Leitware
 const GREATAXE = new Set(['greataxe', 'henkersaxt', 'knochenspalter', 'roter_henker']);
-export const animClassOf = (key, it) => it && it.wtype === 'great' && (GREATAXE.has(key) || /axt/i.test(it.name || '')) ? 'greataxe' : it?.wtype;
+/* Glanz 09.10.: Sensen (Stangenwaffen, deren Name oder Schlüssel auf „sense“ endet — Grassense … Blutkult-Sense, auch künftige) mähen mit eigener
+   Klasse 'scythe'. Die Sensenlanze (Stoßwaffe, Reichweite 90) bleibt Stangenwaffe. Ein Gegenstand kann die Klasse mit anim: '<Klasse>' selbst wählen. */
+const SCYTHE_RX = /sense$/i;
+export const animClassOf = (key, it) => !it ? undefined : it.anim && ANIM_DEFS.attack[it.anim] ? it.anim
+  : it.wtype === 'great' && (GREATAXE.has(key) || /axt/i.test(it.name || '')) ? 'greataxe'
+  : it.wtype === 'polearm' && (SCYTHE_RX.test(key || '') || SCYTHE_RX.test(it.name || '')) ? 'scythe' : it.wtype;
+/* Kampfanimation Glanz (Entwickler 09.10.: „später soll das wirklich flashy aussehen im Endgame“; Regel vorläufig ⚖): Glanzstufe 0–3 aus der
+   Seltenheit der Waffe, die Meisterhaltung der Waffenkunst legt eine Stufe drauf (Deckel 3). Greift für jeden Gegenstand allein über rar/rarity.
+   0 schlicht (gewöhnlich, ungewöhnlich) · 1 Spur in Seltenheitsfarbe (selten) · 2 dazu Nachbild und farbige Funken (episch) · 3 volle Wirkung:
+   Klinge leuchtet, Funkenstaub auf der Spur, Lichtblitz beim Wuchtschlag (legendär, mythisch). Nur Optik (render.js), nie Spielwerte. */
+export const GLOW_RAR = { common: 0, uncommon: 0, rare: 1, epic: 2, legendary: 3, mythic: 3 };
+export const glowTier = (rar, master = false) => Math.min(3, (GLOW_RAR[rar] ?? 0) + (master ? 1 : 0));
+export const GLOW_FX = [
+  { color: false, after: 0, sparks: 0, glow: false, motes: false, flare: false },
+  { color: true, after: 0, sparks: 0, glow: false, motes: false, flare: false },
+  { color: true, after: 2, sparks: 4, glow: false, motes: false, flare: false },
+  { color: true, after: 2, sparks: 6, glow: true, motes: true, flare: true },
+];
 const PACK_AMP = { A: 1.4, B: 1.9, C: 2.4 }, BODY_MAX = { by: 8, ln: 6, st: 11, hy: 3, hr: 8, hd: 12 };   /* Schritt 2 (Entwickler 04.10.: „zu kleine Ausschläge“) — vorläufig: A 1,4 statt 1, B 1,9, C 2,4 */
 const scaleBody = (k, a) => { const o = {}; for (const [n, v] of Object.entries(k || {})) o[n] = Math.max(-BODY_MAX[n], Math.min(BODY_MAX[n], v * a)); return o; };
 for (const [wt, list] of Object.entries(BODY)) {
   const P = ANIM_DEFS.attack[wt]; if (!P) continue; const n = P.shapes.length;
   list.forEach((B, i) => { const F = P.shapes[i]; F.body = B; });
-  for (const F of P.shapes) if (F.body && !F.body.b0) { const prev = P.shapes[P.shapes.indexOf(F) - 1]; F.body.b0 = F.spin ? P.shapes[1]?.body?.f : prev?.body?.f || {}; }
+  for (const F of P.shapes) if (F.body && !F.body.b0) { const prev = P.shapes[P.shapes.indexOf(F) - 1]; F.body.b0 = (F.pre != null ? P.shapes[F.pre]?.body?.f : F.spin ? P.shapes[1]?.body?.f : prev?.body?.f) || {}; }   /* pre: Vorgänger in der Kombo (Finisher-Formen folgen auf Schlag 2) */
   P.shapes[0].body.b0 = {};
   P.nBase = n;
   for (const [k, amp] of [['B', PACK_AMP.B], ['C', PACK_AMP.C]]) {   // größere Formen je Pack, angehängt (Index + n bzw. + 2n)
@@ -382,7 +434,7 @@ const eo = t => 1 - (1 - t) ** 3, ei = t => t * t;
    - nach dem Einschlag schwingt die Klinge ÜBER die Endlage hinaus (bis +35 %) und pendelt zurück;
    - die Erholung beginnt später (Follow-through wird gehalten) und läuft langsamer;
    - der Körper sinkt im Einschlag nach (Gewicht landet) und richtet sich erst spät wieder auf. Werte vorläufig. */
-const WEIGHT = { dagger: 0, rapier: 0.1, katana: 0.2, whip: 0.2, spear: 0.3, sword: 0.35, staff: 0.35, axe: 0.7, polearm: 0.7, mace: 0.85, great: 1, greataxe: 1.05, hammer: 1.2 };
+const WEIGHT = { dagger: 0, rapier: 0.1, katana: 0.2, whip: 0.2, spear: 0.3, sword: 0.35, staff: 0.35, axe: 0.7, polearm: 0.7, scythe: 0.8, mace: 0.85, great: 1, greataxe: 1.05, hammer: 1.2 };
 export const atkWeight = wt => WEIGHT[wt] ?? 0.35;
 const windK = (u, g) => eo(Math.min(1, u / (0.4 - 0.1 * g)));                       /* Ausholen: früher fertig, dann halten */
 const whip = (t, g) => Math.pow(Math.max(0, Math.min(1, t)), 2 + g);               /* Hieb: Peitschen-Beschleunigung */

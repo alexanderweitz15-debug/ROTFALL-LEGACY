@@ -2684,13 +2684,13 @@ Die Beute der Bosse steht in §23.
 
 | Name | Art (Gefolge) | Gegend | Leben × / Wucht × / Tempo × / Rüstung + | Kraft | Sichere Beute |
 |---|---|---|---|---|---|
-| Hagen der Schlitzer | Bandit | Banditen | 1,8 / 1,2 | rally | Langschwert |
-| Ruprecht Einauge | Banditenschütze (Bandit) | Banditen | 1,6 / 1,35 | rally | Langbogen |
+| Hagen der Schlitzer | Bandit | Banditen | 1,8 / 1,2 | rally | Gnadgott (seit 09.10.) |
+| Ruprecht Einauge | Banditenschütze (Bandit) | Banditen | 1,6 / 1,35 | rally | Hundertschritt (Unikat, seit 09.10.) |
 | Wendel die Krähe | Bandit | Banditen | 1,5 / 1,2 / 1,2 | charge | Doppelklinge |
 | Gunther Rotbart | Speerträger (Bandit) | Banditen | 2,0 / 1,2 / – / +3 | tough | Hellebarde |
-| Die Stille Mathilde | Bandit | Banditen | 1,5 / 1,45 | burn | Wurfmesser |
+| Die Stille Mathilde | Bandit | Banditen | 1,5 / 1,45 | burn | Pechklingen (seit 09.10.) |
 | Otmar Brandschatz | Bandit | Banditen | 1,7 / 1,25 | burn | Axt |
-| Galgenstrick Fritz | Bandit | Banditen | 1,6 / 1,3 / 1,15 | rally | Rapier |
+| Galgenstrick Fritz | Bandit | Banditen | 1,6 / 1,3 / 1,15 | rally | Duellantendegen (seit 09.10.) |
 | Adelheid vom Hohlweg | Banditenschütze | Banditen | 1,5 / 1,4 | rally | Armbrust |
 | Karim Sandgeist | Bandit | Wüste, Ödland | 1,7 / 1,3 / 1,2 | charge | Kriegssichel |
 | Nadira die Skorpionin | Banditenschütze (Bandit) | Wüste | 1,5 / 1,45 | shock | Kurzbogen |
@@ -3327,6 +3327,72 @@ Bereich D des detaillierten Ist-Zustands. Grundlage: Code-Stand vom 03.10.2026 (
 
 
 ---
+
+#### Neue Stücke 09.10.2026 — Seltenheitsstufen je Art (59, Werte vorläufig ⚖)
+
+Seit 09.10. hat jede Waffenart (auch Katana, Sense, Peitsche, Wurf, Schleuder, Bogen, Rapier, Zauberstab, Stab) und jeder Rüstplatz (Hände, Beine, Füße, Schild, Talisman) Grundware in allen fünf Stufen gewöhnlich bis legendär. Kennung: `since:'09.10.'` (data.js); neue Ware der flüchtigen Händler in `NEU_POOLS` (game.js). Legendäre sind Unikate mit Geschichte; der erste Fund schreibt einmal „Unikat gefunden: …“ ins Protokoll (`uniqueNote`, `S.flags.uniqSeen`). Kopfgeld-Elite mit neuer sicherer Beute: Hagen der Schlitzer, Ruprecht Einauge, Die Stille Mathilde, Galgenstrick Fritz, Aschenkönigin Sabeth (Aschensense), Veit mit der Peitsche (Neunschwänzige). **Behoben:** Der Nekromant stand zweimal in `LOOT`, der zweite Eintrag überschrieb den Splitter des Rotfalls (4 %) — zusammengelegt, der Splitter hat jetzt eine Quelle.
+
+| Schlüssel | Name | Art | Seltenheit | Werte | Wert | Bezugsquelle |
+|---|---|---|---|---|---|---|
+| `schartenkatana` | Schartiges Katana | Katana | gewöhnl. | Schaden 8, 500 ms, Reichw. 48, Krit ×1.7 | 48 | Laden: Ysolde (Tangkron); Beute: Plünderer der Sturmklinge 4 % |
+| `wanderkatana` | Wanderklinge | Katana | ungew. | Schaden 11, 490 ms, Reichw. 50, Krit ×1.8 | 170 | Laden: Ysolde; Waffenhändler (Aurelheim) |
+| `salztraene` | Salzträne | Katana | legendär, Unikat | Schaden 17, 560 ms, Reichw. 56, Krit ×2, Blutung 20 % | 1050 | Bossbeute: Weißbart |
+| `knochensense` | Knochensense | Sense | selten | Schaden 21, 1000 ms, Reichw. 62, fegt | 300 | Laden: Grimbart Knochenhand (Schwarze Feste); Beute: Großes Skelett 4 % |
+| `aschensense` | Aschensense | Sense | episch | Schaden 23, 960 ms, Reichw. 62, Durchschl. 20 %, fegt | 560 | Kopfgeld-Elite: Aschenkönigin Sabeth |
+| `seelenernte` | Seelenernte | Sense | legendär, Unikat | Schaden 26, 980 ms, Reichw. 64, verlangsamt, fegt (anim scythe) | 1150 | Bossbeute: König Garmadon |
+| `treiberpeitsche` | Treiberpeitsche | Peitsche | ungew. | Schaden 7, 500 ms, Reichw. 98, zieht 38 | 110 | Laden: Gerlach (Eisenfeste); Beute: Kettenknecht 5 % |
+| `neunschwaenzige` | Neunschwänzige | Peitsche | episch | Schaden 10, 540 ms, Reichw. 92, Blutung 30 %, zieht 40 | 400 | Kopfgeld-Elite: Veit mit der Peitsche |
+| `zuchtmeister` | Zuchtmeister | Peitsche | legendär, Unikat | Schaden 12, 560 ms, Reichw. 104, Blutung 20 %, zieht 44, fesselt | 950 | Bossbeute: Varg |
+| `fluegelspiess` | Flügelspieß | Speer | selten | Schaden 15, 720 ms, Reichw. 80 | 230 | Laden: Oda (Grenzwacht) |
+| `partisane` | Partisane | Speer | episch | Schaden 17, 740 ms, Reichw. 82, Durchschl. 30 % | 420 | Laden: Hagen (Varonsburg) |
+| `eisdorn` | Eisdorn | Speer | legendär, Unikat | Schaden 20, 760 ms, Reichw. 84, verlangsamt | 1000 | Bossbeute: Hrodvar |
+| `wurfdolche` | Wurfdolche | Wurf | selten | Schaden 11, 760 ms, Reichw. 320, Durchschl. 15 % | 220 | Laden: Yusuf (Karak-Atar) |
+| `pechklingen` | Pechklingen | Wurf | episch | Schaden 12, 780 ms, Reichw. 320, Brand 35 % | 420 | Kopfgeld-Elite: Die Stille Mathilde |
+| `grubenfalke` | Grubenfalke | Wurf | legendär, Unikat | Schaden 18, 960 ms, Reichw. 280, Durchschl. 35 % | 800 | Bossbeute: Gorak |
+| `hirtenschleuder` | Hirtenschleuder | Schleuder | ungew. | Schaden 9, 740 ms, Reichw. 360 | 70 | Laden: Waffenhändler (Aurelheim); Yusuf |
+| `bleischleuder` | Bleischleuder | Schleuder | selten | Schaden 12, 820 ms, Reichw. 360, Durchschl. 15 % | 200 | Laden: Gerold (Nordfurt) |
+| `stabschleuder` | Stabschleuder | Schleuder | episch | Schaden 16, 920 ms, Reichw. 420 | 360 | Laden: Oda |
+| `riesentoeter` | Riesentöter | Schleuder | legendär, Unikat | Schaden 17, 900 ms, Reichw. 400, Durchschl. 30 % | 750 | Beute: Goblin-Anführer 3 % |
+| `hunting_bow` | Jagdbogen | Bogen | ungew. | Schaden 13, 800 ms, Reichw. 400 | 110 | Laden: Gerold |
+| `hornbogen` | Hornbogen | Bogen | episch | Schaden 16, 840 ms, Reichw. 440 | 380 | Laden: Yusuf |
+| `hundertschritt` | Hundertschritt | Bogen | legendär, Unikat | Schaden 22, 980 ms, Reichw. 520, Durchschl. 25 % | 950 | Kopfgeld-Elite: Ruprecht Einauge |
+| `fechtdegen` | Fechtdegen | Rapier | gewöhnl. | Schaden 7, 380 ms, Reichw. 52, Krit ×2 | 40 | Laden: Gerold |
+| `salzhafener_klinge` | Salzhafener Klinge | Rapier | selten | Schaden 10, 390 ms, Reichw. 56, Krit ×2.3 | 260 | Laden: Waffenhändler (Aurelheim) |
+| `duellantendegen` | Duellantendegen | Rapier | episch | Schaden 12, 410 ms, Reichw. 58, Krit ×2.4 | 440 | Kopfgeld-Elite: Galgenstrick Fritz |
+| `blutnadel` | Blutnadel | Rapier | legendär, Unikat | Schaden 12, 400 ms, Reichw. 58, Krit ×2.5, Blutung 30 % | 950 | Bossbeute: Aldhelm |
+| `weidenrute` | Weidenrute | Zauberstab | gewöhnl. | Schaden 5, 460 ms, Reichw. 300 | 45 | Laden: Gerold |
+| `knochenrute` | Knochenrute | Zauberstab | selten | Schaden 10, 450 ms, Reichw. 340 | 260 | Laden: Sael (Vharnholm) |
+| `kristallrute` | Kristallrute | Zauberstab | episch | Schaden 12, 440 ms, Reichw. 360 | 480 | Laden: Magitech-Ingenieurin (Aurelheim) |
+| `pilgerstab` | Pilgerstab | Stab | ungew. | Schaden 8, 640 ms, fest: Zauber +4 % | 90 | Laden: Sael |
+| `runenstab` | Runenstab | Stab | selten | Schaden 10, 660 ms, fest: Zauber +6 % | 250 | Laden: Hilda (Tiefhall) |
+| `grabstab` | Grabstab | Stab | episch | Schaden 12, 680 ms, fest: Zauber +9 % | 460 | Laden: Sael |
+| `erzruferstab` | Stab des Erzrufers | Stab | legendär, Unikat | Schaden 14, 700 ms, fest: Zauber +12 %, Leben +4 % | 1000 | Beute: Nekromant 2 % |
+| `rostiger_zweihaender` | Rostiger Zweihänder | Zweihänder | gewöhnl. | Schaden 13, 980 ms, Reichw. 54 | 45 | Laden: Stadtschmiede |
+| `landsknechtschwert` | Landsknechtschwert | Zweihänder | ungew. | Schaden 18, 980 ms, Reichw. 56 | 150 | Laden: Brann (Nordfurt) |
+| `vorschlaghammer` | Vorschlaghammer | Hammer | gewöhnl. | Schaden 14, 1150 ms, Durchschl. 40 %, zertrümmert | 50 | Laden: Stadtschmiede |
+| `streithammer` | Streithammer | Hammer | ungew. | Schaden 19, 1150 ms, Durchschl. 50 %, zertrümmert | 160 | Laden: Brann |
+| `stilett` | Stilett | Dolch | selten | Schaden 9, 360 ms, Durchschl. 30 %, Krit ×2.6 | 220 | Laden: Yusuf |
+| `gnadgott` | Gnadgott | Dolch | episch | Schaden 10, 370 ms, Durchschl. 50 %, Krit ×2.6, Hinrichtung <25 % ×1,5 | 420 | Kopfgeld-Elite: Hagen der Schlitzer |
+| `bartaxt` | Tiefhaller Bartaxt | Axt | episch | Schaden 18, 720 ms, Durchschl. 40 % | 440 | Laden: Hilda |
+| `leichte_armbrust` | Leichte Armbrust | Armbrust | gewöhnl. | Schaden 16, Nachladen 1500 ms, Durchschl. 30 % | 55 | Laden: Gerold |
+| `schmiedehandschuhe` | Schmiedehandschuhe | Hände | gewöhnl. | Rüstung 2 | 30 | Laden: Stadtschmiede |
+| `schuetzenhandschuhe` | Schützenhandschuhe | Hände | ungew. | Rüstung 2, fest: Fernkampf +4 % | 95 | Laden: Gerold; Beute: Banditenschütze 4 % |
+| `stulpenhandschuhe` | Stulpenhandschuhe | Hände | selten | Rüstung 4 | 210 | Laden: Brann |
+| `schuppenhandschuhe` | Schuppenhandschuhe | Hände | episch | Rüstung 5 | 460 | Laden: Hilda |
+| `kettenfaust` | Kettenfaust | Hände | legendär, Unikat | Rüstung 5, fest: Rüstung +2, Krit +5 % | 1000 | Bossbeute: Varg |
+| `leinenhose` | Leinenhose | Beine | gewöhnl. | Rüstung 1 | 16 | Laden: Tuchhändlerin (Aurelheim) |
+| `reithose` | Lederne Reithose | Beine | ungew. | Rüstung 3, fest: Tempo +2 % | 110 | Laden: Tuchhändlerin |
+| `seemannshose` | Seemannshose | Beine | ungew. | Rüstung 2 (Wickel) | 70 | Laden: Ysolde |
+| `gesteppte_beinlinge` | Gesteppte Beinlinge | Beine | selten | Rüstung 4, fest: Ausdauer +8 | 220 | Laden: Oda |
+| `rotgarde_beinschienen` | Beinschienen der Rotgarde | Beine | episch | Rüstung 5 (Kniebuckel) | 480 | Beute: Rotgardist 4 % |
+| `eiskoenig_beinschienen` | Beinschienen des Eiskönigs | Beine | legendär, Unikat | Rüstung 5, fest: Leben +5 %, Ausdauer +12 | 1100 | Bossbeute: Hrodvar |
+| `bundschuhe` | Bundschuhe | Füße | gewöhnl. | Rüstung 1 (Wickel) | 16 | Laden: Tuchhändlerin |
+| `reitstiefel` | Reitstiefel | Füße | ungew. | Rüstung 2, fest: Tempo +2 % | 95 | Laden: Gerold |
+| `kettenstiefel` | Kettenstiefel | Füße | selten | Rüstung 4 | 210 | Laden: Brann |
+| `plattenschuhe` | Plattenschuhe | Füße | episch | Rüstung 5 | 460 | Laden: Rüstmeisterin (Aurelheim) |
+| `seestiefel` | Weißbarts Seestiefel | Füße | legendär, Unikat | Rüstung 5, fest: Tempo +4 %, Rüstung +2 | 950 | Bossbeute: Weißbart |
+| `grabwall` | Grabwall | Schild | legendär, Unikat | Rüstung 6, Block 50 %, Legende: Ahnenwall | 1100 | Beute: Todesritter 3 % |
+| `kupferamulett` | Kupferamulett | Talisman | gewöhnl. | fest: Ausdauer +6 | 35 | Laden: Juwelier (Aurelheim) |
 
 ## 3. Sets (ARMOR_SETS)
 
@@ -4023,6 +4089,12 @@ Waffen Wucht, Rüstungsdurchschlag und Taumeln. Nahkampf bleibt vor Fernkampf (S
 Magitech ist nicht übermächtig: das Magiegewehr ist die stärkste Fernwaffe (mit Zellen ≈ Langbogen-Niveau bei 520
 Reichweite, 30 Gold je 10 Schuss), die schweren Gewehre sind Spezialwerkzeuge (Streuung, Durchschlag, Reichweite).
 
+### Neue Waffen 09.10. (Seltenheitsstufen) — Dauerleistung nach §D und Messung
+
+Formel §D, Stufe 15 / 30: Schartiges Katana 54/85 · Wanderklinge 61/91 · Salzträne 68/99 · Knochensense 59/90 · Aschensense 62/93 · Seelenernte 65/95 · Treiberpeitsche 52/83 · Neunschwänzige 57/87 · Zuchtmeister 60/90 · Flügelspieß 59/90 · Partisane 61/92 · Eisdorn 65/95 · Wurfdolche 44,6 · Pechklingen 44,7 · Grubenfalke 42,6 · Schleudern 42–44 · Jagdbogen 39 · Hornbogen 40 · Hundertschritt 40 · Fechtdegen 57/87 · Salzhafener Klinge 64/94 · Duellantendegen 67/98 · Blutnadel 68/99 · Stäbe 51–58 (dafür fester Zauberschaden) · Rostiger Zweihänder 51/82 · Landsknechtschwert 57/87 · Vorschlaghammer 50/81 · Streithammer 55/85 · Stilett 63/94 · Gnadgott 65/96 · Tiefhaller Bartaxt 63/94 · Leichte Armbrust 23. Peitschen und Stäbe liegen wie ihre Nachbarn unter dem Band (Kontrolle bzw. Zauber).
+
+Messung `RF.simFight('bear', { level: 15, weapon, ehp: 4000, eopt: { dmgMul: 0.01, provoked: true }, maxT: 30000 })`, `dealt/30`, Mittel Seed 1–3: Schartiges Katana 38,5 · Wanderklinge 44,5 · Katana 45,9 · Nebelklinge 55 · Salzträne 52 · Erntesense 41,2 · Knochensense 43,1 · Mondsense 39,6 · Aschensense 40,5 · Sturmsense 48,3 · Seelenernte 40,3 (Ausdauer danach 18 → 17) · Dolch 57,4 · Stilett 65,1 · Gnadgott 62,6 · Rapier 39,1 · Blutnadel 58. Ein Lauf (Seed 1): Langschwert 56,3 · Flügelspieß 62,1 · Partisane 63,6 · Eisdorn 68,3 · Zwergenaxt 58 · Bartaxt 61,6 · Zweihänder 54,8 · Rostiger Zweihänder 43,2 · Landsknechtschwert 49,5 · Kriegshammer 55,1 · Vorschlaghammer 40,4 · Streithammer 49,5 · Kettenpeitsche 55,8 · Neunschwänzige 63,1 · Zuchtmeister 59,4. **Befund:** Die E38-Katanas liegen schon über §D (Katana 65 bei Band selten 56–64, Nebelklinge 75 bei episch 60–68); Salzträne wurde deshalb nur knapp darüber gesetzt (Frage in der Roadmap §6).
+
 ## 4. Normale Gegner (Held auf gleicher Stufe, smart / stand)
 
 | Stufe | Gegner | Treffer | Zeit | Lebensverlust smart / stand |
@@ -4182,3 +4254,57 @@ Faktoren in `resolveSwing` (game.js), die sich multiplizieren: kritisch ×1,8 (W
 - Kleriker/Paladin gegen Untote mit Krit und Hinrichten: ×2,1 × 2,8 × 1,5 ≈ 8,8 → Deckel greift.
 - Schlimmster Stapel ohne Hinterhalt ≈ 17, mit Hinterhalt/Meuchelstich > 100 — der Deckel kappt beides auf ×6.
 **Ergebnis:** Der Deckel ×6 trifft nur gestapelte Sonderfälle; Hinterhalt + gewöhnlicher Krit (×5,4) bleibt ungedeckelt. Empfehlung: so lassen.
+
+## Messung 09.10. — Welt-Benchmark ohne Spieler (Agent, `RF.worldBench`)
+
+Werkzeug: `RF.worldBench({ seeds, diffs, days })` (nur `?dev`, Debug „Krieg und Gruppe → Welt-Benchmark“). Je Weltsamen × Schwierigkeit ein neues Spiel (`newGame`, ohne Prolog), Held weit weg in der Tiefe geparkt, `S._quiet` an (kein Speichern; die Bank sperrt zusätzlich alle `rotfall.*`-Schlüssel bis zum Neuladen). Spult minutengenau wie `update()`: Feldzug/Überfall jede Minute, Tribut/Großereignis/Folgen/Aurelion alle 30 Minuten, `hourTick` (Kriegszug alle 6 Std., Weltereignis 10 %), `dayTick` (warDay, capThreatDay, bigDay, keepSiegeDay …). `S._bench` lässt Weltereignisse, Folgen (`afterLive`) und Ortsherren trotz Stummschaltung laufen; `S._sink` zählt Protokoll und Chronik. Ergebnis in `window.__bench`.
+Lauf: 6 Weltsamen (11, 23, 37, 41, 59, 73) × Schwer / Sehr schwer / Angsthase, je 300 Spieltage = 18 Welten, 5400 Tage. Stand v=31 (mit E48 Seelenverwehen, E52/E53). Grenzen: Figuren, Karawanen und Reisende bewegen sich nur mit `update()` (stehen still; Tributzüge kommen trotzdem an), Feldschlachten immer gewürfelt (`battleAbstract`). Drei Läufe (Schwer 11, Angsthase 11 und 37) hatten 2–3 Tage, an denen `dayTick` am Fehler in `planRelations` abbrach (warDay fiel aus) — inzwischen behoben; zwei vorher abgebrochene Läufe wurden wiederholt.
+
+| | Schwer | Sehr schwer | Angsthase |
+|---|---|---|---|
+| Varonheim fällt | **6/6**, Tag 81–83 (⌀ 82) | **6/6**, Tag 66–67 (⌀ 66) | 0/6 (kein Heerzug, gewollt) |
+| Ziel laut ENTSCHEIDUNGEN | Tag 120–150 | um Tag 100 | – |
+| Heerzug Morvaths | Tag 75 (5×), 77 (1×) = frühester Tag | Tag 60 (6×) | – |
+| Belagerung → Fall | 1 Tag nach Aufbruch, Fall nach 5–6 Tagen | ebenso | – |
+| Bedrohung Stufe 1 / 2 | Tag 26–70 / 30–73 | Tag 14–44 / 18–48 | – |
+| König Varon tot (Rote Krönung) | Tag 65–66 | Tag 50 | nie |
+| Sieger nach 300 Tagen | Tote 6/6 (alle 16 Knoten ab ~Tag 90) | Tote 6/6 (ebenso) | Valen 2/6, Patt 4/6 (Tote 15/16, nur Varonheim lebt) |
+| Befreiung Varonheims | 0 | 0 | – |
+| Valen ≥ 70 % der Toten-Orte (3/4) | 6/6, Tag 3–6 | 6/6, Tag 3–6 | 6/6, Tag 3–6 |
+| Tote ≥ 70 % der Valen-Orte (4/5) | 6/6, Tag 15–83 | 6/6, Tag 29–48 | 4/6, Tag 33–71 |
+| Belagerung der Schwarzen Feste (`keepSiegeDay`) | 0/6 | 0/6 | 0/6 |
+| Angriff auf die Eisenfeste | 0/6 | 0/6 | 0/6 |
+| Dörfer ausgelöscht (Tag 300) | 7–8 (immer Grauwasser, Hohlstein, Eisenried, Mühlbach, Rastfurt, Weidenau, Lichtenrain, meist Haselbrück) | 8 | 0–3 (Wiederaufbau) |
+| Köpfe der Kette (Tag 300) | 7 (Start 43) | 7 | 11–13 |
+| Zeitanteil Toten-Besitz: Toten-Kern / Valen-Kern / Varonheim | 88–98 % / 74–91 % / 74 % | 93–99 % / 79–95 % / 79 % | 54–69 % / 45–61 % / 0 % |
+
+**Ereignisse je 100 Spieltage** (Chronik/Protokoll, gemittelt über 6 Welten):
+
+| Ereignis | Schwer | Sehr schwer | Angsthase |
+|---|---|---|---|
+| Feldschlacht (Kriegsgraph) | 28,6 | 27,6 | 43,7 |
+| Ort fällt an die Toten / Ort befreit | 16,8 / 25,6 | 15,7 / 21,2 | 22,1 / 38,3 |
+| Späherwarnung „Die Toten ziehen auf …“ | 21,6 | 20,4 | – |
+| Totenüberfall auf ein Dorf (angekündigt) | 3,4 | 3,2 | 5,0 |
+| Heer zerschlagen | 8,0 | 5,8 | 11,3 |
+| Kette: Stoßtrupp / Feldzug / Heerzug / Sklavenjagd | 14,2 / 8,7 / 1,6 / 0 | 13,9 / 9,0 / 1,3 / 0,1 | 17,6 / 7,6 / 3,8 / 0 |
+| Kette: Sieg im Totenland (nie vernichtet) | 14,3 | 13,6 | – |
+| Große Weltereignisse (BIG) gesamt | 12,5 (Ball 2,3, Streik 2,2, Absturz 2,1, Heuschrecken 2,0, Seuche 0,9, Hexenprozess 1,0, Turnier 0,8, Schatz 0,7, Gildenstreik 0,5) | 11,6 | 19,6 (je 2,1–2,7, Schatz 1,1) |
+| Kreuzzug zum Knochentor (davon siegreich) | 12,8 (9,9) | 12,8 (10,3) | 12,0 |
+| Ketzer-/Hexenjagd · Scheiterhaufen | 13,2 · 11,9 | 13,5 · 12,3 | 23,9 · – |
+| Opferfest · Messe der Gilde | 14,3 · 17,2 | 14,3 · 16,4 | 14,3 · 19,3 |
+| Vermisste (E4) | 7,8 | 7,9 | 7,9 |
+| Magitech-Unfall · Aurelion hungert | 14,3 · 18,7 | 13,1 · 18,8 | – |
+| Sturmklinge kapert Salzschiff · Missernte | 11,0 · 6,6 | 11,0 · 6,3 | – |
+| Händlerzug überfallen · Deserteure werden Räuber | 5,1 · 4,2 | 3,9 · 4,0 | – |
+| Aufstand in der Eisenfeste | 0,3 (1 je Welt) | 0,3 | – |
+| Tod benannter Figuren (Chronik „… gefallen“, meist Seuche) | 185 | 273 | 74 |
+
+Befunde (⚖, Entscheidung beim Entwickler; nichts geändert):
+- **Varonheim fällt zu früh und immer gleich.** Die Front kippt in den ersten 30–70 Tagen, die Bedrohung steht ab Stufe 2 am Deckel 19 und springt am frühesten erlaubten Tag (`CAP_SIEGE.hostMin` 75/60) auf 20 — der Heerzug startet in 12/12 Welten genau dann. Die Belagerung dauert nur 5–6 Tage (Mauerschaden `max(2, 110 × 0,05)` je Zug ≈ 22 %/Tag, Heer 110 gegen Besatzung ~60). Ziel 120–150 (Schwer) bzw. ~100 (Sehr schwer) wird um ~40 bzw. ~35 Tage verfehlt.
+- **Kein Rückweg nach dem Fall.** Ohne eigene Stadt mustert Valen nie wieder (`warDay`: Aufgebot nur in eigener Stadt, Entsatz nur aus gehaltenem Varonheim); Orden und Händler haben keine Heere. Ab ~Tag 90 gehört alles den Toten, 200 Tage lang ohne Änderung.
+- **Gegen-Offensiven fehlen.** Valen nimmt die Schwarze Feste im Kriegsgraphen schon an Tag 3–6 (Startheer v ~40 gegen Besatzung 40), die Toten holen sie zurück — es gibt kein Ereignis „Angriff auf Garmadon/Belagerung der Schwarzen Feste“; `keepSiegeDay` und E40 S3 laufen nur nach Garmadons Tod durch den Spieler. Die Toten greifen die Eisenfeste nie an (Kette nicht im Kriegsgraphen, Fall nur über `liberate()`); sie treffen die Kette nur indirekt: die Tributdörfer Grauwasser, Hohlstein, Eisenried werden in 12/12 Welten ausgelöscht, die Köpfe fallen von 43 auf 7.
+- **Angsthase erstarrt:** in 4/6 Welten halten die Toten 15/16 Knoten, Valens Rest (< 25) wartet in Varonheim, das Totenheer (~75–80) bei Nordfurt greift ohne Heerzug nie an (RB-039) — Patt über 200+ Tage. In 2/6 siegt Valen, weil die Toten keine Seelen mehr für neue Heere haben.
+- **Seuche entvölkert:** ohne Spieler sterben je 100 Tage 150–270 benannte Figuren (Protokoll „gestorben (Seuche)“ dominiert).
+- 🐞 (behoben von der Hauptsitzung): `planRelations` warf bei Bewohnern ohne `plan` (aus `emigrate` → `migrationDay`) — `dayTick` brach ab, `warDay` fiel an dem Tag aus.
+- 🐞 offen: `spawnTraveler` legt Pilger-Einträge in `TRAV_PEND` doppelt ab (Ziel ist ein neues Array, `q.to === to` trifft nie) — ohne Wegsuche (`pumpRoads`) wächst die Liste stündlich; im Spiel harmlos, solange `roadTick` pumpt.
